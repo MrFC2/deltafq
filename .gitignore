@@ -128,6 +128,9 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# JetBrains IDE
+.idea/
+
 # DeltaFQ specific
 data_cache/
 *.csv
