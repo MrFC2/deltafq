@@ -21,7 +21,7 @@ warnings.filterwarnings('ignore')
 class DataFetcher(BaseComponent):
     """Data fetcher for various sources."""
     
-    def __init__(self, source: str = "yahoo", **kwargs: Any) -> None:
+    def __init__(self, source: str = "baostock", **kwargs: Any) -> None:
         """Initialize data fetcher."""
         super().__init__(**kwargs)
         self.source = source

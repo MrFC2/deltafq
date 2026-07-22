@@ -17,11 +17,11 @@ from deltafq.strategy import SignalGenerator
 
 
 def main() -> None:
-    fetcher = DataFetcher() # source="yahoo" as default / "baostock" / "miniqmt"
+    fetcher = DataFetcher() # source="baostock" as default / "yahoo" / "miniqmt"
     indicators = TechnicalIndicators()
     signals = SignalGenerator()
 
-    data = fetcher.fetch_data(symbol="AAPL", start_date="2024-01-01", end_date="2024-03-31", clean=True)
+    data = fetcher.fetch_data(symbol="sh.600519", start_date="2024-01-01", end_date="2024-03-31", clean=True)
 
     close = data["Close"]
     high = data["High"]
