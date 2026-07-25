@@ -45,7 +45,7 @@ class PositionManager(BaseComponent):
         self.logger.info(f"↑ Position updated: {symbol} -> {self.positions[symbol]['quantity']}")
         return True
     
-    def reduce_position(self, symbol: str, quantity: int, price: Optional[float] = None) -> bool:
+    def reduce_position(self, symbol: str, quantity: int) -> bool:
         """Reduce existing position."""
         if symbol not in self.positions:
             self.logger.warning(f"No position found for symbol: {symbol}")
@@ -79,10 +79,10 @@ class PositionManager(BaseComponent):
         """Check if we can sell the specified quantity."""
         return self.get_position(symbol) >= quantity
     
-    def close_position(self, symbol: str, price: Optional[float] = None) -> bool:
+    def close_position(self, symbol: str) -> bool:
         """Close entire position for symbol."""
         if symbol not in self.positions:
             return False
-        
+
         quantity = self.positions[symbol]['quantity']
-        return self.reduce_position(symbol, quantity, price)
+        return self.reduce_position(symbol, quantity)

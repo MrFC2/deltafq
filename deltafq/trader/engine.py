@@ -165,7 +165,7 @@ class ExecutionEngine(BaseComponent):
                 buy_cost = self._get_latest_buy_cost(symbol)
                 profit_loss = net_revenue - buy_cost if buy_cost else net_revenue
                 
-                self.position_manager.reduce_position(symbol, quantity, execution_price)
+                self.position_manager.reduce_position(symbol, quantity)
                 self.cash += net_revenue
                 self.order_manager.mark_executed(order_id, execution_price)
                 
