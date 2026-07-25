@@ -30,29 +30,29 @@ class SimpleMAStrategy(BaseStrategy):
         return signals
 
 
-def run_signal(fetcher, strategy, symbol, start, end, interval, storage=None):
-    data = fetcher.fetch_data(symbol, start, end, interval=interval)
+def run_signal(fetcher, strategy, ticker, start, end, interval, storage=None):
+    data = fetcher.fetch_data(ticker, start, end, interval=interval)
     if storage is not None and not data.empty:
-        storage.save_price_data(data, symbol, start, end)
+        storage.save_price_data(data, ticker, start, end)
     if data.empty or len(data) < 2:
         return 0, None
     strategy.run(data)
     return int(strategy.signals.iloc[-1]), float(data["Close"].iloc[-1])
 
 
-def try_trade(engine, symbol, signal, price, qty, now):
+def try_trade(engine, ticker, signal, price, qty, now):
     if signal == 1 and price:
         buy_qty = min(qty, int(engine.cash / (price * (1 + engine.commission))))
         if buy_qty > 0:
-            engine.execute_order(symbol, buy_qty, "limit", price=price, timestamp=now)
+            engine.execute_order(ticker, buy_qty, "limit", price=price, timestamp=now)
     elif signal == -1 and price:
-        pos = engine.position_manager.get_position(symbol)
+        pos = engine.position_manager.get_position(ticker)
         if pos > 0:
-            engine.execute_order(symbol, -pos, "limit", price=price, timestamp=now)
+            engine.execute_order(ticker, -pos, "limit", price=price, timestamp=now)
 
 
 def main():
-    symbol = "000001.SS"
+    ticker = "000001.SS"
     fetcher = DataFetcher()
     storage = DataStorage()
     engine = ExecutionEngine(broker=None, initial_capital=100_000, commission=0.001, match_on_tick=False)
@@ -70,9 +70,9 @@ def main():
         for interval, strategy, start, end, daily_only in tasks:
             if daily_only and last_day_done == now.date():
                 continue
-            s, p = run_signal(fetcher, strategy, symbol, start, end, interval, storage)
+            s, p = run_signal(fetcher, strategy, ticker, start, end, interval, storage)
             print(now.isoformat(), interval, s)
-            try_trade(engine, symbol, s, p, qty, now)
+            try_trade(engine, ticker, s, p, qty, now)
             if daily_only:
                 last_day_done = now.date()
         time.sleep(5 * 60)

@@ -20,9 +20,9 @@ _FREQ = {
 }
 
 
-def to_bs_code(symbol: str) -> str:
+def to_bs_code(ticker: str) -> str:
     """600000.SH / 000001.SZ → sh.600000 / sz.000001；已是 baostock 格式则原样返回。"""
-    s = symbol.strip()
+    s = ticker.strip()
     u = s.upper()
     if u.endswith(".SH"):
         return "sh." + s.split(".")[0]
@@ -31,7 +31,7 @@ def to_bs_code(symbol: str) -> str:
     return s.lower() if s[:3].lower() in ("sh.", "sz.") else s
 
 
-def fetch_baostock_bars(symbol: str, start_date: str, end_date: Optional[str] = None, interval: str = "1d",
+def fetch_baostock_bars(ticker: str, start_date: str, end_date: Optional[str] = None, interval: str = "1d",
                         adjust_flag: str = "3") -> pd.DataFrame:
     """拉取历史 K 线，返回 Open/High/Low/Close/Volume。end_date 排他（与 yahoo 一致）。"""
     import baostock as bs  # type: ignore
@@ -47,7 +47,7 @@ def fetch_baostock_bars(symbol: str, start_date: str, end_date: Optional[str] = 
     bs.login()
     try:
         rs = bs.query_history_k_data_plus(
-            to_bs_code(symbol), fields,
+            to_bs_code(ticker), fields,
             start_date=start_date[:10], end_date=end,
             frequency=freq, adjustflag=str(adjust_flag),
         )

@@ -29,29 +29,29 @@ class DataFetcher(BaseComponent):
         self._cleaner = DataCleaner()
         self.logger.info(f"初始化数据拉取器，数据源: {self.source}")
 
-    def fetch_data(self, symbol: str, start_date: str, end_date: Optional[str] = None,
+    def fetch_data(self, ticker: str, start_date: str, end_date: Optional[str] = None,
                    interval: str = "1d") -> pd.DataFrame:
         """拉取行情数据并清洗。interval 示例：'1m'、'1h'、'1d'（默认）、'1wk'、'1mo'。"""
         try:
-            self.logger.info(f"拉取 {symbol} 数据，{start_date} 至 {end_date}，周期={interval}")
+            self.logger.info(f"拉取 {ticker} 数据，{start_date} 至 {end_date}，周期={interval}")
             if self.source == "baostock":
                 from ..adapters.data.baostock_bars import fetch_baostock_bars
-                data = fetch_baostock_bars(symbol, start_date, end_date, interval=interval)
+                data = fetch_baostock_bars(ticker, start_date, end_date, interval=interval)
             elif self.source == "miniqmt":
                 from ..adapters.data.miniqmt_bars import fetch_miniqmt_bars
-                data = fetch_miniqmt_bars(symbol, start_date, end_date, interval=interval)
+                data = fetch_miniqmt_bars(ticker, start_date, end_date, interval=interval)
             else:
-                data = yf.download(symbol, start=start_date, end=end_date, interval=interval, progress=False)
+                data = yf.download(ticker, start=start_date, end=end_date, interval=interval, progress=False)
                 if isinstance(data.columns, pd.MultiIndex) and data.columns.nlevels > 1:
                     data = data.droplevel(level=1, axis=1)
             return self._cleaner.dropna(data)
         except Exception as e:
-            raise RuntimeError(f"拉取 {symbol} 数据失败: {str(e)}") from e
+            raise RuntimeError(f"拉取 {ticker} 数据失败: {str(e)}") from e
 
-    def fetch_data_multiple(self, symbols: List[str], start_date: str, end_date: Optional[str] = None,
+    def fetch_data_multiple(self, tickers: List[str], start_date: str, end_date: Optional[str] = None,
                             interval: str = "1d") -> Dict[str, pd.DataFrame]:
         """批量拉取多个标的行情数据。"""
-        return {s: self.fetch_data(s, start_date, end_date, interval) for s in symbols}
+        return {s: self.fetch_data(s, start_date, end_date, interval) for s in tickers}
 
     def fetch_fund_data(self, code: str, page: Optional[int] = None) -> pd.DataFrame:
         """从东方财富 API 拉取基金净值数据。"""

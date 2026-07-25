@@ -1,4 +1,4 @@
-"""Minimal LiveEngine demo: set symbol/params -> add_strategy -> run_live."""
+"""Minimal LiveEngine demo: set ticker/params -> add_strategy -> run_live."""
 
 import sys
 import os
@@ -29,7 +29,7 @@ class Every2BarFlipStrategy(BaseStrategy):
 
 def main():
     engine = LiveEngine(
-        symbol="BTC-USD",
+        ticker="BTC-USD",
         interval=10.0,
         lookback_bars=50,
         signal_interval="1m",

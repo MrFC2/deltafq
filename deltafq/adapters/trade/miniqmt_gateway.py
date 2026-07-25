@@ -73,7 +73,7 @@ class MiniQmtTradeGateway(TradeGateway):
             abs_vol = aligned
         is_buy = qty > 0
         oid = self._client.order_stock_limit(
-            req.symbol,
+            req.ticker,
             abs_vol,
             float(req.price),
             is_buy,

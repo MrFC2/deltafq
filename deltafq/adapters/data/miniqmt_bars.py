@@ -69,7 +69,7 @@ def _end_exclusive_to_xt(end_date: Optional[str]) -> str:
 
 
 def fetch_miniqmt_bars(
-    symbol: str,
+    ticker: str,
     start_date: str,
     end_date: Optional[str] = None,
     interval: str = "1d",
@@ -81,12 +81,12 @@ def fetch_miniqmt_bars(
     t0 = _compact_date(start_date)
     t1 = _end_exclusive_to_xt(end_date) if end_date else ""
 
-    xtdata.download_history_data(symbol, period, t0, t1)
+    xtdata.download_history_data(ticker, period, t0, t1)
 
     fields = ["time", *_OHLCV_FIELDS]
     bars = xtdata.get_market_data(
         field_list=fields,
-        stock_list=[symbol],
+        stock_list=[ticker],
         period=period,
         start_time=t0,
         end_time=t1,
@@ -95,7 +95,7 @@ def fetch_miniqmt_bars(
         fill_data=True,
     )
 
-    loc = bars["time"].loc[symbol].values
+    loc = bars["time"].loc[ticker].values
     idx = pd.DatetimeIndex(pd.to_datetime(loc, unit="ms"))
-    data = {col: bars[f].loc[symbol].values for f, col in zip(_OHLCV_FIELDS, _OHLCV_COLUMNS)}
+    data = {col: bars[f].loc[ticker].values for f, col in zip(_OHLCV_FIELDS, _OHLCV_COLUMNS)}
     return pd.DataFrame(data, index=idx).sort_index()

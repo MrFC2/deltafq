@@ -35,7 +35,7 @@ class DemoStrategy(BaseStrategy):
 
 def main() -> None:
     engine = LiveEngine(
-        symbol="159118.SZ",
+        ticker="159118.SZ",
         interval=5.0,
         lookback_bars=10,
         signal_interval="1m",

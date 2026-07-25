@@ -42,12 +42,12 @@ class DataGateway(BaseComponent, ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_today_ohlc(self, symbol: str) -> Optional[Dict[str, float]]:
+    def get_today_ohlc(self, ticker: str) -> Optional[Dict[str, float]]:
         """返回当日开高低；不可用时返回 None。"""
         raise NotImplementedError
 
     @abstractmethod
-    def get_depths(self, symbol: str, levels: int = 5) -> Dict[str, List[Dict[str, float]]]:
+    def get_depths(self, ticker: str, levels: int = 5) -> Dict[str, List[Dict[str, float]]]:
         """返回盘口深度：bids/asks 各档价格与委托量。"""
         raise NotImplementedError
 

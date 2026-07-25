@@ -18,9 +18,9 @@ class DataStorage(BaseComponent):
     Directory structure:
         data_cache/
         ├── price/          # Price data
-        │   └── {symbol}/
+        │   └── {ticker}/
         ├── backtest/       # Backtest results
-        │   └── {symbol}/
+        │   └── {ticker}/
         └── indicators/     # Technical indicators
     """
     
@@ -53,36 +53,36 @@ class DataStorage(BaseComponent):
     # Price Data Storage
     # ============================================================================
     
-    def save_price_data(self, data: pd.DataFrame, symbol: str, 
+    def save_price_data(self, data: pd.DataFrame, ticker: str, 
                        start_date: Optional[str] = None, 
                        end_date: Optional[str] = None) -> Path:
         """Save price data to storage."""
-        symbol_dir = self.price_dir / symbol.replace('.', '_')
+        symbol_dir = self.price_dir / ticker.replace('.', '_')
         symbol_dir.mkdir(exist_ok=True)
         
         # Generate filename
         if start_date and end_date:
-            filename = f"{symbol}_{start_date}_{end_date}.csv"
+            filename = f"{ticker}_{start_date}_{end_date}.csv"
         else:
-            filename = f"{symbol}_{datetime.now().strftime('%Y%m%d')}.csv"
+            filename = f"{ticker}_{datetime.now().strftime('%Y%m%d')}.csv"
         
         filepath = symbol_dir / filename
         data.to_csv(filepath, encoding='utf-8-sig', index=True)
         self.logger.info(f"Saved price data to: {filepath}")
         return filepath
     
-    def load_price_data(self, symbol: str, start_date: Optional[str] = None,
+    def load_price_data(self, ticker: str, start_date: Optional[str] = None,
                        end_date: Optional[str] = None) -> Optional[pd.DataFrame]:
         """Load price data from storage."""
-        symbol_dir = self.price_dir / symbol.replace('.', '_')
+        symbol_dir = self.price_dir / ticker.replace('.', '_')
         
         if start_date and end_date:
-            filename = f"{symbol}_{start_date}_{end_date}.csv"
+            filename = f"{ticker}_{start_date}_{end_date}.csv"
         else:
             # Try to find the latest file
-            files = list(symbol_dir.glob(f"{symbol}_*.csv"))
+            files = list(symbol_dir.glob(f"{ticker}_*.csv"))
             if not files:
-                self.logger.warning(f"No price data found for {symbol}")
+                self.logger.warning(f"No price data found for {ticker}")
                 return None
             filename = sorted(files)[-1].name
         
@@ -98,17 +98,17 @@ class DataStorage(BaseComponent):
     # ============================================================================
     
     def save_backtest_results(self, trades_df: pd.DataFrame, 
-                             values_df: pd.DataFrame, symbol: str,
+                             values_df: pd.DataFrame, ticker: str,
                              strategy_name: Optional[str] = None) -> Dict[str, Path]:
         """Save backtest results to storage."""
-        symbol_dir = self.backtest_dir / symbol.replace('.', '_')
+        symbol_dir = self.backtest_dir / ticker.replace('.', '_')
         symbol_dir.mkdir(exist_ok=True)
         
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         strategy_suffix = f"_{strategy_name}" if strategy_name else ""
         
-        trades_path = symbol_dir / f"{symbol}_trades{strategy_suffix}_{timestamp}.csv"
-        values_path = symbol_dir / f"{symbol}_values{strategy_suffix}_{timestamp}.csv"
+        trades_path = symbol_dir / f"{ticker}_trades{strategy_suffix}_{timestamp}.csv"
+        values_path = symbol_dir / f"{ticker}_values{strategy_suffix}_{timestamp}.csv"
         
         trades_df.to_csv(trades_path, encoding='utf-8-sig', index=False)
         values_df.to_csv(values_path, encoding='utf-8-sig', index=False)
@@ -116,25 +116,25 @@ class DataStorage(BaseComponent):
         self.logger.info(f"Saved backtest results to: {symbol_dir}")
         return {'trades': trades_path, 'values': values_path}
     
-    def load_backtest_results(self, symbol: str, strategy_name: Optional[str] = None,
+    def load_backtest_results(self, ticker: str, strategy_name: Optional[str] = None,
                              latest: bool = True) -> Optional[Dict[str, pd.DataFrame]]:
         """Load backtest results from storage."""
-        symbol_dir = self.backtest_dir / symbol.replace('.', '_')
+        symbol_dir = self.backtest_dir / ticker.replace('.', '_')
         
         if not symbol_dir.exists():
-            self.logger.warning(f"No backtest results found for {symbol}")
+            self.logger.warning(f"No backtest results found for {ticker}")
             return None
         
         # Find trades and values files
         if strategy_name:
-            trades_files = list(symbol_dir.glob(f"{symbol}_trades_{strategy_name}_*.csv"))
-            values_files = list(symbol_dir.glob(f"{symbol}_values_{strategy_name}_*.csv"))
+            trades_files = list(symbol_dir.glob(f"{ticker}_trades_{strategy_name}_*.csv"))
+            values_files = list(symbol_dir.glob(f"{ticker}_values_{strategy_name}_*.csv"))
         else:
-            trades_files = list(symbol_dir.glob(f"{symbol}_trades*.csv"))
-            values_files = list(symbol_dir.glob(f"{symbol}_values*.csv"))
+            trades_files = list(symbol_dir.glob(f"{ticker}_trades*.csv"))
+            values_files = list(symbol_dir.glob(f"{ticker}_values*.csv"))
         
         if not trades_files or not values_files:
-            self.logger.warning(f"No backtest results found for {symbol}")
+            self.logger.warning(f"No backtest results found for {ticker}")
             return None
         
         if latest:

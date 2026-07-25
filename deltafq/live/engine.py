@@ -2,7 +2,7 @@
 实盘引擎：在实时 Tick 上运行策略，并通过数据/交易网关拉行情、下单。
 
 典型用法::
-    engine = LiveEngine(symbol="BTC-USD", signal_interval="1m", lookback_bars=50)
+    engine = LiveEngine(ticker="BTC-USD", signal_interval="1m", lookback_bars=50)
     engine.set_trade_gateway("paper", initial_capital=100000)
     engine.add_strategy(MyStrategy())
     engine.run_live()
@@ -14,8 +14,8 @@
     _vol_str              将成交量格式化为 B/M/K 或整数字符串
 
 LiveEngine — 配置与策略
-    __init__              构造：symbol、轮询间隔、回看根数、信号周期、网关名
-    set_parameters        更新 symbol / interval / lookback_bars / signal_interval
+    __init__              构造：ticker、轮询间隔、回看根数、信号周期、网关名
+    set_parameters        更新 ticker / interval / lookback_bars / signal_interval
     set_data_gateway      指定数据网关名与参数，清空已缓存网关实例
     set_trade_gateway     指定交易网关名与参数，清空已缓存网关实例
     add_strategy          绑定用于 generate_signals 的策略实例
@@ -108,7 +108,7 @@ class LiveEngine(BaseComponent):
 
     def __init__(
         self,
-        symbol: Optional[str] = None,
+        ticker: Optional[str] = None,
         interval: float = 10.0,
         lookback_bars: int = 100,
         signal_interval: str = "5m",
@@ -118,7 +118,7 @@ class LiveEngine(BaseComponent):
     ):
         """构造；run_live 前可用 set_data_gateway / set_trade_gateway 传入网关参数。"""
         super().__init__(**kwargs)
-        self.symbol = symbol
+        self.ticker = ticker
         self.interval = interval
         self.lookback_bars = lookback_bars
         self.signal_interval = (signal_interval or "5m").lower()
@@ -143,14 +143,14 @@ class LiveEngine(BaseComponent):
 
     def set_parameters(
         self,
-        symbol: Optional[str] = None,
+        ticker: Optional[str] = None,
         interval: Optional[float] = None,
         lookback_bars: Optional[int] = None,
         signal_interval: Optional[str] = None,
     ) -> None:
-        """更新 symbol、轮询间隔、回看根数或信号周期。"""
-        if symbol is not None:
-            self.symbol = symbol
+        """更新 ticker、轮询间隔、回看根数或信号周期。"""
+        if ticker is not None:
+            self.ticker = ticker
         if interval is not None:
             self.interval = interval
         if lookback_bars is not None:
@@ -189,9 +189,9 @@ class LiveEngine(BaseComponent):
         self._event_engine.on(EVENT_TICK, self._on_tick_strategy)
         self._data_gw.set_tick_handler(lambda t: self._event_engine.emit(EVENT_TICK, t))
 
-        self._data_gw.subscribe([self.symbol])
+        self._data_gw.subscribe([self.ticker])
         self._data_gw.start()
-        self.logger.info(f"Running: {self.symbol} {self.signal_interval} lookback={self.lookback_bars}")
+        self.logger.info(f"Running: {self.ticker} {self.signal_interval} lookback={self.lookback_bars}")
 
     def stop(self) -> None:
         """停止数据流与交易网关。"""
@@ -255,14 +255,14 @@ class LiveEngine(BaseComponent):
         if values_df.empty:
             return pd.DataFrame(), {}
         reporter = PerformanceReporter()
-        return reporter.compute(self.symbol, trades_df, values_df)
+        return reporter.compute(self.ticker, trades_df, values_df)
 
     # ---------- 内部：数据与网关 ----------
 
     def _ensure_gateways(self) -> None:
         """懒创建数据/交易网关；非 tick 时创建 DataFetcher。"""
-        if self.symbol is None:
-            raise ValueError("请先设置 symbol（构造参数或 set_parameters）")
+        if self.ticker is None:
+            raise ValueError("请先设置 ticker（构造参数或 set_parameters）")
         if self._data_gw is None:
             gw_params = dict(self._data_gateway_params)
             gw_params.setdefault("interval", self.interval)
@@ -289,7 +289,7 @@ class LiveEngine(BaseComponent):
         end = (now + timedelta(days=1)).strftime("%Y-%m-%d")
         try:
             data = self._data_fetcher.fetch_data(
-                self.symbol, start, end, interval=self.signal_interval
+                self.ticker, start, end, interval=self.signal_interval
             )
         except Exception as e:
             self.logger.warning(f"DataFetcher failed: {e}")
@@ -310,7 +310,7 @@ class LiveEngine(BaseComponent):
         gw = self._trade_gw
         eng = getattr(gw, "_engine", None)
         if eng is not None:
-            position = int(eng.position_manager.get_position(self.symbol))
+            position = int(eng.position_manager.get_position(self.ticker))
             cash = float(eng.cash or 0.0)
             commission = float(getattr(eng, "commission", 0.0) or 0.0)
             return cash, position, commission
@@ -326,7 +326,7 @@ class LiveEngine(BaseComponent):
         position = 0
         try:
             for p in client.query_stock_positions() or []:
-                if (getattr(p, "stock_code", "") or "") == self.symbol:
+                if (getattr(p, "stock_code", "") or "") == self.ticker:
                     position = int(
                         getattr(p, "can_use_volume", None)
                         or getattr(p, "volume", 0)
@@ -393,7 +393,7 @@ class LiveEngine(BaseComponent):
             elif tick.ask is not None:
                 ba = f" ask={tick.ask:.4f}"
             self.logger.info(
-                f"Tick: [{tick.symbol}] {tick.price:.4f}{ba} vol={v}({_vol_str(v)}) @ {ts}"
+                f"Tick: [{tick.ticker}] {tick.price:.4f}{ba} vol={v}({_vol_str(v)}) @ {ts}"
             )
         eng = getattr(self._trade_gw, "_engine", None) if self._trade_gw else None
         if eng is not None:
@@ -485,7 +485,7 @@ class LiveEngine(BaseComponent):
         icon = _SIG_ICON.get(signal, "?")
         act_icon = _ACTION_ICON.get(action_key, "?")
         self.logger.info(
-            f"Signal: {icon} {signal} [{self.symbol}] {px:.4f} cash={cash:.0f} pos={position} -> {act_icon} {action}"
+            f"Signal: {icon} {signal} [{self.ticker}] {px:.4f} cash={cash:.0f} pos={position} -> {act_icon} {action}"
         )
         return _SizingLogResult(action_key, action, qty, sell_order_qty)
 
@@ -513,19 +513,19 @@ class LiveEngine(BaseComponent):
         if signal == 1 and last <= 0:
             if sizing.qty > 0:
                 buy_px = float(getattr(tick, "ask", None)) if getattr(tick, "ask", None) is not None else px
-                req = OrderRequest(symbol=self.symbol, quantity=sizing.qty, price=buy_px, order_type="limit")
+                req = OrderRequest(ticker=self.ticker, quantity=sizing.qty, price=buy_px, order_type="limit")
                 self._last_pending_order_id = self._trade_gw.send_order(req)
-                self.logger.info(f"Order sent: BUY [{self.symbol}] qty={sizing.qty} @ {buy_px:.4f}")
+                self.logger.info(f"Order sent: BUY [{self.ticker}] qty={sizing.qty} @ {buy_px:.4f}")
         elif signal == -1 and last >= 0 and position > 0:
             if sizing.sell_order_qty <= 0:
                 self._last_signal = signal
                 return
             sell_px = float(getattr(tick, "bid", None)) if getattr(tick, "bid", None) is not None else px
             req = OrderRequest(
-                symbol=self.symbol, quantity=-sizing.sell_order_qty, price=sell_px, order_type="limit"
+                ticker=self.ticker, quantity=-sizing.sell_order_qty, price=sell_px, order_type="limit"
             )
             self._last_pending_order_id = self._trade_gw.send_order(req)
-            self.logger.info(f"Order sent: SELL [{self.symbol}] qty={sizing.sell_order_qty} @ {sell_px:.4f}")
+            self.logger.info(f"Order sent: SELL [{self.ticker}] qty={sizing.sell_order_qty} @ {sell_px:.4f}")
 
         self._last_signal = signal
 
@@ -533,7 +533,7 @@ class LiveEngine(BaseComponent):
         """编排：建 df → 信号 → 账户快照 → 权益 → sizing 与日志 → 信号翻转时撤单/下单。"""
         if getattr(tick, "source", None) in ("yf_warmup", "miniqmt_warmup", "baostock_warmup"):
             return
-        if tick.symbol != self.symbol or self._strategy is None:
+        if tick.ticker != self.ticker or self._strategy is None:
             return
 
         df = self._build_signal_df(tick)

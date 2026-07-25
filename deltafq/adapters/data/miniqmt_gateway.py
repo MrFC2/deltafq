@@ -65,9 +65,9 @@ class MiniQmtDataGateway(DataGateway):
     def subscribe(self, symbols: List[str]) -> bool:
         """追加订阅；新标的用近一日 1m K 线逐根暖机回调。"""
         new_symbols = [s for s in symbols if s not in self._symbols]
-        for symbol in new_symbols:
-            self._symbols.append(symbol)
-            self._warm_up(symbol)
+        for ticker in new_symbols:
+            self._symbols.append(ticker)
+            self._warm_up(ticker)
         return True
 
     def start(self) -> None:
@@ -93,9 +93,9 @@ class MiniQmtDataGateway(DataGateway):
         self._thread = None
         self.logger.info(f"Stopped MiniQmtDataGateway ({self.mode})")
 
-    def get_today_ohlc(self, symbol: str) -> Optional[Dict[str, float]]:
+    def get_today_ohlc(self, ticker: str) -> Optional[Dict[str, float]]:
         """从快照取当日开、高、低三个 float；缺或错返回 None。"""
-        tick, err = self._get_full_tick(symbol)
+        tick, err = self._get_full_tick(ticker)
         if err or not tick:
             self.logger.warning(f"get_today_ohlc: {err}")
             return None
@@ -110,11 +110,11 @@ class MiniQmtDataGateway(DataGateway):
             self.logger.error(f"get_today_ohlc parse error: {e}")
             return None
 
-    def get_depths(self, symbol: str, levels: int = 5) -> Dict[str, List[Dict[str, float]]]:
+    def get_depths(self, ticker: str, levels: int = 5) -> Dict[str, List[Dict[str, float]]]:
         """返回买卖盘口深度（价格+委托量）。"""
-        tick, err = self._get_full_tick(symbol)
+        tick, err = self._get_full_tick(ticker)
         if err or not tick:
-            self.logger.debug(f"get_depths {symbol}: {err}")
+            self.logger.debug(f"get_depths {ticker}: {err}")
             return {"bids": [], "asks": []}
         lv = max(1, min(int(levels), 10))
         bids: List[Dict[str, float]] = []
@@ -133,21 +133,21 @@ class MiniQmtDataGateway(DataGateway):
 
     # ---------- 私有 ----------
 
-    def _warm_up(self, symbol: str) -> None:
+    def _warm_up(self, ticker: str) -> None:
         """近一日 1m 收盘合成暖机 tick，来源标记 miniqmt_warmup。"""
-        self.logger.debug(f"Warming up {symbol} with miniQMT 1m history...")
+        self.logger.debug(f"Warming up {ticker} with miniQMT 1m history...")
         try:
             end = datetime.now()
             start = end - timedelta(days=1)
             data = fetch_miniqmt_bars(
-                symbol,
+                ticker,
                 start.strftime("%Y-%m-%d"),
                 None,
                 interval="1m",
                 dividend_type=self.dividend_type,
             )
             if data.empty:
-                self.logger.warning(f"No warm-up data for {symbol}")
+                self.logger.warning(f"No warm-up data for {ticker}")
                 return
             pushed = 0
             for timestamp, row in data.iterrows():
@@ -157,7 +157,7 @@ class MiniQmtDataGateway(DataGateway):
                 price = float(row["Close"])
                 volume = int(row["Volume"])
                 tick = TickData(
-                    symbol=symbol,
+                    ticker=ticker,
                     price=price,
                     timestamp=ts,
                     volume=volume,
@@ -166,9 +166,9 @@ class MiniQmtDataGateway(DataGateway):
                 if self._tick_handler:
                     self._tick_handler(tick)
                 pushed += 1
-            self.logger.info(f"Subscribed & warmed up {symbol} ({pushed} bars)")
+            self.logger.info(f"Subscribed & warmed up {ticker} ({pushed} bars)")
         except Exception as e:
-            self.logger.warning(f"Warm-up failed for {symbol}: {e}")
+            self.logger.warning(f"Warm-up failed for {ticker}: {e}")
 
     def _unsubscribe_push(self) -> None:
         """push 停时逐个退订 quote，再调 xtdata.stop（有则调）。"""
@@ -191,10 +191,10 @@ class MiniQmtDataGateway(DataGateway):
     def _run_poll(self) -> None:
         """对每个标的拉全快照，组 TickData，调 tick 回调。"""
         while self._running:
-            for symbol in self._symbols:
-                tick, err = self._get_full_tick(symbol)
+            for ticker in self._symbols:
+                tick, err = self._get_full_tick(ticker)
                 if err or not tick:
-                    self.logger.debug(f"tick skip {symbol}: {err}")
+                    self.logger.debug(f"tick skip {ticker}: {err}")
                     continue
                 try:
                     last = tick.get("lastPrice") or tick.get("last") or tick.get("price")
@@ -204,7 +204,7 @@ class MiniQmtDataGateway(DataGateway):
                     ts = self._ts_from_millis_or_now(tick.get("time"))
                     bid, ask = self._bid_ask_from_dict(tick)
                     t = TickData(
-                        symbol=symbol,
+                        ticker=ticker,
                         price=float(last),
                         timestamp=ts,
                         volume=int(vol) if vol is not None else None,
@@ -215,7 +215,7 @@ class MiniQmtDataGateway(DataGateway):
                     if self._tick_handler:
                         self._tick_handler(t)
                 except Exception as e:
-                    self.logger.error(f"Error polling {symbol}: {e}")
+                    self.logger.error(f"Error polling {ticker}: {e}")
             time.sleep(self.interval)
 
     def _run_push(self) -> None:
@@ -227,11 +227,11 @@ class MiniQmtDataGateway(DataGateway):
             return
         xd = _import_xtdata()
         self._quote_seqs = []
-        for symbol in list(self._symbols):
+        for ticker in list(self._symbols):
             if not self._running:
                 break
             seq = xd.subscribe_quote(
-                symbol,
+                ticker,
                 period="tick",
                 start_time="",
                 end_time="",
@@ -239,7 +239,7 @@ class MiniQmtDataGateway(DataGateway):
                 callback=self._on_push_datas,
             )
             if seq < 0:
-                self.logger.error(f"subscribe_quote failed {symbol}: {seq}")
+                self.logger.error(f"subscribe_quote failed {ticker}: {seq}")
                 continue
             self._quote_seqs.append(seq)
         if not self._running or not self._quote_seqs:
@@ -265,7 +265,7 @@ class MiniQmtDataGateway(DataGateway):
                 ts = self._ts_from_millis_or_now(row.get("time"))
                 bid, ask = self._bid_ask_from_dict(row)
                 t = TickData(
-                    symbol=code,
+                    ticker=code,
                     price=float(last),
                     timestamp=ts,
                     volume=int(vol) if vol is not None else None,
@@ -276,14 +276,14 @@ class MiniQmtDataGateway(DataGateway):
                 if self._tick_handler:
                     self._tick_handler(t)
 
-    def _get_full_tick(self, symbol: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    def _get_full_tick(self, ticker: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
         """调 get_full_tick；成功返回快照和 None，失败返回 None 和错误说明。"""
         try:
             xtdata = _import_xtdata()
-            data = xtdata.get_full_tick([symbol])
-            if not data or symbol not in data:
-                return None, f"{symbol} 无快照"
-            return data[symbol], None
+            data = xtdata.get_full_tick([ticker])
+            if not data or ticker not in data:
+                return None, f"{ticker} 无快照"
+            return data[ticker], None
         except Exception as e:
             return None, str(e)
 

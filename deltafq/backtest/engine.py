@@ -98,7 +98,7 @@ class BacktestEngine(BaseComponent, ABC):
                     max_qty = int(self.execution.cash / (price * (1 + self.commission)))
                     if max_qty > 0:
                         self.execution.execute_order(
-                            symbol=ticker,
+                            ticker=ticker,
                             quantity=max_qty,
                             order_type="limit",
                             price=price,
@@ -109,7 +109,7 @@ class BacktestEngine(BaseComponent, ABC):
                     current_qty = self.execution.position_manager.get_position(ticker)
                     if current_qty > 0:
                         self.execution.execute_order(
-                            symbol=ticker,
+                            ticker=ticker,
                             quantity=-current_qty,
                             order_type="limit",
                             price=price,
@@ -151,7 +151,7 @@ class BacktestEngine(BaseComponent, ABC):
 
     def show_report(self) -> None:
         """打印回测汇总报告。"""
-        self.reporter.print_summary(symbol=self.ticker, trades_df=self.trades_df, values_df=self.values_df)
+        self.reporter.print_summary(ticker=self.ticker, trades_df=self.trades_df, values_df=self.values_df)
 
     def show_chart(self, use_plotly: bool = True) -> None:
         """展示回测绩效图表。"""
@@ -164,5 +164,5 @@ class BacktestEngine(BaseComponent, ABC):
 
     def save_backtest_results(self) -> None:
         """将回测结果保存为 CSV 文件。"""
-        self.storage.save_backtest_results(trades_df=self.trades_df, values_df=self.values_df, symbol=self.ticker,
+        self.storage.save_backtest_results(trades_df=self.trades_df, values_df=self.values_df, ticker=self.ticker,
                                            strategy_name=self.strategy.name if self.strategy is not None else None)

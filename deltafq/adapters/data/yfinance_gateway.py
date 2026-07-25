@@ -50,9 +50,9 @@ class YFinanceDataGateway(DataGateway):
     def subscribe(self, symbols: List[str]) -> bool:
         """追加订阅；新标的拉近一日 1m 数据暖机并逐根回调。"""
         new_symbols = [s for s in symbols if s not in self._symbols]
-        for symbol in new_symbols:
-            self._symbols.append(symbol)
-            self._warm_up(symbol)
+        for ticker in new_symbols:
+            self._symbols.append(ticker)
+            self._warm_up(ticker)
         return True
 
     def start(self) -> None:
@@ -71,32 +71,32 @@ class YFinanceDataGateway(DataGateway):
             self._thread.join(timeout=2)
         self.logger.info("Stopped yfinance polling")
 
-    def get_today_ohlc(self, symbol: str) -> Optional[Dict[str, float]]:
+    def get_today_ohlc(self, ticker: str) -> Optional[Dict[str, float]]:
         """从 fast_info 取当日开、高、低；缺字段返回 None。"""
         try:
-            ticker = yf.Ticker(symbol)
+            ticker = yf.Ticker(ticker)
             info = ticker.fast_info
             open_price = info.open
             high_price = info.day_high
             low_price = info.day_low
             if open_price is None or high_price is None or low_price is None:
                 self.logger.warning(
-                    f"Incomplete OHLC data for {symbol}: open={open_price}, high={high_price}, low={low_price}"
+                    f"Incomplete OHLC data for {ticker}: open={open_price}, high={high_price}, low={low_price}"
                 )
                 return None
             return {"open": open_price, "high": high_price, "low": low_price}
         except Exception as e:
-            self.logger.error(f"Failed to get today's OHLC for {symbol}: {e}")
+            self.logger.error(f"Failed to get today's OHLC for {ticker}: {e}")
             return None
 
-    def get_depths(self, symbol: str, levels: int = 5) -> Dict[str, List[Dict[str, float]]]:
+    def get_depths(self, ticker: str, levels: int = 5) -> Dict[str, List[Dict[str, float]]]:
         """
         合成盘口（非真实 L2）：价由 fast_info.last_price 按相对价差铺档；
         各档成交量在 [~5%·last_volume, last_volume] 内独立随机（无 last_volume 时用默认尺度）。
         """
         levels = max(1, min(int(levels), 10))
         try:
-            info = yf.Ticker(symbol).fast_info
+            info = yf.Ticker(ticker).fast_info
             last = info.last_price
             if last is None:
                 return {"bids": [], "asks": []}
@@ -106,7 +106,7 @@ class YFinanceDataGateway(DataGateway):
             vol_raw = info.last_volume
             base = int(vol_raw) if vol_raw is not None and int(vol_raw) > 0 else 1000
         except Exception as e:
-            self.logger.debug(f"get_depths {symbol}: {e}")
+            self.logger.debug(f"get_depths {ticker}: {e}")
             return {"bids": [], "asks": []}
 
         lo = max(1, base // 20)
@@ -124,13 +124,13 @@ class YFinanceDataGateway(DataGateway):
 
     # ---------- 私有 ----------
 
-    def _warm_up(self, symbol: str) -> None:
+    def _warm_up(self, ticker: str) -> None:
         """下载近一日 1m K 线，逐根合成暖机 tick（source=yf_warmup）。"""
-        self.logger.debug(f"Warming up {symbol} with intraday history...")
+        self.logger.debug(f"Warming up {ticker} with intraday history...")
         try:
-            data = yf.download(symbol, period="1d", interval="1m", progress=False)
+            data = yf.download(ticker, period="1d", interval="1m", progress=False)
             if data.empty:
-                self.logger.warning(f"No warm-up data for {symbol}")
+                self.logger.warning(f"No warm-up data for {ticker}")
                 return
             pushed_count = 0
             for timestamp, row in data.iterrows():
@@ -138,7 +138,7 @@ class YFinanceDataGateway(DataGateway):
                 price = float(row["Close"])
                 volume = int(row["Volume"])
                 tick = TickData(
-                    symbol=symbol,
+                    ticker=ticker,
                     price=price,
                     timestamp=local_ts,
                     volume=volume,
@@ -147,23 +147,23 @@ class YFinanceDataGateway(DataGateway):
                 if self._tick_handler:
                     self._tick_handler(tick)
                 pushed_count += 1
-            self.logger.info(f"Subscribed & Warmed up {symbol} ({pushed_count} bars)")
+            self.logger.info(f"Subscribed & Warmed up {ticker} ({pushed_count} bars)")
         except Exception as e:
-            self.logger.warning(f"Warm-up failed for {symbol}: {e}")
+            self.logger.warning(f"Warm-up failed for {ticker}: {e}")
 
     def _run(self) -> None:
         """轮询各标的 fast_info，组 TickData 回调。"""
         while self._running:
-            for symbol in self._symbols:
+            for ticker in self._symbols:
                 try:
-                    ticker = yf.Ticker(symbol)
+                    ticker = yf.Ticker(ticker)
                     info = ticker.fast_info
                     price = info.last_price
                     volume = info.last_volume
                     if price is None or volume is None:
                         continue
                     tick = TickData(
-                        symbol=symbol,
+                        ticker=ticker,
                         price=float(price),
                         timestamp=datetime.utcnow(),
                         volume=int(volume),
@@ -172,6 +172,6 @@ class YFinanceDataGateway(DataGateway):
                     if self._tick_handler:
                         self._tick_handler(tick)
                 except Exception as e:
-                    self.logger.error(f"Error fetching data for {symbol}: {str(e)}")
+                    self.logger.error(f"Error fetching data for {ticker}: {str(e)}")
                     continue
             time.sleep(self.interval)

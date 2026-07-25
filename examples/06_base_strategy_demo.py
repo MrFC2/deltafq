@@ -41,7 +41,7 @@ def run_strategy_demo() -> None:
     strategy = DemoStrategy(name="DemoStrategy", fast_period=10, slow_period=30)
 
     data = fetcher.fetch_data(
-        symbol="AAPL",
+        ticker="AAPL",
         start_date="2024-01-01",
         end_date="2024-06-30",
     )

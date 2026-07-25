@@ -21,7 +21,7 @@ def main() -> None:
     indicators = TechnicalIndicators()
     signals = SignalGenerator()
 
-    data = fetcher.fetch_data(symbol="sh.600519", start_date="2024-01-01", end_date="2024-03-31")
+    data = fetcher.fetch_data(ticker="sh.600519", start_date="2024-01-01", end_date="2024-03-31")
 
     close = data["Close"]
     high = data["High"]

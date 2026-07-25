@@ -31,7 +31,7 @@ def compare_frame(name: str, custom_df: pd.DataFrame, talib_df: pd.DataFrame) ->
 
 def main() -> None:
     fetcher = DataFetcher()
-    data = fetcher.fetch_data(symbol="AAPL", start_date="2024-01-01", end_date="2024-02-20")
+    data = fetcher.fetch_data(ticker="AAPL", start_date="2024-01-01", end_date="2024-02-20")
 
     close = data["Close"]
     high = data["High"]

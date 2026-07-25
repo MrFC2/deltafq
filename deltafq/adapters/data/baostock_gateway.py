@@ -57,9 +57,9 @@ class BaostockDataGateway(DataGateway):
     def subscribe(self, symbols: List[str]) -> bool:
         """追加订阅；新标的拉最近交易日 5m 暖机并逐根回调。"""
         new_symbols = [s for s in symbols if s not in self._symbols]
-        for symbol in new_symbols:
-            self._symbols.append(symbol)
-            self._warm_up(symbol)
+        for ticker in new_symbols:
+            self._symbols.append(ticker)
+            self._warm_up(ticker)
         return True
 
     def start(self) -> None:
@@ -81,26 +81,26 @@ class BaostockDataGateway(DataGateway):
             self._bs = None
         self.logger.info("Stopped baostock polling")
 
-    def get_today_ohlc(self, symbol: str) -> Optional[Dict[str, float]]:
+    def get_today_ohlc(self, ticker: str) -> Optional[Dict[str, float]]:
         """从最近日线取开、高、低；缺数据返回 None。"""
         try:
-            data = self._fetch_bars(symbol, "d")
+            data = self._fetch_bars(ticker, "d")
             if data is None or data.empty:
                 return None
             row = data.iloc[-1]
             return {"open": float(row["Open"]), "high": float(row["High"]), "low": float(row["Low"])}
         except Exception as e:
-            self.logger.error(f"Failed to get today's OHLC for {symbol}: {e}")
+            self.logger.error(f"Failed to get today's OHLC for {ticker}: {e}")
             return None
 
-    def get_depths(self, symbol: str, levels: int = 5) -> Dict[str, List[Dict[str, float]]]:
+    def get_depths(self, ticker: str, levels: int = 5) -> Dict[str, List[Dict[str, float]]]:
         """
         合成盘口（非真实 L2）：价由最新 5m close 按相对价差铺档；
         各档量在 [~5%·volume, volume] 内独立随机。
         """
         levels = max(1, min(int(levels), 10))
         try:
-            data = self._fetch_bars(symbol, "5")
+            data = self._fetch_bars(ticker, "5")
             if data is None or data.empty:
                 return {"bids": [], "asks": []}
             row = data.iloc[-1]
@@ -110,7 +110,7 @@ class BaostockDataGateway(DataGateway):
             vol_raw = row["Volume"]
             base = int(vol_raw) if pd.notna(vol_raw) and int(vol_raw) > 0 else 1000
         except Exception as e:
-            self.logger.debug(f"get_depths {symbol}: {e}")
+            self.logger.debug(f"get_depths {ticker}: {e}")
             return {"bids": [], "asks": []}
 
         lo = max(1, base // 20)
@@ -126,20 +126,20 @@ class BaostockDataGateway(DataGateway):
 
     # ---------- 私有 ----------
 
-    def _warm_up(self, symbol: str) -> None:
+    def _warm_up(self, ticker: str) -> None:
         """最近交易日 5m K 线，逐根合成暖机 tick（source=baostock_warmup）。"""
-        self.logger.debug(f"Warming up {symbol} with baostock 5m history...")
+        self.logger.debug(f"Warming up {ticker} with baostock 5m history...")
         try:
-            data = self._fetch_bars(symbol, "5")
+            data = self._fetch_bars(ticker, "5")
             if data is None or data.empty:
-                self.logger.warning(f"No warm-up data for {symbol}")
+                self.logger.warning(f"No warm-up data for {ticker}")
                 return
             last_day = pd.Timestamp(data.index[-1]).normalize()
             data = data[data.index.normalize() == last_day]
             pushed_count = 0
             for timestamp, row in data.iterrows():
                 tick = TickData(
-                    symbol=symbol,
+                    ticker=ticker,
                     price=float(row["Close"]),
                     timestamp=timestamp.to_pydatetime().replace(tzinfo=None),
                     volume=int(row["Volume"]),
@@ -148,26 +148,26 @@ class BaostockDataGateway(DataGateway):
                 if self._tick_handler:
                     self._tick_handler(tick)
                 pushed_count += 1
-            self._last_bar_ts[symbol] = data.index[-1]
-            self.logger.info(f"Subscribed & Warmed up {symbol} ({pushed_count} bars)")
+            self._last_bar_ts[ticker] = data.index[-1]
+            self.logger.info(f"Subscribed & Warmed up {ticker} ({pushed_count} bars)")
         except Exception as e:
-            self.logger.warning(f"Warm-up failed for {symbol}: {e}")
+            self.logger.warning(f"Warm-up failed for {ticker}: {e}")
 
     def _run(self) -> None:
         """轮询各标的最新 5m；仅 bar 时间变化时组 TickData 回调。"""
         while self._running:
-            for symbol in self._symbols:
+            for ticker in self._symbols:
                 try:
-                    data = self._fetch_bars(symbol, "5")
+                    data = self._fetch_bars(ticker, "5")
                     if data is None or data.empty:
                         continue
                     bar_ts = data.index[-1]
-                    if self._last_bar_ts.get(symbol) == bar_ts:
+                    if self._last_bar_ts.get(ticker) == bar_ts:
                         continue
-                    self._last_bar_ts[symbol] = bar_ts
+                    self._last_bar_ts[ticker] = bar_ts
                     row = data.iloc[-1]
                     tick = TickData(
-                        symbol=symbol,
+                        ticker=ticker,
                         price=float(row["Close"]),
                         timestamp=bar_ts.to_pydatetime().replace(tzinfo=None),
                         volume=int(row["Volume"]),
@@ -176,11 +176,11 @@ class BaostockDataGateway(DataGateway):
                     if self._tick_handler:
                         self._tick_handler(tick)
                 except Exception as e:
-                    self.logger.error(f"Error fetching data for {symbol}: {str(e)}")
+                    self.logger.error(f"Error fetching data for {ticker}: {str(e)}")
                     continue
             time.sleep(self.interval)
 
-    def _fetch_bars(self, symbol: str, freq: str) -> Optional[pd.DataFrame]:
+    def _fetch_bars(self, ticker: str, freq: str) -> Optional[pd.DataFrame]:
         """已登录会话上拉近 7 日 K 线（frequency: d / 5）。"""
         if self._bs is None:
             return None
@@ -188,7 +188,7 @@ class BaostockDataGateway(DataGateway):
         start = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
         fields = "date,time,open,high,low,close,volume" if freq != "d" else "date,open,high,low,close,volume"
         rs = self._bs.query_history_k_data_plus(
-            to_bs_code(symbol), fields, start_date=start, end_date=end, frequency=freq, adjustflag="3"
+            to_bs_code(ticker), fields, start_date=start, end_date=end, frequency=freq, adjustflag="3"
         )
         rows = []
         while rs.error_code == "0" and rs.next():

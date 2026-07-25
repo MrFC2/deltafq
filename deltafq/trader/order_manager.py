@@ -18,7 +18,7 @@ class OrderManager(BaseComponent):
         self.order_counter = 0
         self.logger.info("Initializing order manager")
     
-    def create_order(self, symbol: str, quantity: int, order_type: str = "limit", 
+    def create_order(self, ticker: str, quantity: int, order_type: str = "limit", 
                     price: Optional[float] = None, stop_price: Optional[float] = None) -> str:
         """Create a new order."""
         self.order_counter += 1
@@ -26,7 +26,7 @@ class OrderManager(BaseComponent):
         
         order = {
             'id': order_id,
-            'symbol': symbol,
+            'ticker': ticker,
             'quantity': quantity,
             'order_type': order_type,
             'price': price,
@@ -70,9 +70,9 @@ class OrderManager(BaseComponent):
             return True
         return False
     
-    def get_orders_by_symbol(self, symbol: str) -> List[Dict[str, Any]]:
-        """Get all orders for a symbol."""
-        return [order for order in self.orders.values() if order['symbol'] == symbol]
+    def get_orders_by_symbol(self, ticker: str) -> List[Dict[str, Any]]:
+        """Get all orders for a ticker."""
+        return [order for order in self.orders.values() if order['ticker'] == ticker]
     
     def get_orders_by_status(self, status: str) -> List[Dict[str, Any]]:
         """Get all orders with specific status."""

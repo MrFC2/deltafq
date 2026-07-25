@@ -53,13 +53,13 @@ class PerformanceReporter(BaseComponent):
 
     def print_summary(
         self,
-        symbol: str,
+        ticker: str,
         trades_df: pd.DataFrame,
         values_df: pd.DataFrame,
         title: str | None = None,
         language: str = "zh",
     ) -> None:
-        _, metrics = self.compute(symbol, trades_df, values_df)
+        _, metrics = self.compute(ticker, trades_df, values_df)
         texts = _TEXTS_ZH if language == "zh" else _TEXTS_EN
         _ensure_utf8(language)
 
@@ -117,7 +117,7 @@ class PerformanceReporter(BaseComponent):
 
     def compute(
         self,
-        symbol: str,
+        ticker: str,
         trades_df: pd.DataFrame,
         values_df: pd.DataFrame,
     ) -> tuple[pd.DataFrame, Dict[str, Any]]:
@@ -216,7 +216,7 @@ class PerformanceReporter(BaseComponent):
         total_pnl = realized_pnl + unrealized_pnl
 
         metrics: Dict[str, Any] = {
-            "symbol": symbol,
+            "ticker": ticker,
             "first_trade_date": values.index[0] if not values.empty else None,
             "last_trade_date": values.index[-1] if not values.empty else None,
             "total_trading_days": total_days,

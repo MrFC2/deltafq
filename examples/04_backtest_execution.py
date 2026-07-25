@@ -19,16 +19,16 @@ def main() -> None:
     generator = SignalGenerator()
     engine = BacktestEngine(initial_capital=10000, commission=0.0005) # default initial_capital=1000000, commission=0.001
 
-    symbol = "AAPL"
+    ticker = "AAPL"
     start_date = "2024-01-01"
     end_date = "2024-06-30"
-    data = fetcher.fetch_data(symbol=symbol, start_date=start_date, end_date=end_date)
+    data = fetcher.fetch_data(ticker=ticker, start_date=start_date, end_date=end_date)
 
     # Take BOLL as signal
     boll = indicators.boll(data["Close"], period=20, std_dev=2, method="population")
     signals = generator.boll_signals(price=data["Close"], bands=boll, method="touch")
 
-    trades_df, values_df = engine.run_backtest(symbol=symbol, signals=signals, price_series=data["Close"])
+    trades_df, values_df = engine.run_backtest(ticker=ticker, signals=signals, price_series=data["Close"])
 
     print("Trades:")
     print(trades_df)

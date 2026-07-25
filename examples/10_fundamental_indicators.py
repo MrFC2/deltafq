@@ -17,15 +17,15 @@ from deltafq.indicators import FundamentalIndicators
 
 
 def main() -> None:
-    symbol = "AAPL"
+    ticker = "AAPL"
     
     # Fetch price data
     fetcher = DataFetcher()
-    data = fetcher.fetch_data(symbol=symbol, start_date="2024-01-01", end_date="2024-12-31")
+    data = fetcher.fetch_data(ticker=ticker, start_date="2024-01-01", end_date="2024-12-31")
     price = data["Close"]
     
     # Fetch fundamental data from yfinance
-    ticker = yf.Ticker(symbol)
+    ticker = yf.Ticker(ticker)
     info = ticker.info
     quarterly_financials = ticker.quarterly_financials
     quarterly_balance = ticker.quarterly_balance_sheet

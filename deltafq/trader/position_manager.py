@@ -16,12 +16,12 @@ class PositionManager(BaseComponent):
         self.positions = {}
         self.logger.info("Initializing position manager")
     
-    def add_position(self, symbol: str, quantity: int, price: Optional[float] = None) -> bool:
+    def add_position(self, ticker: str, quantity: int, price: Optional[float] = None) -> bool:
         """Add to existing position or create new position."""
-        if symbol in self.positions:
+        if ticker in self.positions:
             # Update existing position
-            current_quantity = self.positions[symbol]['quantity']
-            current_avg_price = self.positions[symbol]['avg_price']
+            current_quantity = self.positions[ticker]['quantity']
+            current_avg_price = self.positions[ticker]['avg_price']
             
             new_quantity = current_quantity + quantity
             if price:
@@ -29,60 +29,60 @@ class PositionManager(BaseComponent):
             else:
                 new_avg_price = current_avg_price
             
-            self.positions[symbol]['quantity'] = new_quantity
-            self.positions[symbol]['avg_price'] = new_avg_price
-            self.positions[symbol]['updated_at'] = datetime.now()
+            self.positions[ticker]['quantity'] = new_quantity
+            self.positions[ticker]['avg_price'] = new_avg_price
+            self.positions[ticker]['updated_at'] = datetime.now()
         else:
             # Create new position
-            self.positions[symbol] = {
-                'symbol': symbol,
+            self.positions[ticker] = {
+                'ticker': ticker,
                 'quantity': quantity,
                 'avg_price': price or 0.0,
                 'created_at': datetime.now(),
                 'updated_at': datetime.now()
             }
         
-        self.logger.info(f"↑ Position updated: {symbol} -> {self.positions[symbol]['quantity']}")
+        self.logger.info(f"↑ Position updated: {ticker} -> {self.positions[ticker]['quantity']}")
         return True
     
-    def reduce_position(self, symbol: str, quantity: int) -> bool:
+    def reduce_position(self, ticker: str, quantity: int) -> bool:
         """Reduce existing position."""
-        if symbol not in self.positions:
-            self.logger.warning(f"No position found for symbol: {symbol}")
+        if ticker not in self.positions:
+            self.logger.warning(f"No position found for ticker: {ticker}")
             return False
         
-        current_quantity = self.positions[symbol]['quantity']
+        current_quantity = self.positions[ticker]['quantity']
         if current_quantity < quantity:
-            self.logger.warning(f"Insufficient position: {symbol}")
+            self.logger.warning(f"Insufficient position: {ticker}")
             return False
         
         new_quantity = current_quantity - quantity
         
         if new_quantity == 0:
-            del self.positions[symbol]
+            del self.positions[ticker]
         else:
-            self.positions[symbol]['quantity'] = new_quantity
-            self.positions[symbol]['updated_at'] = datetime.now()
+            self.positions[ticker]['quantity'] = new_quantity
+            self.positions[ticker]['updated_at'] = datetime.now()
         
-        self.logger.info(f"↓ Position reduced: {symbol} -> {new_quantity}")
+        self.logger.info(f"↓ Position reduced: {ticker} -> {new_quantity}")
         return True
     
-    def get_position(self, symbol: str) -> int:
-        """Get current position quantity for symbol."""
-        return self.positions.get(symbol, {}).get('quantity', 0)
+    def get_position(self, ticker: str) -> int:
+        """Get current position quantity for ticker."""
+        return self.positions.get(ticker, {}).get('quantity', 0)
     
     def get_all_positions(self) -> Dict[str, int]:
         """Get all current positions."""
-        return {symbol: pos['quantity'] for symbol, pos in self.positions.items()}
+        return {ticker: pos['quantity'] for ticker, pos in self.positions.items()}
     
-    def can_sell(self, symbol: str, quantity: int) -> bool:
+    def can_sell(self, ticker: str, quantity: int) -> bool:
         """Check if we can sell the specified quantity."""
-        return self.get_position(symbol) >= quantity
+        return self.get_position(ticker) >= quantity
     
-    def close_position(self, symbol: str) -> bool:
-        """Close entire position for symbol."""
-        if symbol not in self.positions:
+    def close_position(self, ticker: str) -> bool:
+        """Close entire position for ticker."""
+        if ticker not in self.positions:
             return False
 
-        quantity = self.positions[symbol]['quantity']
-        return self.reduce_position(symbol, quantity)
+        quantity = self.positions[ticker]['quantity']
+        return self.reduce_position(ticker, quantity)

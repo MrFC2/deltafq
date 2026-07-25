@@ -21,23 +21,23 @@ def main() -> None:
     engine = BacktestEngine(initial_capital=500_000, commission=0.001)
     reporter = PerformanceReporter()
 
-    symbol = "AAPL"
+    ticker = "AAPL"
     start_date = "2024-01-01"
     end_date = "2024-06-30"
 
-    data = fetcher.fetch_data(symbol=symbol, start_date=start_date, end_date=end_date)
+    data = fetcher.fetch_data(ticker=ticker, start_date=start_date, end_date=end_date)
     boll = indicators.boll(data["Close"], period=20, std_dev=2, method="population")
     signals = generator.boll_signals(price=data["Close"], bands=boll, method="touch")
 
     trades_df, values_df = engine.run_backtest(
-        symbol=symbol,
+        ticker=ticker,
         signals=signals,
         price_series=data["Close"],
         strategy_name="BOLL",
     )
     
     print("Performance Summary:")
-    reporter.print_summary(symbol=symbol, trades_df=trades_df, values_df=values_df, title="Performance Summary", language="zh")
+    reporter.print_summary(ticker=ticker, trades_df=trades_df, values_df=values_df, title="Performance Summary", language="zh")
 
 
 if __name__ == "__main__":

@@ -24,19 +24,19 @@ def main() -> None:
     signal_chart = SignalChart()
     performance_chart = PerformanceChart()
 
-    symbol = "AAPL"
+    ticker = "AAPL"
     start_date = "2024-01-01"
     end_date = "2024-06-30"
     benchmark = "SPY"
 
-    data = fetcher.fetch_data(symbol=symbol, start_date=start_date, end_date=end_date)
-    benchmark_data = fetcher.fetch_data(symbol=benchmark, start_date=start_date, end_date=end_date)
+    data = fetcher.fetch_data(ticker=ticker, start_date=start_date, end_date=end_date)
+    benchmark_data = fetcher.fetch_data(ticker=benchmark, start_date=start_date, end_date=end_date)
     
     boll = indicators.boll(data["Close"], period=10, std_dev=2, method="population")
     signals = generator.boll_signals(price=data["Close"], bands=boll, method="touch")
 
     trades_df, values_df = engine.run_backtest(
-        symbol=symbol,
+        ticker=ticker,
         signals=signals,
         price_series=data["Close"],
         strategy_name="BOLL",
@@ -45,10 +45,10 @@ def main() -> None:
     
     print("Plotting Plotly charts...")
 
-    data_dict = {symbol: data, benchmark: benchmark_data}
+    data_dict = {ticker: data, benchmark: benchmark_data}
     price_chart.plot_prices(
         data=data_dict,
-        title=f"{symbol} Price vs {benchmark} Price",
+        title=f"{ticker} Price vs {benchmark} Price",
         use_plotly=True,
     )
 

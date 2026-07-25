@@ -17,7 +17,7 @@ class PaperTradeGateway(TradeGateway):
 
     def send_order(self, req: OrderRequest) -> str:
         return self._engine.execute_order(
-            symbol=req.symbol,
+            ticker=req.ticker,
             quantity=req.quantity,
             order_type=req.order_type,
             price=req.price,

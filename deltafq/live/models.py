@@ -5,7 +5,7 @@ from typing import Optional
 
 @dataclass
 class TickData:
-    symbol: str
+    ticker: str
     price: float
     timestamp: datetime
     volume: Optional[int] = None
@@ -17,7 +17,7 @@ class TickData:
 
 @dataclass
 class OrderRequest:
-    symbol: str
+    ticker: str
     quantity: int
     price: float
     order_type: str = "limit"
