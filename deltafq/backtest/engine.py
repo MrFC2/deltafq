@@ -21,7 +21,7 @@ class BacktestEngine(BaseComponent, ABC):
                  commission: float = 0.001, data_source: str = "baostock", **kwargs):
         """初始化回测引擎。"""
         super().__init__(**kwargs)
-        self.logger.info("Initializing backtest engine")
+        self.logger.info("初始化回测引擎")
         # 回测标的代码
         self.ticker = ticker
         # 回测起始日期
@@ -141,7 +141,7 @@ class BacktestEngine(BaseComponent, ABC):
             return self.trades_df, self.values_df
 
         except Exception as e:
-            self.logger.error(f"run_backtest error: {e}")
+            self.logger.error(f"run_backtest 执行失败: {e}")
             raise RuntimeError(f"Backtest execution failed: {e}") from e
 
     def calculate_metrics(self) -> Tuple[pd.DataFrame, Dict[str, float]]:
