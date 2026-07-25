@@ -48,12 +48,12 @@ class DataFetcher(BaseComponent):
         except Exception as e:
             raise RuntimeError(f"拉取 {ticker} 数据失败: {str(e)}") from e
 
-    def fetch_data_multiple(self, tickers: List[str], start_date: str, end_date: Optional[str] = None,
-                            interval: str = "1d") -> Dict[str, pd.DataFrame]:
+    def fetch_datas(self, tickers: List[str], start_date: str, end_date: Optional[str] = None,
+                    interval: str = "1d") -> Dict[str, pd.DataFrame]:
         """批量拉取多个标的行情数据。"""
         return {s: self.fetch_data(s, start_date, end_date, interval) for s in tickers}
 
-    def fetch_fund_data(self, code: str, page: Optional[int] = None) -> pd.DataFrame:
+    def fetch_data_from_fund(self, code: str, page: Optional[int] = None) -> pd.DataFrame:
         """从东方财富 API 拉取基金净值数据。"""
         base_url = "https://fundf10.eastmoney.com/F10DataApi.aspx"
         base_params = {"type": "lsjz", "per": 20, "code": code}
