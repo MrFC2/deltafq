@@ -31,13 +31,8 @@ def to_bs_code(symbol: str) -> str:
     return s.lower() if s[:3].lower() in ("sh.", "sz.") else s
 
 
-def fetch_baostock_bars(
-    symbol: str,
-    start_date: str,
-    end_date: Optional[str] = None,
-    interval: str = "1d",
-    adjustflag: str = "3",
-) -> pd.DataFrame:
+def fetch_baostock_bars(symbol: str, start_date: str, end_date: Optional[str] = None, interval: str = "1d",
+                        adjust_flag: str = "3") -> pd.DataFrame:
     """拉取历史 K 线，返回 Open/High/Low/Close/Volume。end_date 排他（与 yahoo 一致）。"""
     import baostock as bs  # type: ignore
 
@@ -47,13 +42,14 @@ def fetch_baostock_bars(
     if end_date:
         end = (datetime.strptime(end_date.replace("-", "")[:8], "%Y%m%d") - timedelta(days=1)).strftime("%Y-%m-%d")
 
-    fields = "date,time,open,high,low,close,volume" if freq in ("5", "15", "30", "60") else "date,open,high,low,close,volume"
+    fields = "date,time,open,high,low,close,volume" if freq in ("5", "15", "30",
+                                                                "60") else "date,open,high,low,close,volume"
     bs.login()
     try:
         rs = bs.query_history_k_data_plus(
             to_bs_code(symbol), fields,
             start_date=start_date[:10], end_date=end,
-            frequency=freq, adjustflag=str(adjustflag),
+            frequency=freq, adjustflag=str(adjust_flag),
         )
         rows = []
         while rs.error_code == "0" and rs.next():
