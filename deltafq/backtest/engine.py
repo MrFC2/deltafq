@@ -80,7 +80,7 @@ class BacktestEngine(BaseComponent, ABC):
                      save_csv: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """逐 bar 回放，返回 trades_df 和 values_df。"""
         if signals is None and self.signals is None:
-            raise ValueError("Signals must be set. Call add_strategy() first.")
+            raise ValueError("请先调用 add_strategy() 设置策略。")
 
         try:
             ticker = self.ticker
@@ -142,7 +142,7 @@ class BacktestEngine(BaseComponent, ABC):
 
         except Exception as e:
             self.logger.error(f"run_backtest 执行失败: {e}")
-            raise RuntimeError(f"Backtest execution failed: {e}") from e
+            raise RuntimeError(f"回测执行失败: {e}") from e
 
     def calculate_metrics(self) -> Tuple[pd.DataFrame, Dict[str, float]]:
         """计算回测指标，包括收益率、最大回撤、夏普比率等。"""
