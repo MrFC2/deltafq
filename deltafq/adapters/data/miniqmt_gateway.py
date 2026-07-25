@@ -45,7 +45,7 @@ class MiniQmtDataGateway(DataGateway):
         self.dividend_type = dividend_type
         self.mode = (mode or "poll").strip().lower()
         if self.mode not in ("poll", "push"):
-            raise ValueError('mode must be "poll" or "push"')
+            raise ValueError("mode 必须为 poll 或 push")
         self._symbols: List[str] = []
         self._running = False
         self._thread: Optional[threading.Thread] = None
@@ -56,10 +56,10 @@ class MiniQmtDataGateway(DataGateway):
         """加载 xtdata，本机需已启动 miniQMT。"""
         try:
             _import_xtdata()
-            self.logger.info("xtquant xtdata loaded (ensure miniQMT is running)")
+            self.logger.info("xtquant xtdata 已加载（请确保 miniQMT 正在运行）")
             return True
         except Exception as e:
-            self.logger.error(f"miniQMT connect failed: {e}")
+            self.logger.error(f"miniQMT 连接失败: {e}")
             return False
 
     def subscribe(self, symbols: List[str]) -> bool:
@@ -76,10 +76,10 @@ class MiniQmtDataGateway(DataGateway):
             return
         self._running = True
         if self.mode == "poll":
-            self.logger.info("Starting miniQMT poll loop")
+            self.logger.info("启动 miniQMT 轮询循环")
             self._thread = threading.Thread(target=self._run_poll, daemon=True)
         else:
-            self.logger.info("Starting miniQMT subscribe_quote + xtdata.run()")
+            self.logger.info("启动 miniQMT subscribe_quote + xtdata.run()")
             self._thread = threading.Thread(target=self._run_push, daemon=True)
         self._thread.start()
 
@@ -91,7 +91,7 @@ class MiniQmtDataGateway(DataGateway):
         if self._thread:
             self._thread.join(timeout=5.0)
         self._thread = None
-        self.logger.info(f"Stopped MiniQmtDataGateway ({self.mode})")
+        self.logger.info(f"已停止 MiniQmtDataGateway（{self.mode}）")
 
     def get_today_ohlc(self, ticker: str) -> Optional[Dict[str, float]]:
         """从快照取当日开、高、低三个 float；缺或错返回 None。"""
@@ -107,7 +107,7 @@ class MiniQmtDataGateway(DataGateway):
                 return None
             return {"open": float(o), "high": float(h), "low": float(l_)}
         except Exception as e:
-            self.logger.error(f"get_today_ohlc parse error: {e}")
+            self.logger.error(f"get_today_ohlc 解析错误: {e}")
             return None
 
     def get_depths(self, ticker: str, levels: int = 5) -> Dict[str, List[Dict[str, float]]]:
@@ -135,7 +135,7 @@ class MiniQmtDataGateway(DataGateway):
 
     def _warm_up(self, ticker: str) -> None:
         """近一日 1m 收盘合成暖机 tick，来源标记 miniqmt_warmup。"""
-        self.logger.debug(f"Warming up {ticker} with miniQMT 1m history...")
+        self.logger.debug(f"正在用 miniQMT 1m 数据暖机 {ticker}...")
         try:
             end = datetime.now()
             start = end - timedelta(days=1)
@@ -147,7 +147,7 @@ class MiniQmtDataGateway(DataGateway):
                 dividend_type=self.dividend_type,
             )
             if data.empty:
-                self.logger.warning(f"No warm-up data for {ticker}")
+                self.logger.warning(f"{ticker} 暖机数据为空")
                 return
             pushed = 0
             for timestamp, row in data.iterrows():
@@ -166,9 +166,9 @@ class MiniQmtDataGateway(DataGateway):
                 if self._tick_handler:
                     self._tick_handler(tick)
                 pushed += 1
-            self.logger.info(f"Subscribed & warmed up {ticker} ({pushed} bars)")
+            self.logger.info(f"已订阅并暖机 {ticker}（{pushed} 根）")
         except Exception as e:
-            self.logger.warning(f"Warm-up failed for {ticker}: {e}")
+            self.logger.warning(f"{ticker} 暖机失败: {e}")
 
     def _unsubscribe_push(self) -> None:
         """push 停时逐个退订 quote，再调 xtdata.stop（有则调）。"""
@@ -180,13 +180,13 @@ class MiniQmtDataGateway(DataGateway):
                 try:
                     xd.unsubscribe_quote(seq)
                 except Exception as e:
-                    self.logger.debug(f"unsubscribe_quote {seq}: {e}")
+                    self.logger.debug(f"unsubscribe_quote {seq} 失败: {e}")
             self._quote_seqs.clear()
             stop_fn = getattr(xd, "stop", None)
             if callable(stop_fn):
                 stop_fn()
         except Exception as e:
-            self.logger.warning(f"push cleanup: {e}")
+            self.logger.warning(f"push 清理失败: {e}")
 
     def _run_poll(self) -> None:
         """对每个标的拉全快照，组 TickData，调 tick 回调。"""
@@ -194,7 +194,7 @@ class MiniQmtDataGateway(DataGateway):
             for ticker in self._symbols:
                 tick, err = self._get_full_tick(ticker)
                 if err or not tick:
-                    self.logger.debug(f"tick skip {ticker}: {err}")
+                    self.logger.debug(f"跳过 tick {ticker}: {err}")
                     continue
                 try:
                     last = tick.get("lastPrice") or tick.get("last") or tick.get("price")
@@ -215,7 +215,7 @@ class MiniQmtDataGateway(DataGateway):
                     if self._tick_handler:
                         self._tick_handler(t)
                 except Exception as e:
-                    self.logger.error(f"Error polling {ticker}: {e}")
+                    self.logger.error(f"轮询 {ticker} 出错: {e}")
             time.sleep(self.interval)
 
     def _run_push(self) -> None:
@@ -239,7 +239,7 @@ class MiniQmtDataGateway(DataGateway):
                 callback=self._on_push_datas,
             )
             if seq < 0:
-                self.logger.error(f"subscribe_quote failed {ticker}: {seq}")
+                self.logger.error(f"subscribe_quote 失败 {ticker}: {seq}")
                 continue
             self._quote_seqs.append(seq)
         if not self._running or not self._quote_seqs:
@@ -248,7 +248,7 @@ class MiniQmtDataGateway(DataGateway):
             xd.run()
         except Exception as e:
             if self._running:
-                self.logger.error(f"xtdata.run: {e}")
+                self.logger.error(f"xtdata.run 异常: {e}")
 
     def _on_push_datas(self, datas: dict) -> None:
         """分笔推送回调：行转 TickData 再交 tick 回调。"""

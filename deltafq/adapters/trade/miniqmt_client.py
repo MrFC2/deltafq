@@ -164,7 +164,7 @@ class MiniQmtXtTraderClient:
     ) -> int:
         """限价委托；返回柜台委托号，失败多为 -1 或 0，以柜台为准。"""
         if self._xt is None or self._acc is None:
-            raise RuntimeError("not connected; call connect() first")
+            raise RuntimeError("未连接，请先调用 connect()")
         oc = self._xtconstant
         direction = oc.STOCK_BUY if is_buy else oc.STOCK_SELL
         oid = self._xt.order_stock(
@@ -182,13 +182,13 @@ class MiniQmtXtTraderClient:
     def cancel_order_stock(self, order_id: int) -> int:
         """按本地委托号撤单；返回 0 表示成功，以柜台为准。"""
         if self._xt is None or self._acc is None:
-            raise RuntimeError("not connected; call connect() first")
+            raise RuntimeError("未连接，请先调用 connect()")
         return int(self._xt.cancel_order_stock(self._acc, int(order_id)))
 
     def cancel_order_stock_sysid(self, stock_code: str, order_sysid: str) -> int:
         """按合同号撤单；需股票代码推市场；不识别的代码返回 -1。"""
         if self._xt is None or self._acc is None:
-            raise RuntimeError("not connected; call connect() first")
+            raise RuntimeError("未连接，请先调用 connect()")
         m = market_by_stock_code(stock_code, self._xtconstant)
         if m is None:
             return -1
@@ -197,41 +197,41 @@ class MiniQmtXtTraderClient:
     def query_account_infos(self) -> Any:
         """未连接抛错；否则透传柜台 query_account_infos。"""
         if self._xt is None:
-            raise RuntimeError("not connected")
+            raise RuntimeError("未连接")
         return self._xt.query_account_infos()
 
     def query_account_status(self) -> Any:
         """未连接抛错；否则透传柜台 query_account_status。"""
         if self._xt is None:
-            raise RuntimeError("not connected")
+            raise RuntimeError("未连接")
         return self._xt.query_account_status()
 
     def query_stock_asset(self) -> Any:
         """未连接抛错；否则透传柜台 query_stock_asset。"""
         if self._xt is None or self._acc is None:
-            raise RuntimeError("not connected")
+            raise RuntimeError("未连接")
         return self._xt.query_stock_asset(self._acc)
 
     def query_stock_positions(self) -> List[Any]:
         """持仓列表；无则空列表。"""
         if self._xt is None or self._acc is None:
-            raise RuntimeError("not connected")
+            raise RuntimeError("未连接")
         return list(self._xt.query_stock_positions(self._acc) or [])
 
     def query_stock_position(self, stock_code: str) -> Any:
         """单只标的持仓；未连接抛错。"""
         if self._xt is None or self._acc is None:
-            raise RuntimeError("not connected")
+            raise RuntimeError("未连接")
         return self._xt.query_stock_position(self._acc, stock_code)
 
     def query_stock_orders(self, cancelable_only: bool = False) -> List[Any]:
         """委托列表；cancelable_only 为 True 时仅可撤委托。"""
         if self._xt is None or self._acc is None:
-            raise RuntimeError("not connected")
+            raise RuntimeError("未连接")
         return list(self._xt.query_stock_orders(self._acc, cancelable_only=cancelable_only) or [])
 
     def query_stock_trades(self) -> List[Any]:
         """当日成交列表；无则空列表。"""
         if self._xt is None or self._acc is None:
-            raise RuntimeError("not connected")
+            raise RuntimeError("未连接")
         return list(self._xt.query_stock_trades(self._acc) or [])

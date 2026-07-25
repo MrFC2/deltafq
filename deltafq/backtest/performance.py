@@ -49,7 +49,7 @@ class PerformanceReporter(BaseComponent):
     def __init__(self, **kwargs):
         """Initialize performance reporter."""
         super().__init__(**kwargs)
-        self.logger.info("Initializing performance reporter")
+        self.logger.info("初始化绩效报告器")
 
     def print_summary(
         self,

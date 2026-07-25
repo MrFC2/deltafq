@@ -13,7 +13,7 @@ class TechnicalIndicators(BaseComponent):
     def __init__(self, **kwargs):
         """Initialize technical indicators."""
         super().__init__(**kwargs)
-        self.logger.info("Initializing technical indicators")
+        self.logger.info("初始化技术指标计算器")
     
     def sma(self, data: pd.Series, period: int) -> pd.Series:
         """Calculate Simple Moving Average (SMA)."""
@@ -146,7 +146,7 @@ class TechnicalIndicators(BaseComponent):
             method: 'ema' uses EMA for smoothing (default, more responsive),
                    'sma' uses SMA for smoothing matching TA-Lib STOCH.
         """
-        self.logger.info(f"Calculating KDJ(n={n}, m1={m1}, m2={m2}, method={method})")
+        self.logger.info(f"计算 KDJ(n={n}, m1={m1}, m2={m2}, method={method})")
         
         # Calculate RSV (Raw Stochastic Value)
         lowest_low = low.rolling(window=n).min()
@@ -233,7 +233,7 @@ class TechnicalIndicators(BaseComponent):
             close: Close price series
             volume: Volume series
         """
-        self.logger.info("Calculating OBV")
+        self.logger.info("计算 OBV")
         
         # Calculate price change direction
         price_change = close.diff()

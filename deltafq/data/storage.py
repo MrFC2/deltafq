@@ -34,7 +34,7 @@ class DataStorage(BaseComponent):
             base_path = config.get_cache_dir()
         
         self.base_path = Path(base_path)
-        self.logger.info(f"Initializing data storage at: {self.base_path}")
+        self.logger.info(f"正在初始化数据存储，路径：{self.base_path}")
         self._init_directories()
     
     def _init_directories(self):
@@ -68,7 +68,7 @@ class DataStorage(BaseComponent):
         
         filepath = symbol_dir / filename
         data.to_csv(filepath, encoding='utf-8-sig', index=True)
-        self.logger.info(f"Saved price data to: {filepath}")
+        self.logger.info(f"已保存价格数据至：{filepath}")
         return filepath
     
     def load_price_data(self, ticker: str, start_date: Optional[str] = None,
@@ -82,14 +82,14 @@ class DataStorage(BaseComponent):
             # Try to find the latest file
             files = list(symbol_dir.glob(f"{ticker}_*.csv"))
             if not files:
-                self.logger.warning(f"No price data found for {ticker}")
+                self.logger.warning(f"未找到 {ticker} 的价格数据")
                 return None
             filename = sorted(files)[-1].name
         
         filepath = symbol_dir / filename
         if filepath.exists():
             data = pd.read_csv(filepath, index_col=0, parse_dates=True)
-            self.logger.info(f"Loaded price data from: {filepath}")
+            self.logger.info(f"已从以下路径加载价格数据：{filepath}")
             return data
         return None
     
@@ -113,7 +113,7 @@ class DataStorage(BaseComponent):
         trades_df.to_csv(trades_path, encoding='utf-8-sig', index=False)
         values_df.to_csv(values_path, encoding='utf-8-sig', index=False)
         
-        self.logger.info(f"Saved backtest results to: {symbol_dir}")
+        self.logger.info(f"已保存回测结果至：{symbol_dir}")
         return {'trades': trades_path, 'values': values_path}
     
     def load_backtest_results(self, ticker: str, strategy_name: Optional[str] = None,
@@ -122,9 +122,9 @@ class DataStorage(BaseComponent):
         symbol_dir = self.backtest_dir / ticker.replace('.', '_')
         
         if not symbol_dir.exists():
-            self.logger.warning(f"No backtest results found for {ticker}")
+            self.logger.warning(f"未找到 {ticker} 的回测结果")
             return None
-        
+
         # Find trades and values files
         if strategy_name:
             trades_files = list(symbol_dir.glob(f"{ticker}_trades_{strategy_name}_*.csv"))
@@ -132,9 +132,9 @@ class DataStorage(BaseComponent):
         else:
             trades_files = list(symbol_dir.glob(f"{ticker}_trades*.csv"))
             values_files = list(symbol_dir.glob(f"{ticker}_values*.csv"))
-        
+
         if not trades_files or not values_files:
-            self.logger.warning(f"No backtest results found for {ticker}")
+            self.logger.warning(f"未找到 {ticker} 的回测结果")
             return None
         
         if latest:
@@ -165,15 +165,15 @@ class DataStorage(BaseComponent):
         elif category == "indicators":
             target_dir = self.indicators_dir
         else:
-            raise ValueError(f"Invalid category: {category}. Must be 'price', 'backtest', or 'indicators'")
-        
+            raise ValueError(f"无效的分类：{category}，必须为 'price'、'backtest' 或 'indicators'")
+
         if subdir:
             target_dir = target_dir / subdir
             target_dir.mkdir(parents=True, exist_ok=True)
-        
+
         filepath = target_dir / filename
         data.to_csv(filepath, encoding='utf-8-sig', index=False)
-        self.logger.info(f"Saved data to: {filepath}")
+        self.logger.info(f"已保存数据至：{filepath}")
         return filepath
     
     def load_data(self, filename: str, category: str = "indicators", 
@@ -186,18 +186,12 @@ class DataStorage(BaseComponent):
         elif category == "indicators":
             target_dir = self.indicators_dir
         else:
-            raise ValueError(f"Invalid category: {category}. Must be 'price', 'backtest', or 'indicators'")
-        
-        if subdir:
-            target_dir = target_dir / subdir
-        
-        filepath = target_dir / filename
-        if filepath.exists():
+            raise ValueError(f"无效的分类：{category}，必须为 'price'、'backtest' 或 'indicators'")
             data = pd.read_csv(filepath, encoding='utf-8-sig')
-            self.logger.info(f"Loaded data from: {filepath}")
+            self.logger.info(f"已加载数据: {filepath}")
             return data
         else:
-            self.logger.warning(f"File not found: {filepath}")
+            self.logger.warning(f"文件不存在: {filepath}")
             return None
     
     # ============================================================================

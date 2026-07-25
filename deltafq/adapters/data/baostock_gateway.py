@@ -39,7 +39,7 @@ class BaostockDataGateway(DataGateway):
         self._thread: Optional[threading.Thread] = None
         self._bs = None
         self._last_bar_ts: Dict[str, Any] = {}
-        self.logger.info(f"Initialized BaostockDataGateway with interval: {self.interval}s")
+        self.logger.info(f"初始化 BaostockDataGateway，轮询间隔: {self.interval}s")
 
     def connect(self) -> bool:
         """登录 baostock。"""
@@ -48,10 +48,10 @@ class BaostockDataGateway(DataGateway):
 
             bs.login()
             self._bs = bs
-            self.logger.info("Connected to baostock")
+            self.logger.info("已连接 baostock")
             return True
         except Exception as e:
-            self.logger.error(f"Failed to connect: {e}")
+            self.logger.error(f"连接失败: {e}")
             return False
 
     def subscribe(self, symbols: List[str]) -> bool:
@@ -66,7 +66,7 @@ class BaostockDataGateway(DataGateway):
         """启动轮询线程。"""
         if self._running:
             return
-        self.logger.info("Starting baostock polling")
+        self.logger.info("启动 baostock 轮询")
         self._running = True
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
@@ -79,7 +79,7 @@ class BaostockDataGateway(DataGateway):
         if self._bs is not None:
             self._bs.logout()
             self._bs = None
-        self.logger.info("Stopped baostock polling")
+        self.logger.info("已停止 baostock 轮询")
 
     def get_today_ohlc(self, ticker: str) -> Optional[Dict[str, float]]:
         """从最近日线取开、高、低；缺数据返回 None。"""
@@ -90,7 +90,7 @@ class BaostockDataGateway(DataGateway):
             row = data.iloc[-1]
             return {"open": float(row["Open"]), "high": float(row["High"]), "low": float(row["Low"])}
         except Exception as e:
-            self.logger.error(f"Failed to get today's OHLC for {ticker}: {e}")
+            self.logger.error(f"获取 {ticker} 当日 OHLC 失败: {e}")
             return None
 
     def get_depths(self, ticker: str, levels: int = 5) -> Dict[str, List[Dict[str, float]]]:
@@ -128,11 +128,11 @@ class BaostockDataGateway(DataGateway):
 
     def _warm_up(self, ticker: str) -> None:
         """最近交易日 5m K 线，逐根合成暖机 tick（source=baostock_warmup）。"""
-        self.logger.debug(f"Warming up {ticker} with baostock 5m history...")
+        self.logger.debug(f"正在用 baostock 5m 数据暖机 {ticker}...")
         try:
             data = self._fetch_bars(ticker, "5")
             if data is None or data.empty:
-                self.logger.warning(f"No warm-up data for {ticker}")
+                self.logger.warning(f"{ticker} 暖机数据为空")
                 return
             last_day = pd.Timestamp(data.index[-1]).normalize()
             data = data[data.index.normalize() == last_day]
@@ -149,9 +149,9 @@ class BaostockDataGateway(DataGateway):
                     self._tick_handler(tick)
                 pushed_count += 1
             self._last_bar_ts[ticker] = data.index[-1]
-            self.logger.info(f"Subscribed & Warmed up {ticker} ({pushed_count} bars)")
+            self.logger.info(f"已订阅并暖机 {ticker}（{pushed_count} 根）")
         except Exception as e:
-            self.logger.warning(f"Warm-up failed for {ticker}: {e}")
+            self.logger.warning(f"{ticker} 暖机失败: {e}")
 
     def _run(self) -> None:
         """轮询各标的最新 5m；仅 bar 时间变化时组 TickData 回调。"""
@@ -176,7 +176,7 @@ class BaostockDataGateway(DataGateway):
                     if self._tick_handler:
                         self._tick_handler(tick)
                 except Exception as e:
-                    self.logger.error(f"Error fetching data for {ticker}: {str(e)}")
+                    self.logger.error(f"拉取 {ticker} 数据出错: {str(e)}")
                     continue
             time.sleep(self.interval)
 

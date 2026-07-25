@@ -53,9 +53,9 @@ class ExecutionEngine(BaseComponent):
     def initialize(self) -> bool:
         """Initialize execution engine."""
         if self.is_paper_trading:
-            self.logger.info(f"Initializing paper trading execution engine with capital: {self.initial_capital}")
+            self.logger.info(f"初始化模拟交易执行引擎，初始资金: {self.initial_capital}")
         else:
-            self.logger.info("Initializing live trading execution engine")
+            self.logger.info("初始化实盘交易执行引擎")
         
         if self.broker:
             return self.broker.initialize()
@@ -68,7 +68,7 @@ class ExecutionEngine(BaseComponent):
         try:
             # Validate price for limit orders
             if order_type == "limit" and price is None:
-                raise ValueError("Price is required for limit orders")
+                raise ValueError("限价单必须提供价格")
             
             # Create order
             order_id = self.order_manager.create_order(
@@ -92,11 +92,11 @@ class ExecutionEngine(BaseComponent):
                 if order:
                     order['broker_order_id'] = broker_order_id
                 
-                self.logger.info(f"Order executed - broker: {order_id} -> {broker_order_id}, date: {timestamp.date()}, price: {price}, quantity: {quantity}")
+                self.logger.info(f"订单已执行（券商）: {order_id} -> {broker_order_id}，日期: {timestamp.date()}，价格: {price}，数量: {quantity}")
             else:
                 if not self.match_on_tick:
                     self._on_trade(order_id, price, timestamp)
-                    self.logger.info(f"Order executed - paper trading: {order_id}, date: {timestamp.date()}, price: {price}, quantity: {quantity}")
+                    self.logger.info(f"订单已执行（模拟）: {order_id}，日期: {timestamp.date()}，价格: {price}，数量: {quantity}")
                 else:
                     side = "[SELL]" if quantity < 0 else "[BUY]"
                     self.logger.info(f"○ Order pending: {order_id} {side} {ticker} qty={abs(quantity)} @ {price:.2f}")
@@ -104,7 +104,7 @@ class ExecutionEngine(BaseComponent):
             return order_id
             
         except Exception as e:
-            raise RuntimeError(f"Failed to execute order: {str(e)}") from e
+            raise RuntimeError(f"订单执行失败: {str(e)}") from e
 
     def on_tick(self, tick: "TickData") -> None:
         """Match pending orders against tick (for EventEngine-driven simulation)."""
@@ -152,7 +152,7 @@ class ExecutionEngine(BaseComponent):
                 })
                 self.logger.info(f"✓ Order filled: {order_id} [BUY] {ticker} qty={quantity} @ {execution_price:.2f}")
             else:
-                self.logger.warning(f"Insufficient cash for buy: need {total_cost:.2f}, have {self.cash:.2f}")
+                self.logger.warning(f"买入资金不足: 需要 {total_cost:.2f}，当前 {self.cash:.2f}")
                 self.order_manager.cancel_order(order_id)
         else:  # Sell
             quantity = abs(quantity)
@@ -185,7 +185,7 @@ class ExecutionEngine(BaseComponent):
                 })
                 self.logger.info(f"✓ Order filled: {order_id} [SELL] {ticker} qty={quantity} @ {execution_price:.2f}")
             else:
-                self.logger.warning(f"Insufficient position for sell: {ticker}, need {quantity}")
+                self.logger.warning(f"卖出持仓不足: {ticker}，需要 {quantity}")
                 self.order_manager.cancel_order(order_id)
     
     def _get_latest_buy_cost(self, ticker: str) -> float:

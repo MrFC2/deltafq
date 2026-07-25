@@ -18,11 +18,11 @@ TRADE_GATEWAYS: Dict[str, Type[TradeGateway]] = {
 
 def create_data_gateway(name: str, **params: Any) -> DataGateway:
     if name not in DATA_GATEWAYS:
-        raise ValueError(f"Unknown data gateway: {name}")
+        raise ValueError(f"未知数据网关: {name}")
     return DATA_GATEWAYS[name](**params)
 
 
 def create_trade_gateway(name: str, **params: Any) -> TradeGateway:
     if name not in TRADE_GATEWAYS:
-        raise ValueError(f"Unknown trade gateway: {name}")
+        raise ValueError(f"未知交易网关: {name}")
     return TRADE_GATEWAYS[name](**params)

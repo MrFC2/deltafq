@@ -191,7 +191,7 @@ class LiveEngine(BaseComponent):
 
         self._data_gw.subscribe([self.ticker])
         self._data_gw.start()
-        self.logger.info(f"Running: {self.ticker} {self.signal_interval} lookback={self.lookback_bars}")
+        self.logger.info(f"运行中: {self.ticker} {self.signal_interval} lookback={self.lookback_bars}")
 
     def stop(self) -> None:
         """停止数据流与交易网关。"""
@@ -292,7 +292,7 @@ class LiveEngine(BaseComponent):
                 self.ticker, start, end, interval=self.signal_interval
             )
         except Exception as e:
-            self.logger.warning(f"DataFetcher failed: {e}")
+            self.logger.warning(f"DataFetcher 拉取失败: {e}")
             return None
         if data.empty:
             return None
@@ -321,7 +321,7 @@ class LiveEngine(BaseComponent):
             asset = client.query_stock_asset()
             cash = float(getattr(asset, "cash", 0.0) or 0.0) if asset is not None else 0.0
         except Exception as e:
-            self.logger.warning(f"query_stock_asset failed: {e}")
+            self.logger.warning(f"query_stock_asset 失败: {e}")
             cash = 0.0
         position = 0
         try:
@@ -334,7 +334,7 @@ class LiveEngine(BaseComponent):
                     )
                     break
         except Exception as e:
-            self.logger.warning(f"query_stock_positions failed: {e}")
+            self.logger.warning(f"query_stock_positions 失败: {e}")
             position = 0
         return cash, position, 0.001
 
@@ -374,7 +374,7 @@ class LiveEngine(BaseComponent):
                 return st in _MINIQMT_ORDER_STATUS_TERMINAL
             return True
         except Exception as e:
-            self.logger.warning(f"query_stock_orders for pending {order_id}: {e}")
+            self.logger.warning(f"查询挂单 {order_id} 失败: {e}")
             return False
 
     # ---------- 内部：Tick ----------
@@ -500,14 +500,14 @@ class LiveEngine(BaseComponent):
         if self._last_pending_order_id:
             oid = self._last_pending_order_id
             if self._pending_order_no_cancel_needed(oid):
-                self.logger.info(f"Pending order {oid} already finished; skip cancel")
+                self.logger.info(f"挂单 {oid} 已完成，跳过撤单")
                 self._last_pending_order_id = None
             else:
                 cancelled = self._trade_gw.cancel_order(oid)
                 if cancelled:
-                    self.logger.info(f"Cancelled pending order: {oid}")
+                    self.logger.info(f"已撤销挂单: {oid}")
                 else:
-                    self.logger.warning(f"Cancel pending order {oid} returned false")
+                    self.logger.warning(f"撤销挂单 {oid} 返回失败")
                 self._last_pending_order_id = None
 
         if signal == 1 and last <= 0:
@@ -515,7 +515,7 @@ class LiveEngine(BaseComponent):
                 buy_px = float(getattr(tick, "ask", None)) if getattr(tick, "ask", None) is not None else px
                 req = OrderRequest(ticker=self.ticker, quantity=sizing.qty, price=buy_px, order_type="limit")
                 self._last_pending_order_id = self._trade_gw.send_order(req)
-                self.logger.info(f"Order sent: BUY [{self.ticker}] qty={sizing.qty} @ {buy_px:.4f}")
+                self.logger.info(f"已发送买单: [{self.ticker}] qty={sizing.qty} @ {buy_px:.4f}")
         elif signal == -1 and last >= 0 and position > 0:
             if sizing.sell_order_qty <= 0:
                 self._last_signal = signal
@@ -525,7 +525,7 @@ class LiveEngine(BaseComponent):
                 ticker=self.ticker, quantity=-sizing.sell_order_qty, price=sell_px, order_type="limit"
             )
             self._last_pending_order_id = self._trade_gw.send_order(req)
-            self.logger.info(f"Order sent: SELL [{self.ticker}] qty={sizing.sell_order_qty} @ {sell_px:.4f}")
+            self.logger.info(f"已发送卖单: [{self.ticker}] qty={sizing.sell_order_qty} @ {sell_px:.4f}")
 
         self._last_signal = signal
 
@@ -543,7 +543,7 @@ class LiveEngine(BaseComponent):
         try:
             signals = self._strategy.generate_signals(df)
         except Exception as e:
-            self.logger.warning(f"Strategy signal failed: {e}")
+            self.logger.warning(f"策略信号执行失败: {e}")
             return
 
         if signals.empty:

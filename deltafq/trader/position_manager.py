@@ -14,7 +14,7 @@ class PositionManager(BaseComponent):
         """Initialize position manager."""
         super().__init__(**kwargs)
         self.positions = {}
-        self.logger.info("Initializing position manager")
+        self.logger.info("初始化持仓管理器")
     
     def add_position(self, ticker: str, quantity: int, price: Optional[float] = None) -> bool:
         """Add to existing position or create new position."""
@@ -42,18 +42,18 @@ class PositionManager(BaseComponent):
                 'updated_at': datetime.now()
             }
         
-        self.logger.info(f"↑ Position updated: {ticker} -> {self.positions[ticker]['quantity']}")
+        self.logger.info(f"↑ 持仓已更新: {ticker} -> {self.positions[ticker]['quantity']}")
         return True
     
     def reduce_position(self, ticker: str, quantity: int) -> bool:
         """Reduce existing position."""
         if ticker not in self.positions:
-            self.logger.warning(f"No position found for ticker: {ticker}")
+            self.logger.warning(f"未找到标的持仓: {ticker}")
             return False
         
         current_quantity = self.positions[ticker]['quantity']
         if current_quantity < quantity:
-            self.logger.warning(f"Insufficient position: {ticker}")
+            self.logger.warning(f"持仓数量不足: {ticker}")
             return False
         
         new_quantity = current_quantity - quantity
@@ -64,7 +64,7 @@ class PositionManager(BaseComponent):
             self.positions[ticker]['quantity'] = new_quantity
             self.positions[ticker]['updated_at'] = datetime.now()
         
-        self.logger.info(f"↓ Position reduced: {ticker} -> {new_quantity}")
+        self.logger.info(f"↓ 持仓已减少: {ticker} -> {new_quantity}")
         return True
     
     def get_position(self, ticker: str) -> int:

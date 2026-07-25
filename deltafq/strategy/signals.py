@@ -12,7 +12,7 @@ class SignalGenerator(BaseComponent):
     def __init__(self, **kwargs):
         """Initialize signal generator."""
         super().__init__(**kwargs)
-        self.logger.info("Initializing signal generator")
+        self.logger.info("初始化信号生成器")
 
     def _log_signal_counts(self, label: str, series: pd.Series) -> None:
         """Log the number of buy, sell, and flat signals."""
@@ -63,7 +63,7 @@ class SignalGenerator(BaseComponent):
         """Bullish on K crossing above D, bearish on K crossing beneath D."""
         for col in ("k", "d"):
             if col not in kdj:
-                raise ValueError("kdj must contain 'k' and 'd' columns")
+                raise ValueError("kdj 必须包含 k 和 d 列")
         signals = pd.Series(
             np.where(kdj["k"] > kdj["d"], 1, np.where(kdj["k"] < kdj["d"], -1, 0)),
             index=kdj.index,
@@ -76,9 +76,9 @@ class SignalGenerator(BaseComponent):
     def boll_signals(self, price: pd.Series, bands: pd.DataFrame, method: str = "cross") -> pd.Series:
         """Bollinger logic: touch or cross of the outer bands triggers entries."""
         if method not in ["touch", "cross", "cross_current"]:
-            raise ValueError("Invalid method")
+            raise ValueError("无效的 method 参数")
         if not all(col in bands for col in ("upper", "middle", "lower")):
-            raise ValueError("bands missing required columns")
+            raise ValueError("bands 缺少必要列")
 
         signals = pd.Series(0, index=price.index, dtype=int)
 
@@ -125,7 +125,7 @@ class SignalGenerator(BaseComponent):
     ) -> pd.Series:
         """Combine multiple {-1,0,1} Series using 'vote' | 'weighted' | 'threshold'."""
         if not signals_dict:
-            raise ValueError("signals_dict cannot be empty")
+            raise ValueError("signals_dict 不能为空")
         
         signal_names = list(signals_dict.keys())
         first_signal = signals_dict[signal_names[0]]
@@ -133,10 +133,10 @@ class SignalGenerator(BaseComponent):
         
         for name, signal in signals_dict.items():
             if len(signal) != len(first_signal):
-                raise ValueError(f"Signal '{name}' has different length")
+                raise ValueError(f"信号 '{name}' 长度不一致")
             if not signal.index.equals(index):
                 signals_dict[name] = signal.reindex(index)
-                self.logger.info(f"Aligned signal '{name}' index")
+                self.logger.info(f"已对齐信号 '{name}' 的索引")
         
         signals_df = pd.DataFrame(signals_dict)
         
@@ -153,7 +153,7 @@ class SignalGenerator(BaseComponent):
             else:
                 total_weight = sum(weights.values())
                 if total_weight == 0:
-                    raise ValueError("Total weight cannot be zero")
+                    raise ValueError("权重之和不能为零")
                 weights = {k: v / total_weight for k, v in weights.items()}
             
             weighted_sum = pd.Series(0.0, index=index)
@@ -170,7 +170,7 @@ class SignalGenerator(BaseComponent):
             else:
                 total_weight = sum(weights.values())
                 if total_weight == 0:
-                    raise ValueError("Total weight cannot be zero")
+                    raise ValueError("权重之和不能为零")
                 weights = {k: v / total_weight for k, v in weights.items()}
             
             weighted_sum = pd.Series(0.0, index=index)
@@ -182,7 +182,7 @@ class SignalGenerator(BaseComponent):
             combined = np.where(weighted_sum <= -threshold, -1, combined)
             
         else:
-            raise ValueError("Invalid method")
+            raise ValueError("无效的 method 参数")
         
         combined_series = pd.Series(combined, index=index, dtype=int)
         self._log_signal_counts(f"Combined ({method})", combined_series)

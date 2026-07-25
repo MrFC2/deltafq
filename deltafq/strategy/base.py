@@ -14,7 +14,7 @@ class BaseStrategy(BaseComponent, ABC):
     def __init__(self, name: str = None, **kwargs: Any) -> None:
         super().__init__(name=name, **kwargs)
         self.signals: pd.Series = pd.Series(dtype=int)
-        self.logger.info(f"Initializing strategy: {self.name}")
+        self.logger.info(f"初始化策略: {self.name}")
 
     @abstractmethod
     def generate_signals(self, data: pd.DataFrame) -> pd.Series:
@@ -23,9 +23,9 @@ class BaseStrategy(BaseComponent, ABC):
 
     def run(self, data: pd.DataFrame) -> Dict[str, Any]:
         """Run the strategy and return the signals."""
-        self.logger.info(f"Running strategy: {self.name}")
+        self.logger.info(f"运行策略: {self.name}")
         try:
             self.signals = self.generate_signals(data)
             return {"strategy_name": self.name, "signals": self.signals.astype(int)}
         except Exception as exc:
-            raise RuntimeError(f"Strategy execution failed: {exc}") from exc
+            raise RuntimeError(f"策略执行失败: {exc}") from exc

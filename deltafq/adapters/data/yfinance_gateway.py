@@ -35,16 +35,16 @@ class YFinanceDataGateway(DataGateway):
         self._symbols: List[str] = []
         self._running = False
         self._thread: Optional[threading.Thread] = None
-        self.logger.info(f"Initialized YFinanceDataGateway with interval: {self.interval}s")
+        self.logger.info(f"YFinanceDataGateway 已初始化，轮询间隔: {self.interval}s")
 
     def connect(self) -> bool:
         """验证网络与 yfinance 可访问。"""
         try:
             yf.Ticker("AAPL").fast_info
-            self.logger.info("Connected to yfinance")
+            self.logger.info("已连接到 yfinance")
             return True
         except Exception as e:
-            self.logger.error(f"Failed to connect: {e}")
+            self.logger.error(f"连接失败: {e}")
             return False
 
     def subscribe(self, symbols: List[str]) -> bool:
@@ -59,7 +59,7 @@ class YFinanceDataGateway(DataGateway):
         """启动轮询线程。"""
         if self._running:
             return
-        self.logger.info("Starting yfinance polling")
+        self.logger.info("启动 yfinance 轮询")
         self._running = True
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
@@ -69,7 +69,7 @@ class YFinanceDataGateway(DataGateway):
         self._running = False
         if self._thread:
             self._thread.join(timeout=2)
-        self.logger.info("Stopped yfinance polling")
+        self.logger.info("已停止 yfinance 轮询")
 
     def get_today_ohlc(self, ticker: str) -> Optional[Dict[str, float]]:
         """从 fast_info 取当日开、高、低；缺字段返回 None。"""
@@ -81,12 +81,12 @@ class YFinanceDataGateway(DataGateway):
             low_price = info.day_low
             if open_price is None or high_price is None or low_price is None:
                 self.logger.warning(
-                    f"Incomplete OHLC data for {ticker}: open={open_price}, high={high_price}, low={low_price}"
+                    f"{ticker} OHLC 数据不完整: open={open_price}, high={high_price}, low={low_price}"
                 )
                 return None
             return {"open": open_price, "high": high_price, "low": low_price}
         except Exception as e:
-            self.logger.error(f"Failed to get today's OHLC for {ticker}: {e}")
+            self.logger.error(f"获取 {ticker} 今日 OHLC 失败: {e}")
             return None
 
     def get_depths(self, ticker: str, levels: int = 5) -> Dict[str, List[Dict[str, float]]]:
@@ -126,11 +126,11 @@ class YFinanceDataGateway(DataGateway):
 
     def _warm_up(self, ticker: str) -> None:
         """下载近一日 1m K 线，逐根合成暖机 tick（source=yf_warmup）。"""
-        self.logger.debug(f"Warming up {ticker} with intraday history...")
+        self.logger.debug(f"正在为 {ticker} 加载历史数据进行暖机...")
         try:
             data = yf.download(ticker, period="1d", interval="1m", progress=False)
             if data.empty:
-                self.logger.warning(f"No warm-up data for {ticker}")
+                self.logger.warning(f"{ticker} 无暖机数据")
                 return
             pushed_count = 0
             for timestamp, row in data.iterrows():
@@ -147,9 +147,9 @@ class YFinanceDataGateway(DataGateway):
                 if self._tick_handler:
                     self._tick_handler(tick)
                 pushed_count += 1
-            self.logger.info(f"Subscribed & Warmed up {ticker} ({pushed_count} bars)")
+            self.logger.info(f"已订阅并完成 {ticker} 暖机（{pushed_count} 根K线）")
         except Exception as e:
-            self.logger.warning(f"Warm-up failed for {ticker}: {e}")
+            self.logger.warning(f"{ticker} 暖机失败: {e}")
 
     def _run(self) -> None:
         """轮询各标的 fast_info，组 TickData 回调。"""
@@ -172,6 +172,6 @@ class YFinanceDataGateway(DataGateway):
                     if self._tick_handler:
                         self._tick_handler(tick)
                 except Exception as e:
-                    self.logger.error(f"Error fetching data for {ticker}: {str(e)}")
+                    self.logger.error(f"拉取 {ticker} 数据出错: {str(e)}")
                     continue
             time.sleep(self.interval)

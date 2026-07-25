@@ -13,7 +13,7 @@ class TalibIndicators(BaseComponent):
     def __init__(self, **kwargs):
         """Initialize technical indicators."""
         super().__init__(**kwargs)
-        self.logger.info("Initializing TA-Lib technical indicators")
+        self.logger.info("初始化 TA-Lib 技术指标计算器")
     
     def sma(self, data: pd.Series, period: int) -> pd.Series:
         """Calculate Simple Moving Average (SMA) using TA-Lib."""
@@ -33,7 +33,7 @@ class TalibIndicators(BaseComponent):
     def kdj(self, high: pd.Series, low: pd.Series, close: pd.Series, 
             n: int = 9, m1: int = 3, m2: int = 3) -> pd.DataFrame:
         """Calculate KDJ indicator using TA-Lib."""
-        self.logger.info(f"Calculating KDJ(n={n}, m1={m1}, m2={m2})")
+        self.logger.info(f"计算 KDJ(n={n}, m1={m1}, m2={m2})")
         k, d = talib.STOCH(high.values.astype(float), low.values.astype(float), close.values.astype(float),
                            fastk_period=n, slowk_period=m1, slowd_period=m2)
         return pd.DataFrame({
@@ -63,5 +63,5 @@ class TalibIndicators(BaseComponent):
     
     def obv(self, close: pd.Series, volume: pd.Series) -> pd.Series:
         """Calculate On-Balance Volume (OBV) using TA-Lib."""
-        self.logger.info("Calculating OBV")
+        self.logger.info("计算 OBV")
         return pd.Series(talib.OBV(close.values.astype(float), volume.values.astype(float)), index=close.index)

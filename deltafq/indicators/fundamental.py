@@ -12,7 +12,7 @@ class FundamentalIndicators(BaseComponent):
     def __init__(self, **kwargs):
         """Initialize fundamental indicators."""
         super().__init__(**kwargs)
-        self.logger.info("Initializing fundamental indicators")
+        self.logger.info("初始化基本面指标计算器")
                          
     def pe(self, price: pd.Series, eps_ttm: pd.Series) -> pd.Series:
         """PE = price / EPS"""

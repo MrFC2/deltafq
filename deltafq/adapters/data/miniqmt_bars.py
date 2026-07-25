@@ -48,7 +48,7 @@ def interval_to_xt_period(interval: str) -> str:
     m = (interval or "1d").strip().lower()
     p = _PERIOD_ALIASES.get(m, m)
     if p not in _XT_PERIODS:
-        raise ValueError(f"Unsupported interval: {interval!r}")
+        raise ValueError(f"不支持的周期: {interval!r}")
     return p
 
 

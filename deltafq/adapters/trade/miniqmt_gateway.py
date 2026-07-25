@@ -63,12 +63,12 @@ class MiniQmtTradeGateway(TradeGateway):
             raise ValueError("MiniQmtTradeGateway currently supports limit orders only (order_type=limit)")
         qty = int(req.quantity)
         if qty == 0:
-            raise ValueError("quantity must be non-zero")
+            raise ValueError("数量不能为零")
         abs_vol = abs(qty)
         if abs_vol % self._lot_size != 0:
             aligned = (abs_vol // self._lot_size) * self._lot_size
             if aligned <= 0:
-                raise ValueError(f"quantity {qty} is below one lot ({self._lot_size})")
+                raise ValueError(f"数量 {qty} 小于最小手数（{self._lot_size}）")
             logger.warning("adjusting quantity %s -> %s (lot_size=%s)", abs_vol, aligned, self._lot_size)
             abs_vol = aligned
         is_buy = qty > 0
@@ -81,7 +81,7 @@ class MiniQmtTradeGateway(TradeGateway):
             order_remark=self._order_remark,
         )
         if oid is None or int(oid) <= 0:
-            raise RuntimeError(f"order_stock failed: oid={oid!r}")
+            raise RuntimeError(f"下单失败: oid={oid!r}")
         return str(int(oid))
 
     def cancel_order(self, order_id: str) -> bool:

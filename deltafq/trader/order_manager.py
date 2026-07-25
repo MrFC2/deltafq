@@ -16,7 +16,7 @@ class OrderManager(BaseComponent):
         super().__init__(**kwargs)
         self.orders = {}
         self.order_counter = 0
-        self.logger.info("Initializing order manager")
+        self.logger.info("初始化订单管理器")
     
     def create_order(self, ticker: str, quantity: int, order_type: str = "limit", 
                     price: Optional[float] = None, stop_price: Optional[float] = None) -> str:
@@ -37,7 +37,7 @@ class OrderManager(BaseComponent):
         }
         
         self.orders[order_id] = order
-        self.logger.info(f"+ Order created: {order_id}")
+        self.logger.info(f"+ 订单已创建: {order_id}")
         return order_id
     
     def get_order(self, order_id: str) -> Optional[Dict[str, Any]]:
@@ -101,6 +101,6 @@ class OrderManager(BaseComponent):
         for order_id in old_orders:
             del self.orders[order_id]
         
-        self.logger.info(f"Cleaned up {len(old_orders)} old orders")
+        self.logger.info(f"已清理 {len(old_orders)} 条旧订单")
         return len(old_orders)
 
