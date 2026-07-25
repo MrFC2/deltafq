@@ -31,7 +31,7 @@ class SimpleMAStrategy(BaseStrategy):
 
 
 def run_signal(fetcher, strategy, symbol, start, end, interval, storage=None):
-    data = fetcher.fetch_data(symbol, start, end, clean=True, interval=interval)
+    data = fetcher.fetch_data(symbol, start, end, interval=interval)
     if storage is not None and not data.empty:
         storage.save_price_data(data, symbol, start, end)
     if data.empty or len(data) < 2:

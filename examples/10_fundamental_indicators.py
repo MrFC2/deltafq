@@ -21,7 +21,7 @@ def main() -> None:
     
     # Fetch price data
     fetcher = DataFetcher()
-    data = fetcher.fetch_data(symbol=symbol, start_date="2024-01-01", end_date="2024-12-31", clean=True)
+    data = fetcher.fetch_data(symbol=symbol, start_date="2024-01-01", end_date="2024-12-31")
     price = data["Close"]
     
     # Fetch fundamental data from yfinance

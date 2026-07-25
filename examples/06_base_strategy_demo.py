@@ -44,7 +44,6 @@ def run_strategy_demo() -> None:
         symbol="AAPL",
         start_date="2024-01-01",
         end_date="2024-06-30",
-        clean=True,
     )
 
     result = strategy.run(data)

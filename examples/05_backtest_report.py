@@ -25,7 +25,7 @@ def main() -> None:
     start_date = "2024-01-01"
     end_date = "2024-06-30"
 
-    data = fetcher.fetch_data(symbol=symbol, start_date=start_date, end_date=end_date, clean=True)
+    data = fetcher.fetch_data(symbol=symbol, start_date=start_date, end_date=end_date)
     boll = indicators.boll(data["Close"], period=20, std_dev=2, method="population")
     signals = generator.boll_signals(price=data["Close"], bands=boll, method="touch")
 

@@ -65,7 +65,7 @@ class BacktestEngine(BaseComponent, ABC):
 
     def load_data(self) -> pd.DataFrame:
         """通过数据获取器加载行情数据。"""
-        self.data = self.data_fetcher.fetch_data(self.ticker, self.start_date, self.end_date, clean=True)
+        self.data = self.data_fetcher.fetch_data(self.ticker, self.start_date, self.end_date)
         return self.data
 
     def add_strategy(self, strategy: BaseStrategy) -> None:
@@ -156,7 +156,7 @@ class BacktestEngine(BaseComponent, ABC):
     def show_chart(self, use_plotly: bool = True) -> None:
         """展示回测绩效图表。"""
         if self.benchmark is not None:
-            benchmark_data = self.data_fetcher.fetch_data(self.benchmark, self.start_date, self.end_date, clean=True)
+            benchmark_data = self.data_fetcher.fetch_data(self.benchmark, self.start_date, self.end_date)
             self.chart.plot_backtest_charts(values_df=self.values_df, benchmark_close=benchmark_data['Close'],
                                             use_plotly=use_plotly)
         else:

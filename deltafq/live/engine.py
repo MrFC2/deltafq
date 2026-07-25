@@ -289,7 +289,7 @@ class LiveEngine(BaseComponent):
         end = (now + timedelta(days=1)).strftime("%Y-%m-%d")
         try:
             data = self._data_fetcher.fetch_data(
-                self.symbol, start, end, clean=True, interval=self.signal_interval
+                self.symbol, start, end, interval=self.signal_interval
             )
         except Exception as e:
             self.logger.warning(f"DataFetcher failed: {e}")

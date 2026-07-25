@@ -29,8 +29,8 @@ def main() -> None:
     end_date = "2024-06-30"
     benchmark = "SPY"
 
-    data = fetcher.fetch_data(symbol=symbol, start_date=start_date, end_date=end_date, clean=True)
-    benchmark_data = fetcher.fetch_data(symbol=benchmark, start_date=start_date, end_date=end_date, clean=True)
+    data = fetcher.fetch_data(symbol=symbol, start_date=start_date, end_date=end_date)
+    benchmark_data = fetcher.fetch_data(symbol=benchmark, start_date=start_date, end_date=end_date)
     
     boll = indicators.boll(data["Close"], period=10, std_dev=2, method="population")
     signals = generator.boll_signals(price=data["Close"], bands=boll, method="touch")
