@@ -21,7 +21,7 @@ class PerformanceChart(BaseComponent):
     def __init__(self, **kwargs):
         """Initialize performance chart."""
         super().__init__(**kwargs)
-        self.logger.info("Initializing performance chart")
+        self.logger.info("初始化绩效图表")
 
     def plot_backtest_charts(
         self,
@@ -47,7 +47,7 @@ class PerformanceChart(BaseComponent):
         df.index = pd.to_datetime(df.index)
 
         if "total_value" not in df.columns:
-            raise KeyError("values_df must contain 'total_value'")
+            raise KeyError("values_df 必须包含 total_value 列")
 
         if "returns" not in df.columns:
             df["returns"] = df["total_value"].pct_change().fillna(0.0)
@@ -81,7 +81,7 @@ class PerformanceChart(BaseComponent):
                 import plotly.graph_objects as go
                 from plotly.subplots import make_subplots
             except ImportError as exc:  # pragma: no cover
-                self.logger.info(f"Plotly not available ({exc}); falling back to Matplotlib")
+                self.logger.info(f"Plotly 不可用（{exc}），回退到 Matplotlib")
             else:
                 rows = 5
                 fig = make_subplots(
@@ -194,7 +194,7 @@ class PerformanceChart(BaseComponent):
                 if save_path:
                     html_path = save_path if str(save_path).lower().endswith(".html") else f"{save_path}.html"
                     fig.write_html(html_path, include_plotlyjs="cdn")
-                    self.logger.info(f"Chart saved to {html_path}")
+                    self.logger.info(f"图表已保存至 {html_path}")
                 else:
                     fig.show()
                 return
@@ -224,7 +224,7 @@ class PerformanceChart(BaseComponent):
 
         if save_path:
             fig.savefig(save_path, dpi=300, bbox_inches="tight")
-            self.logger.info(f"Chart saved to {save_path}")
+            self.logger.info(f"图表已保存至 {save_path}")
         else:
             plt.show()
 
