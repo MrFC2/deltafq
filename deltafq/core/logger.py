@@ -6,10 +6,10 @@ import logging
 import sys
 
 class Logger:
-    """Logger for DeltaFQ components."""
+    """日志工具。"""
     
     def __init__(self, name: str = "deltafq", level: str = "INFO"):
-        """Initialize logger."""
+        """初始化日志器。"""
         self.logger = logging.getLogger(name)
         self.logger.setLevel(getattr(logging, level.upper()))
         
@@ -23,22 +23,22 @@ class Logger:
             self.logger.addHandler(handler)
     
     def debug(self, message: str):
-        """Log debug message."""
+        """输出 debug 日志。"""
         self.logger.debug(message)
     
     def info(self, message: str):
-        """Log info message."""
+        """输出 info 日志。"""
         self.logger.info(message)
     
     def warning(self, message: str):
-        """Log warning message."""
+        """输出 warning 日志。"""
         self.logger.warning(message)
     
     def error(self, message: str):
-        """Log error message."""
+        """输出 error 日志。"""
         self.logger.error(message)
     
     def critical(self, message: str):
-        """Log critical message."""
+        """输出 critical 日志。"""
         self.logger.critical(message)
 

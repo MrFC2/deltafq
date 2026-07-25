@@ -8,18 +8,18 @@ from ..core.base import BaseComponent
 
 
 class PositionManager(BaseComponent):
-    """Manage trading positions."""
+    """持仓管理器。"""
     
     def __init__(self, **kwargs):
-        """Initialize position manager."""
+        """初始化持仓管理器。"""
         super().__init__(**kwargs)
         self.positions = {}
         self.logger.info("初始化持仓管理器")
     
     def add_position(self, ticker: str, quantity: int, price: Optional[float] = None) -> bool:
-        """Add to existing position or create new position."""
+        """增加或新建持仓。"""
         if ticker in self.positions:
-            # Update existing position
+            # 更新已有持仓
             current_quantity = self.positions[ticker]['quantity']
             current_avg_price = self.positions[ticker]['avg_price']
             
@@ -33,7 +33,7 @@ class PositionManager(BaseComponent):
             self.positions[ticker]['avg_price'] = new_avg_price
             self.positions[ticker]['updated_at'] = datetime.now()
         else:
-            # Create new position
+            # 新建持仓
             self.positions[ticker] = {
                 'ticker': ticker,
                 'quantity': quantity,
@@ -46,7 +46,7 @@ class PositionManager(BaseComponent):
         return True
     
     def reduce_position(self, ticker: str, quantity: int) -> bool:
-        """Reduce existing position."""
+        """减少持仓。"""
         if ticker not in self.positions:
             self.logger.warning(f"未找到标的持仓: {ticker}")
             return False
@@ -68,19 +68,19 @@ class PositionManager(BaseComponent):
         return True
     
     def get_position(self, ticker: str) -> int:
-        """Get current position quantity for ticker."""
+        """查询标的当前持仓数量。"""
         return self.positions.get(ticker, {}).get('quantity', 0)
     
     def get_all_positions(self) -> Dict[str, int]:
-        """Get all current positions."""
+        """查询所有持仓。"""
         return {ticker: pos['quantity'] for ticker, pos in self.positions.items()}
     
     def can_sell(self, ticker: str, quantity: int) -> bool:
-        """Check if we can sell the specified quantity."""
+        """检查是否可以卖出指定数量。"""
         return self.get_position(ticker) >= quantity
     
     def close_position(self, ticker: str) -> bool:
-        """Close entire position for ticker."""
+        """清空指定标的持仓。"""
         if ticker not in self.positions:
             return False
 

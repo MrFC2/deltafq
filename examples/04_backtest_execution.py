@@ -28,12 +28,13 @@ def main() -> None:
     boll = indicators.boll(data["Close"], period=20, std_dev=2, method="population")
     signals = generator.boll_signals(price=data["Close"], bands=boll, method="touch")
 
-    trades_df, values_df = engine.run_backtest(ticker=ticker, signals=signals, price_series=data["Close"])
+    # TODO: 将信号逻辑封装为 BaseStrategy 子类，通过 add_strategy() 传入后再调用 run_backtest()
+    # trades_df, values_df = engine.run_backtest(ticker=ticker, signals=signals, price_series=data["Close"])
 
     print("Trades:")
-    print(trades_df)
+    # print(trades_df)
     print("\nPortfolio values:")
-    print(values_df)
+    # print(values_df)
 
 
 if __name__ == "__main__":

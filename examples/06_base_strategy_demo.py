@@ -46,10 +46,9 @@ def run_strategy_demo() -> None:
         end_date="2024-06-30",
     )
 
-    result = strategy.run(data)
-    signals = result["signals"]
+    signals = strategy.run(data)
 
-    print(f"Strategy name: {result['strategy_name']}")
+    print(f"Strategy name: {strategy.name}")
     print(f"Signals:\n{signals}")
     print(f"Buy count: {(signals == 1).sum()}")
     print(f"Sell count: {(signals == -1).sum()}")

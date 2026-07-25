@@ -1,4 +1,4 @@
-"""Essential signal generation and combination utilities."""
+"""信号生成与合并工具。"""
 
 import pandas as pd
 import numpy as np
@@ -7,15 +7,15 @@ from ..core.base import BaseComponent
 
 
 class SignalGenerator(BaseComponent):
-    """Generate trading signals from precomputed indicators and combine them."""
+    """从预计算指标生成交易信号，并支持多信号合并。"""
     
     def __init__(self, **kwargs):
-        """Initialize signal generator."""
+        """初始化信号生成器。"""
         super().__init__(**kwargs)
         self.logger.info("初始化信号生成器")
 
     def _log_signal_counts(self, label: str, series: pd.Series) -> None:
-        """Log the number of buy, sell, and flat signals."""
+        """记录买入、卖出、持平信号数量。"""
         buy = int((series == 1).sum())
         sell = int((series == -1).sum())
         flat = int((series == 0).sum())
@@ -23,7 +23,7 @@ class SignalGenerator(BaseComponent):
         
     # --- SMA -----------------------------------------------------------------
     def sma_signals(self, fast_ma: pd.Series, slow_ma: pd.Series) -> pd.Series:
-        """Bullish when the fast MA is above the slow MA, bearish when below."""
+        """快线在慢线上方为多头，下方为空头。"""
         if not fast_ma.index.equals(slow_ma.index):
             slow_ma = slow_ma.reindex(fast_ma.index)
         signals = pd.Series(
@@ -36,7 +36,7 @@ class SignalGenerator(BaseComponent):
 
     # --- EMA -----------------------------------------------------------------
     def ema_signals(self, price: pd.Series, ema: pd.Series) -> pd.Series:
-        """Bullish when price sits above the EMA, bearish when it falls below."""
+        """价格在 EMA 上方为多头，下方为空头。"""
         if not price.index.equals(ema.index):
             ema = ema.reindex(price.index)
         signals = pd.Series(
@@ -49,7 +49,7 @@ class SignalGenerator(BaseComponent):
 
     # --- RSI -----------------------------------------------------------------
     def rsi_signals(self, rsi: pd.Series, oversold: float = 30, overbought: float = 70) -> pd.Series:
-        """Buy when RSI drops beneath the oversold band, sell when above overbought."""
+        """RSI 低于超卖线买入，高于超买线卖出。"""
         signals = pd.Series(
             np.where(rsi < oversold, 1, np.where(rsi > overbought, -1, 0)),
             index=rsi.index,
@@ -60,7 +60,7 @@ class SignalGenerator(BaseComponent):
 
     # --- KDJ -----------------------------------------------------------------
     def kdj_signals(self, kdj: pd.DataFrame) -> pd.Series:
-        """Bullish on K crossing above D, bearish on K crossing beneath D."""
+        """K 上穿 D 为多头，下穿为空头。"""
         for col in ("k", "d"):
             if col not in kdj:
                 raise ValueError("kdj 必须包含 k 和 d 列")
@@ -74,7 +74,7 @@ class SignalGenerator(BaseComponent):
 
     # --- BOLL ----------------------------------------------------------------
     def boll_signals(self, price: pd.Series, bands: pd.DataFrame, method: str = "cross") -> pd.Series:
-        """Bollinger logic: touch or cross of the outer bands triggers entries."""
+        """触及或穿越布林带外轨触发信号。"""
         if method not in ["touch", "cross", "cross_current"]:
             raise ValueError("无效的 method 参数")
         if not all(col in bands for col in ("upper", "middle", "lower")):
@@ -94,7 +94,7 @@ class SignalGenerator(BaseComponent):
             sell_condition = (prev_price >= prev_bands["upper"]) & (price <= bands["upper"])
             signals = np.where(buy_condition, 1, np.where(sell_condition, -1, 0))
 
-        elif method == "cross_current": # same as jupyter notebook example
+        elif method == "cross_current":
             prev_price = price.shift(1)
             buy_condition = (prev_price <= bands["lower"]) & (price >= bands["lower"])
             sell_condition = (prev_price >= bands["upper"]) & (price <= bands["upper"])
@@ -106,7 +106,7 @@ class SignalGenerator(BaseComponent):
 
     # --- OBV -----------------------------------------------------------------
     def obv_signals(self, obv: pd.Series) -> pd.Series:
-        """Positive OBV slope hints at buying pressure; negative slope at selling."""
+        """OBV 斜率为正为买压，为负为卖压。"""
         obv_change = obv.diff().fillna(0)
         signals = pd.Series(
             np.where(obv_change > 0, 1, np.where(obv_change < 0, -1, 0)),
@@ -123,7 +123,7 @@ class SignalGenerator(BaseComponent):
         weights: Optional[Dict[str, float]] = None,
         threshold: float = 0.5
     ) -> pd.Series:
-        """Combine multiple {-1,0,1} Series using 'vote' | 'weighted' | 'threshold'."""
+        """合并多个 {-1,0,1} 信号序列，支持 vote / weighted / threshold 三种方式。"""
         if not signals_dict:
             raise ValueError("signals_dict 不能为空")
         

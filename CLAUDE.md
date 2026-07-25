@@ -52,9 +52,9 @@ strategy.generate_signals(df)   # returns pd.Series of {-1, 0, 1}
 ```python
 engine.set_parameters(symbol, start, end)
 engine.load_data()
-engine.add_strategy(MyStrategy())   # calls strategy.run() internally
-engine.run_backtest()
-engine.show_report()
+engine.add_strategy(MyStrategy())  # calls strategy.run() internally
+engine.run()
+engine.print_report()
 ```
 
 Execution replay lives in `trader/engine.py` (`ExecutionEngine`), which delegates to `order_manager.py` and `position_manager.py`.

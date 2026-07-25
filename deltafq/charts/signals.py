@@ -1,4 +1,4 @@
-"""Minimal signal chart helper."""
+"""信号图表工具。"""
 
 from typing import Dict, Optional
 
@@ -12,9 +12,9 @@ from ..core.base import BaseComponent
 
 class SignalChart(BaseComponent):
     def __init__(self, **kwargs):
-        """Initialize the signal chart."""
+        """初始化信号图表。"""
         super().__init__(**kwargs)
-        self.logger.info("Initializing signal chart")
+        self.logger.info("初始化信号图表")
 
     def plot_boll_signals(
         self,
@@ -26,7 +26,7 @@ class SignalChart(BaseComponent):
     ) -> None:
         required = {"Open", "High", "Low", "Close"}
         if not required.issubset(data.columns):
-            raise ValueError(f"data must contain columns: {required}")
+            raise ValueError(f"data 缺少必要列: {required}")
 
         frame = data.copy()
         frame.index = pd.to_datetime(frame.index)

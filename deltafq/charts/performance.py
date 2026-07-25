@@ -1,4 +1,4 @@
-"""Performance visualization utilities."""
+"""绩效可视化工具。"""
 
 from typing import Optional
 
@@ -16,10 +16,10 @@ except ImportError:  # pragma: no cover
 
 
 class PerformanceChart(BaseComponent):
-    """Visualize backtest performance with stacked panels."""
+    """多面板回测绩效图表。"""
 
     def __init__(self, **kwargs):
-        """Initialize performance chart."""
+        """初始化绩效图表。"""
         super().__init__(**kwargs)
         self.logger.info("初始化绩效图表")
 
@@ -58,7 +58,7 @@ class PerformanceChart(BaseComponent):
         else:
             date_text = "no data"
 
-        # Pre-compute series used by both matplotlib and plotly paths
+        # 预计算 matplotlib 和 plotly 共用的序列
         strategy_nv = df["total_value"] / df["total_value"].iloc[0]
         drawdown = (df["total_value"].expanding().max() - df["total_value"]) / df["total_value"].expanding().max() * -100
         returns_pct = df["returns"] * 100
@@ -229,7 +229,7 @@ class PerformanceChart(BaseComponent):
             plt.show()
 
     # ------------------------------------------------------------------
-    # Individual panels (Matplotlib)
+    # 各面板绘制方法（Matplotlib）
     # ------------------------------------------------------------------
 
     def _plot_price_compare(

@@ -7,14 +7,14 @@ from .logger import Logger
 
 
 class BaseComponent(ABC):
-    """Base class for all DeltaFQ components."""
+    """所有组件的基类。"""
     
     def __init__(self, name: str = None, **kwargs):
-        """Initialize base component."""
+        """初始化组件。"""
         self.name = name or self.__class__.__name__
         self.logger = Logger(self.name)
     
     def initialize(self) -> bool:
-        """Initialize the component if needed such as connection to external services."""
+        """初始化组件，如建立外部服务连接。"""
         return True
 

@@ -35,37 +35,25 @@ class SimpleMAStrategy(BaseStrategy):
 
 
 def main() -> None:
+    strategy = SimpleMAStrategy(fast_period=10, slow_period=30)
     engine = BacktestEngine(
         ticker="AAPL",
+        strategy=strategy,
         start_date="2024-01-01",
         end_date="2024-06-30",
         benchmark="SPY",
     )
 
-    engine.load_data()    
-    # add strategy
-    strategy = SimpleMAStrategy(fast_period=10, slow_period=30)
-    engine.add_strategy(strategy)
-    # run backtest
-    engine.run_backtest()
-    # calculate metrics
-    engine.calculate_metrics()
-    # show report
-    engine.show_report()
-    # show chart
-    engine.show_chart(use_plotly=True)
-    # save backtest results
-    engine.save_backtest_results()
-    
-    # print results
-    print("Data:")
-    print(pd.DataFrame(engine.data))
-    print("Trades:")
-    print(pd.DataFrame(engine.trades_df))
-    print("Values:")
-    print(pd.DataFrame(engine.values_df))
-    print("Metrics:")
-    print(pd.DataFrame([engine.metrics]).T)
+    engine.run(save_results=False)
+
+    # print("Data:")
+    # print(pd.DataFrame(engine.data))
+    # print("Trades:")
+    # print(pd.DataFrame(engine.trades_df))
+    # print("Values:")
+    # print(pd.DataFrame(engine.values_df))
+    # print("Metrics:")
+    # print(pd.DataFrame([engine.metrics]).T)
 
 
 if __name__ == "__main__":

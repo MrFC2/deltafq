@@ -49,19 +49,21 @@ pip install deltafq
 ```python
 import deltafq as dfq
 
+
 # 1. 定义策略逻辑
 class MyStrategy(dfq.strategy.BaseStrategy):
     def generate_signals(self, data):
         bands = dfq.indicators.TechnicalIndicators().boll(data["Close"])
         return dfq.strategy.SignalGenerator().boll_signals(data["Close"], bands)
 
+
 # 2. 极简回测与展示
 engine = dfq.backtest.BacktestEngine()
 engine.set_parameters("GOOGL", "2025-07-26", "2026-01-26")
 engine.load_data()
 engine.add_strategy(MyStrategy(name="BOLL"))
-engine.run_backtest()
-engine.show_report()
+engine.run()
+engine.print_report()
 engine.show_chart(use_plotly=False)
 ```
 

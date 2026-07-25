@@ -1,5 +1,5 @@
 """
-Trade execution engine for DeltaFQ.
+交易执行引擎。
 """
 
 from typing import Dict, List, Optional, Any, TYPE_CHECKING
@@ -13,30 +13,18 @@ if TYPE_CHECKING:
 
 
 class ExecutionEngine(BaseComponent):
-    """
-    Trade execution engine for real-time trading.
-    Supports paper trading (broker=None) and live trading (broker=adapter).
-    Paper trading manages cash internally. Live trading uses broker for account info.
-    """
-    
+    """实盘/模拟两用交易执行引擎。broker=None 为模拟交易，内部管理资金；传入 broker 为实盘，账户信息由 broker 提供。"""
+
     def __init__(self, broker=None, initial_capital: Optional[float] = None,
                  commission: float = 0.001, match_on_tick: bool = False, **kwargs):
-        """
-        Initialize execution engine.
-        Args:
-            broker: Broker adapter for live trading. None for paper trading.
-            initial_capital: Initial capital for paper trading. Defaults to 1000000.
-            commission: Commission rate for paper trading. Defaults to 0.001.
-            match_on_tick: If True, paper limit orders stay pending until on_tick matches (simulation).
-                If False (default), paper orders fill at once (backtest).
-        """
+        """初始化执行引擎。"""
         super().__init__(**kwargs)
         self.broker = broker
         self.match_on_tick = match_on_tick
         self.order_manager = OrderManager()
         self.position_manager = PositionManager()
         
-        # Paper trading mode: manage cash internally
+        # 模拟交易：内部管理资金
         if broker is None:
             self.initial_capital = initial_capital if initial_capital is not None else 1000000
             self.cash = self.initial_capital
@@ -44,14 +32,14 @@ class ExecutionEngine(BaseComponent):
             self.trades: List[Dict[str, Any]] = []
             self.is_paper_trading = True
         else:
-            # Live trading mode: get account info from broker
+            # 实盘：账户信息由 broker 提供
             self.cash = None
             self.commission = None
             self.trades = []
             self.is_paper_trading = False
     
     def initialize(self) -> bool:
-        """Initialize execution engine."""
+        """初始化执行引擎"""
         if self.is_paper_trading:
             self.logger.info(f"初始化模拟交易执行引擎，初始资金: {self.initial_capital}")
         else:
@@ -64,13 +52,13 @@ class ExecutionEngine(BaseComponent):
     
     def execute_order(self, ticker: str, quantity: int, order_type: str = "limit", 
                      price: Optional[float] = None, timestamp: Optional[datetime] = None) -> str:
-        """Execute an order. Default is limit order (price required)."""
+        """执行订单，默认为限价单。"""
         try:
-            # Validate price for limit orders
+            # 限价单校验价格
             if order_type == "limit" and price is None:
                 raise ValueError("限价单必须提供价格")
             
-            # Create order
+            # 创建订单
             order_id = self.order_manager.create_order(
                 ticker=ticker,
                 quantity=quantity,
@@ -78,7 +66,7 @@ class ExecutionEngine(BaseComponent):
                 price=price
             )
             
-            # Execute through broker
+            # 通过券商执行
             if self.broker:
                 broker_order_id = self.broker.place_order(
                     ticker=ticker,
@@ -87,7 +75,7 @@ class ExecutionEngine(BaseComponent):
                     price=price
                 )
                 
-                # Update order with broker ID
+                # 更新券商订单 ID
                 order = self.order_manager.get_order(order_id)
                 if order:
                     order['broker_order_id'] = broker_order_id
@@ -99,7 +87,7 @@ class ExecutionEngine(BaseComponent):
                     self.logger.info(f"订单已执行（模拟）: {order_id}，日期: {timestamp.date()}，价格: {price}，数量: {quantity}")
                 else:
                     side = "[SELL]" if quantity < 0 else "[BUY]"
-                    self.logger.info(f"○ Order pending: {order_id} {side} {ticker} qty={abs(quantity)} @ {price:.2f}")
+                    self.logger.info(f"○ 订单挂起: {order_id} {side} {ticker} qty={abs(quantity)} @ {price:.2f}")
             
             return order_id
             
@@ -107,7 +95,7 @@ class ExecutionEngine(BaseComponent):
             raise RuntimeError(f"订单执行失败: {str(e)}") from e
 
     def on_tick(self, tick: "TickData") -> None:
-        """Match pending orders against tick (for EventEngine-driven simulation)."""
+        """对挂单进行 tick 撮合（EventEngine 驱动的模拟交易）。"""
         if not self.is_paper_trading:
             return
         for order in self.order_manager.get_pending_orders():
@@ -117,10 +105,10 @@ class ExecutionEngine(BaseComponent):
             match = ot == "market" or (q > 0 and tick.price <= p) or (q < 0 and tick.price >= p)
             if match:
                 self._on_trade(order["id"], tick.price, tick.timestamp)
-                break  # one fill per tick per ticker, keep it simple
+                break  # 每个 tick 每标的只撮合一笔
 
     def _on_trade(self, order_id: str, execution_price: float, timestamp: Optional[datetime] = None):
-        """Unified settlement entry after a trade. Updates cash, position, order status and trade record."""
+        """成交后统一结算：更新资金、持仓、订单状态和成交记录。"""
         order = self.order_manager.get_order(order_id)
         if not order:
             return
@@ -129,7 +117,7 @@ class ExecutionEngine(BaseComponent):
         quantity = order['quantity']
         timestamp = timestamp or datetime.now()
         
-        if quantity > 0:  # Buy
+        if quantity > 0:  # 买入
             gross_cost = quantity * execution_price
             commission_amount = gross_cost * self.commission
             total_cost = gross_cost + commission_amount
@@ -139,7 +127,7 @@ class ExecutionEngine(BaseComponent):
                 self.position_manager.add_position(ticker, quantity, execution_price)
                 self.order_manager.mark_executed(order_id, execution_price)
                 
-                # Record trade (unified record with full details)
+                # 记录成交
                 self.trades.append({
                     'order_id': order_id,
                     'ticker': ticker,
@@ -150,18 +138,18 @@ class ExecutionEngine(BaseComponent):
                     'commission': commission_amount,
                     'cost': total_cost
                 })
-                self.logger.info(f"✓ Order filled: {order_id} [BUY] {ticker} qty={quantity} @ {execution_price:.2f}")
+                self.logger.info(f"✓ 订单成交: {order_id} [BUY] {ticker} qty={quantity} @ {execution_price:.2f}")
             else:
                 self.logger.warning(f"买入资金不足: 需要 {total_cost:.2f}，当前 {self.cash:.2f}")
                 self.order_manager.cancel_order(order_id)
-        else:  # Sell
+        else:  # 卖出
             quantity = abs(quantity)
             if self.position_manager.can_sell(ticker, quantity):
                 gross_revenue = quantity * execution_price
                 commission_amount = gross_revenue * self.commission
                 net_revenue = gross_revenue - commission_amount
                 
-                # Calculate profit/loss
+                # 计算盈亏
                 buy_cost = self._get_latest_buy_cost(ticker)
                 profit_loss = net_revenue - buy_cost if buy_cost else net_revenue
                 
@@ -169,7 +157,7 @@ class ExecutionEngine(BaseComponent):
                 self.cash += net_revenue
                 self.order_manager.mark_executed(order_id, execution_price)
                 
-                # Record trade (unified record with full details)
+                # 记录成交
                 self.trades.append({
                     'order_id': order_id,
                     'ticker': ticker,
@@ -183,13 +171,13 @@ class ExecutionEngine(BaseComponent):
                     'buy_cost': buy_cost,
                     'profit_loss': profit_loss
                 })
-                self.logger.info(f"✓ Order filled: {order_id} [SELL] {ticker} qty={quantity} @ {execution_price:.2f}")
+                self.logger.info(f"✓ 订单成交: {order_id} [SELL] {ticker} qty={quantity} @ {execution_price:.2f}")
             else:
                 self.logger.warning(f"卖出持仓不足: {ticker}，需要 {quantity}")
                 self.order_manager.cancel_order(order_id)
     
     def _get_latest_buy_cost(self, ticker: str) -> float:
-        """Get the latest buy cost for a ticker (for PnL calculation)."""
+        """获取最近一笔买入成本，用于计算盈亏。"""
         for trade in reversed(self.trades):
             if trade.get('ticker') == ticker and trade.get('type') == 'buy':
                 return float(trade.get('cost', 0.0))

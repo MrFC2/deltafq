@@ -1,4 +1,4 @@
-"""Minimal price chart helper (Matplotlib or Plotly)."""
+"""价格图表工具（支持 Matplotlib 和 Plotly）。"""
 from typing import Dict, Optional, Union
 
 import matplotlib.pyplot as plt
@@ -9,7 +9,7 @@ from ..core.base import BaseComponent
 
 class PriceChart(BaseComponent):
     def __init__(self, **kwargs):
-        """Initialize the price chart."""
+        """初始化价格图表。"""
         super().__init__(**kwargs)
         self.logger.info("初始化价格图表")
 

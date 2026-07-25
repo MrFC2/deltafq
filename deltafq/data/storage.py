@@ -17,18 +17,18 @@ class DataStorage(BaseComponent):
     
     Directory structure:
         data_cache/
-        ├── price/          # Price data
+        ├── price/          # 行情数据
         │   └── {ticker}/
-        ├── backtest/       # Backtest results
+        ├── backtest/       # 回测结果
         │   └── {ticker}/
-        └── indicators/     # Technical indicators
+        └── indicators/     # 技术指标
     """
     
     def __init__(self, base_path: str = None, **kwargs):
-        """Initialize data storage."""
+        """初始化数据存储。"""
         super().__init__(**kwargs)
         
-        # Use Config to get cache directory if base_path not provided
+        # 未传 base_path 时从 Config 获取缓存目录
         if base_path is None:
             config = Config()
             base_path = config.get_cache_dir()
@@ -38,29 +38,29 @@ class DataStorage(BaseComponent):
         self._init_directories()
     
     def _init_directories(self):
-        """Initialize directory structure."""
+        """初始化目录结构。"""
         self.price_dir = self.base_path / "price"
         self.backtest_dir = self.base_path / "backtest"
         self.indicators_dir = self.base_path / "indicators"
         
-        # Create directories
+        # 创建目录
         for dir_path in [self.price_dir, self.backtest_dir, 
                         self.indicators_dir]:
             dir_path.mkdir(parents=True, exist_ok=True)
     
     
     # ============================================================================
-    # Price Data Storage
+    # 行情数据存储
     # ============================================================================
     
     def save_price_data(self, data: pd.DataFrame, ticker: str, 
                        start_date: Optional[str] = None, 
                        end_date: Optional[str] = None) -> Path:
-        """Save price data to storage."""
+        """保存行情数据。"""
         symbol_dir = self.price_dir / ticker.replace('.', '_')
         symbol_dir.mkdir(exist_ok=True)
         
-        # Generate filename
+        # 生成文件名
         if start_date and end_date:
             filename = f"{ticker}_{start_date}_{end_date}.csv"
         else:
@@ -73,13 +73,13 @@ class DataStorage(BaseComponent):
     
     def load_price_data(self, ticker: str, start_date: Optional[str] = None,
                        end_date: Optional[str] = None) -> Optional[pd.DataFrame]:
-        """Load price data from storage."""
+        """加载行情数据。"""
         symbol_dir = self.price_dir / ticker.replace('.', '_')
         
         if start_date and end_date:
             filename = f"{ticker}_{start_date}_{end_date}.csv"
         else:
-            # Try to find the latest file
+            # 查找最新文件
             files = list(symbol_dir.glob(f"{ticker}_*.csv"))
             if not files:
                 self.logger.warning(f"未找到 {ticker} 的价格数据")
@@ -94,13 +94,13 @@ class DataStorage(BaseComponent):
         return None
     
     # ============================================================================
-    # Backtest Data Storage
+    # 回测结果存储
     # ============================================================================
     
     def save_backtest_results(self, trades_df: pd.DataFrame, 
                              values_df: pd.DataFrame, ticker: str,
                              strategy_name: Optional[str] = None) -> Dict[str, Path]:
-        """Save backtest results to storage."""
+        """保存回测结果。"""
         symbol_dir = self.backtest_dir / ticker.replace('.', '_')
         symbol_dir.mkdir(exist_ok=True)
         
@@ -118,14 +118,14 @@ class DataStorage(BaseComponent):
     
     def load_backtest_results(self, ticker: str, strategy_name: Optional[str] = None,
                              latest: bool = True) -> Optional[Dict[str, pd.DataFrame]]:
-        """Load backtest results from storage."""
+        """加载回测结果。"""
         symbol_dir = self.backtest_dir / ticker.replace('.', '_')
         
         if not symbol_dir.exists():
             self.logger.warning(f"未找到 {ticker} 的回测结果")
             return None
 
-        # Find trades and values files
+        # 查找成交和净值文件
         if strategy_name:
             trades_files = list(symbol_dir.glob(f"{ticker}_trades_{strategy_name}_*.csv"))
             values_files = list(symbol_dir.glob(f"{ticker}_values_{strategy_name}_*.csv"))
@@ -145,19 +145,19 @@ class DataStorage(BaseComponent):
                 'values': pd.read_csv(values_file, encoding='utf-8-sig')
             }
         else:
-            # Return all files
+            # 返回所有文件
             return {
                 'trades': [pd.read_csv(f, encoding='utf-8-sig') for f in trades_files],
                 'values': [pd.read_csv(f, encoding='utf-8-sig') for f in values_files]
             }
     
     # ============================================================================
-    # Generic Storage Methods
+    # 通用存储方法
     # ============================================================================
     
     def save_data(self, data: pd.DataFrame, filename: str, 
                  category: str = "indicators", subdir: Optional[str] = None) -> Path:
-        """Save data to storage with category."""
+        """按分类保存数据。"""
         if category == "price":
             target_dir = self.price_dir
         elif category == "backtest":
@@ -176,31 +176,31 @@ class DataStorage(BaseComponent):
         self.logger.info(f"已保存数据至：{filepath}")
         return filepath
     
-    def load_data(self, filename: str, category: str = "indicators", 
-                 subdir: Optional[str] = None) -> Optional[pd.DataFrame]:
-        """Load data from storage."""
-        if category == "price":
-            target_dir = self.price_dir
-        elif category == "backtest":
-            target_dir = self.backtest_dir
-        elif category == "indicators":
-            target_dir = self.indicators_dir
-        else:
-            raise ValueError(f"无效的分类：{category}，必须为 'price'、'backtest' 或 'indicators'")
-            data = pd.read_csv(filepath, encoding='utf-8-sig')
-            self.logger.info(f"已加载数据: {filepath}")
-            return data
-        else:
-            self.logger.warning(f"文件不存在: {filepath}")
-            return None
+    # def load_data(self, filename: str, category: str = "indicators",
+    #              subdir: Optional[str] = None) -> Optional[pd.DataFrame]:
+    #     """从存储加载数据。"""
+    #     if category == "price":
+    #         target_dir = self.price_dir
+    #     elif category == "backtest":
+    #         target_dir = self.backtest_dir
+    #     elif category == "indicators":
+    #         target_dir = self.indicators_dir
+    #     else:
+    #         raise ValueError(f"无效的分类：{category}，必须为 'price'、'backtest' 或 'indicators'")
+    #         data = pd.read_csv(filepath, encoding='utf-8-sig')
+    #         self.logger.info(f"已加载数据: {filepath}")
+    #         return data
+    #     else:
+    #         self.logger.warning(f"文件不存在: {filepath}")
+    #         return None
     
     # ============================================================================
-    # Utility Methods
+    # 工具方法
     # ============================================================================
     
     def list_files(self, category: Optional[str] = None, 
                   subdir: Optional[str] = None) -> list:
-        """List all files in storage."""
+        """列出存储中的所有文件。"""
         if category == "price":
             target_dir = self.price_dir
         elif category == "backtest":
@@ -223,7 +223,7 @@ class DataStorage(BaseComponent):
         return files
     
     def get_storage_info(self) -> Dict[str, Any]:
-        """Get storage information."""
+        """获取存储信息。"""
         return {
             'base_path': str(self.base_path),
             'price_files': len(list(self.price_dir.rglob('*.csv'))),
@@ -233,7 +233,7 @@ class DataStorage(BaseComponent):
         }
     
     def _calculate_size(self) -> float:
-        """Calculate total storage size in MB."""
+        """计算存储总大小（MB）。"""
         total_size = 0
         for file_path in self.base_path.rglob('*'):
             if file_path.is_file():

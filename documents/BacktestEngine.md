@@ -11,19 +11,21 @@ from deltafq.backtest import BacktestEngine
 from deltafq.strategy.base import BaseStrategy
 import pandas as pd
 
+
 class SimpleMAStrategy(BaseStrategy):
     def generate_signals(self, data: pd.DataFrame) -> pd.Series:
         fast = data["Close"].rolling(10).mean()
         slow = data["Close"].rolling(30).mean()
         return pd.Series(1, index=data.index).where(fast > slow, -1)
 
+
 engine = BacktestEngine()
 engine.set_parameters(symbol="AAPL", start_date="2024-01-01", end_date="2024-06-30", benchmark="SPY")
 engine.load_data()
 engine.add_strategy(SimpleMAStrategy())
-engine.run_backtest()
+engine.run()
 engine.calculate_metrics()
-engine.show_report()
+engine.print_report()
 engine.show_chart(use_plotly=True)
 ```
 
@@ -130,11 +132,11 @@ BacktestEngine 内部创建的 ExecutionEngine 未显式传 `match_on_tick`，�
 ## 七、run_backtest 可选参数
 
 ```python
-engine.run_backtest(
-    symbol=None,        # 覆盖 set_parameters 的 symbol
-    signals=None,       # 覆盖 add_strategy 产生的 signals
+engine.run(
+    symbol=None,  # 覆盖 set_parameters 的 symbol
+    signals=None,  # 覆盖 add_strategy 产生的 signals
     price_series=None,  # 覆盖 data['Close']
-    save_csv=False,     # 是否立即保存结果
+    save_csv=False,  # 是否立即保存结果
     strategy_name=None  # 保存时的策略名
 )
 ```

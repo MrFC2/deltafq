@@ -36,8 +36,8 @@ def run_signal(fetcher, strategy, ticker, start, end, interval, storage=None):
         storage.save_price_data(data, ticker, start, end)
     if data.empty or len(data) < 2:
         return 0, None
-    strategy.run(data)
-    return int(strategy.signals.iloc[-1]), float(data["Close"].iloc[-1])
+    signals = strategy.run(data)
+    return int(signals.iloc[-1]), float(data["Close"].iloc[-1])
 
 
 def try_trade(engine, ticker, signal, price, qty, now):

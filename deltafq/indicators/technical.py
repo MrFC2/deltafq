@@ -8,16 +8,16 @@ from ..core.base import BaseComponent
 
 
 class TechnicalIndicators(BaseComponent):
-    """Basic technical indicators."""
+    """基础技术指标计算器。"""
     
     def __init__(self, **kwargs):
-        """Initialize technical indicators."""
+        """初始化技术指标计算器。"""
         super().__init__(**kwargs)
         self.logger.info("初始化技术指标计算器")
     
     def sma(self, data: pd.Series, period: int) -> pd.Series:
-        """Calculate Simple Moving Average (SMA)."""
-        self.logger.info(f"Calculating SMA(period={period})")
+        """计算简单移动均线（SMA）。"""
+        self.logger.info(f"计算 SMA(period={period})")
         return data.rolling(window=period).mean()
     
     def ema(self, data: pd.Series, period: int, method: str = 'pandas') -> pd.Series:
@@ -29,7 +29,7 @@ class TechnicalIndicators(BaseComponent):
             method: 'pandas' uses pandas ewm (default), 'talib' uses inline calculation matching TA-Lib.
                    Talib method is more precise but slightly slower.
         """
-        self.logger.info(f"Calculating EMA(period={period}, method={method})")
+        self.logger.info(f"计算 EMA(period={period}, method={method})")
         
         if method == 'talib':
             # TA-Lib compatible: seed with SMA of the first full window
@@ -43,14 +43,14 @@ class TechnicalIndicators(BaseComponent):
                 return ema
             
             first_valid_pos = data.index.get_loc(first_valid_idx)
-            # Require a full window for initial SMA
+            # 需要完整窗口才能计算初始 SMA
             start = first_valid_pos
-            end = start + period  # exclusive
+            end = start + period  # 不含右端
             if end > len(data):
-                # Not enough data to seed
+                # 数据不足，无法初始化
                 return ema
             
-            # Attempt to find a clean initial window without NaNs
+            # 寻找不含 NaN 的初始窗口
             seed_pos = end - 1
             initial_window = data.iloc[start:end]
             if initial_window.isna().any():
@@ -67,15 +67,15 @@ class TechnicalIndicators(BaseComponent):
             
             ema.iloc[seed_pos] = float(initial_window.mean())
             
-            # Forward recursion from the next bar after seed
+            # 从种子值之后逐根递推
             for i in range(seed_pos + 1, len(data)):
                 x = data.iloc[i]
                 prev = ema.iloc[i - 1]
                 if pd.isna(x):
-                    # Output NaN for this bar but keep previous state for the next step
+                    # 当前 bar 输出 NaN，但不影响下一步的状态
                     ema.iloc[i] = np.nan
                 else:
-                    # Use last non-NaN ema value as previous
+                    # 向前查找最近的非 NaN EMA 值
                     j = i - 1
                     while j >= 0 and pd.isna(prev):
                         j -= 1
@@ -86,7 +86,7 @@ class TechnicalIndicators(BaseComponent):
                         ema.iloc[i] = float(alpha * x + (1.0 - alpha) * prev)
             return ema
         else:
-            # Default: pandas ewm
+            # 默认：pandas ewm
             return data.ewm(span=period, adjust=False).mean()
 
     def rsi(self, data: pd.Series, period: int = 14, method: str = 'sma') -> pd.Series:
@@ -98,7 +98,7 @@ class TechnicalIndicators(BaseComponent):
             method: 'sma' uses SMA for smoothing (default), 'rma' uses RMA (Wilder's Smoothing) matching TA-Lib.
                    RMA gives more weight to historical data, making it less responsive to recent changes.
         """
-        self.logger.info(f"Calculating RSI(period={period}, method={method})")
+        self.logger.info(f"计算 RSI(period={period}, method={method})")
         delta = data.diff()
         gains = delta.where(delta > 0, 0)
         losses = -delta.where(delta < 0, 0)
@@ -125,7 +125,7 @@ class TechnicalIndicators(BaseComponent):
             
             rs = avg_gain / avg_loss
         else:
-            # Default: SMA
+            # 默认：SMA
             avg_gain = gains.rolling(window=period).mean()
             avg_loss = losses.rolling(window=period).mean()
             rs = avg_gain / avg_loss
@@ -148,18 +148,18 @@ class TechnicalIndicators(BaseComponent):
         """
         self.logger.info(f"计算 KDJ(n={n}, m1={m1}, m2={m2}, method={method})")
         
-        # Calculate RSV (Raw Stochastic Value)
+        # 计算 RSV（原始随机值）
         lowest_low = low.rolling(window=n).min()
         highest_high = high.rolling(window=n).max()
         rsv = 100 * (close - lowest_low) / (highest_high - lowest_low)
-        rsv = rsv.fillna(50)  # Fill NaN with neutral value
+        rsv = rsv.fillna(50)  # NaN 填充为中性值 50
         
         if method == 'sma':
             # TA-Lib compatible: SMA smoothing
             k = self.sma(rsv, m1)
             d = self.sma(k, m2)
         else:
-            # Default: EMA smoothing (more responsive)
+            # 默认：EMA 平滑（响应更灵敏）
             k = self.ema(rsv, m1)
             d = self.ema(k, m2)
         
@@ -181,7 +181,7 @@ class TechnicalIndicators(BaseComponent):
             method: 'sample' uses sample std (ddof=1, default), 'population' uses population std (ddof=0) matching TA-Lib.
                    Population std is slightly smaller, making bands tighter. TA-Lib BBANDS uses population std.
         """
-        self.logger.info(f"Calculating BOLL(period={period}, std_dev={std_dev}, method={method})")
+        self.logger.info(f"计算 BOLL(period={period}, std_dev={std_dev}, method={method})")
         sma = self.sma(data, period)
         ddof = 0 if method == 'population' else 1
         std = data.rolling(window=period).std(ddof=ddof)
@@ -203,9 +203,9 @@ class TechnicalIndicators(BaseComponent):
             method: 'sma' uses SMA for smoothing (default), 'rma' uses RMA (Wilder's Smoothing) matching TA-Lib.
                    RMA gives more weight to historical data, making it less responsive to recent changes.
         """
-        self.logger.info(f"Calculating ATR(period={period}, method={method})")
+        self.logger.info(f"计算 ATR(period={period}, method={method})")
 
-        # Calculate True Range
+        # 计算真实波幅
         tr1 = high - low
         tr2 = abs(high - close.shift(1))
         tr3 = abs(low - close.shift(1))
@@ -223,7 +223,7 @@ class TechnicalIndicators(BaseComponent):
                         atr.iloc[i] = np.nan
             return atr
         else:
-            # Default: SMA
+            # 默认：SMA
             return tr.rolling(window=period).mean()
     
     def obv(self, close: pd.Series, volume: pd.Series) -> pd.Series:
@@ -235,17 +235,17 @@ class TechnicalIndicators(BaseComponent):
         """
         self.logger.info("计算 OBV")
         
-        # Calculate price change direction
+        # 计算价格变动方向
         price_change = close.diff()
         
-        # Calculate signed volume based on price direction
+        # 按价格方向计算带符号成交量
         signed_volume = volume.copy()
-        signed_volume[price_change > 0] = volume[price_change > 0]  # Add volume when price up
-        signed_volume[price_change < 0] = -volume[price_change < 0]  # Subtract volume when price down
-        signed_volume[price_change == 0] = 0  # No change when price unchanged
-        signed_volume.iloc[0] = volume.iloc[0]  # First value is first volume
+        signed_volume[price_change > 0] = volume[price_change > 0]  # 上涨加量
+        signed_volume[price_change < 0] = -volume[price_change < 0]  # 下跌减量
+        signed_volume[price_change == 0] = 0  # 平盘不变
+        signed_volume.iloc[0] = volume.iloc[0]  # 首值取首根成交量
         
-        # Calculate cumulative OBV
+        # 累加得到 OBV
         obv = signed_volume.cumsum()
         
         return obv

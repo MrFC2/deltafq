@@ -9,10 +9,10 @@ from ..core.base import BaseComponent
 
 
 class OrderManager(BaseComponent):
-    """Manage trading orders."""
+    """订单管理器。"""
     
     def __init__(self, **kwargs):
-        """Initialize order manager."""
+        """初始化订单管理器。"""
         super().__init__(**kwargs)
         self.orders = {}
         self.order_counter = 0
@@ -20,7 +20,7 @@ class OrderManager(BaseComponent):
     
     def create_order(self, ticker: str, quantity: int, order_type: str = "limit", 
                     price: Optional[float] = None, stop_price: Optional[float] = None) -> str:
-        """Create a new order."""
+        """创建新订单。"""
         self.order_counter += 1
         order_id = f"ORD_{self.order_counter:06d}"
         
@@ -41,11 +41,11 @@ class OrderManager(BaseComponent):
         return order_id
     
     def get_order(self, order_id: str) -> Optional[Dict[str, Any]]:
-        """Get order by ID."""
+        """按 ID 查询订单。"""
         return self.orders.get(order_id)
     
     def update_order_status(self, order_id: str, status: str) -> bool:
-        """Update order status."""
+        """更新订单状态。"""
         if order_id in self.orders:
             self.orders[order_id]['status'] = status
             self.orders[order_id]['updated_at'] = datetime.now()
@@ -53,7 +53,7 @@ class OrderManager(BaseComponent):
         return False
     
     def mark_executed(self, order_id: str, execution_price: Optional[float] = None) -> bool:
-        """Mark order as executed."""
+        """标记订单为已成交。"""
         if order_id in self.orders:
             self.orders[order_id]['status'] = 'executed'
             self.orders[order_id]['execution_price'] = execution_price
@@ -63,7 +63,7 @@ class OrderManager(BaseComponent):
         return False
     
     def cancel_order(self, order_id: str) -> bool:
-        """Cancel an order."""
+        """撤销订单。"""
         if order_id in self.orders and self.orders[order_id]['status'] == 'pending':
             self.orders[order_id]['status'] = 'cancelled'
             self.orders[order_id]['updated_at'] = datetime.now()
@@ -71,27 +71,27 @@ class OrderManager(BaseComponent):
         return False
     
     def get_orders_by_symbol(self, ticker: str) -> List[Dict[str, Any]]:
-        """Get all orders for a ticker."""
+        """查询指定标的的所有订单。"""
         return [order for order in self.orders.values() if order['ticker'] == ticker]
     
     def get_orders_by_status(self, status: str) -> List[Dict[str, Any]]:
-        """Get all orders with specific status."""
+        """查询指定状态的所有订单。"""
         return [order for order in self.orders.values() if order['status'] == status]
     
     def get_pending_orders(self) -> List[Dict[str, Any]]:
-        """Get all pending orders."""
+        """查询所有挂单。"""
         return self.get_orders_by_status('pending')
     
     def get_executed_orders(self) -> List[Dict[str, Any]]:
-        """Get all executed orders."""
+        """查询所有已成交订单。"""
         return self.get_orders_by_status('executed')
     
     def get_order_history(self) -> List[Dict[str, Any]]:
-        """Get complete order history."""
+        """获取完整订单历史。"""
         return list(self.orders.values())
     
     def cleanup_old_orders(self, days: int = 30) -> int:
-        """Clean up old orders."""
+        """清理旧订单。"""
         cutoff_date = datetime.now() - pd.Timedelta(days=days)
         old_orders = [
             order_id for order_id, order in self.orders.items()

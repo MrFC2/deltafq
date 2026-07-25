@@ -1,4 +1,4 @@
-"""Combined performance computation and reporting utilities."""
+"""绩效计算与报告工具。"""
 
 from __future__ import annotations
 
@@ -44,10 +44,10 @@ _EMPTY_TRADING_METRICS = {
 
 
 class PerformanceReporter(BaseComponent):
-    """Compute backtest metrics and print summary."""
+    """计算回测指标并打印摘要。"""
 
     def __init__(self, **kwargs):
-        """Initialize performance reporter."""
+        """初始化绩效报告器。"""
         super().__init__(**kwargs)
         self.logger.info("初始化绩效报告器")
 
@@ -285,7 +285,7 @@ def _calculate_trading_metrics(trades_df: pd.DataFrame, total_days: int) -> Dict
         return _EMPTY_TRADING_METRICS.copy()
 
     commission = float(trades_df.get("commission", pd.Series(dtype=float)).sum())
-    # Total turnover = sum of (|quantity| * price) per trade (both buy and sell)
+    # 总成交额 = 每笔交易的 |数量| * 价格 之和（买卖均计）
     turnover = float((trades_df["quantity"].abs() * trades_df["price"]).sum()) if "quantity" in trades_df.columns and "price" in trades_df.columns else float(trades_df.get("gross_revenue", pd.Series(dtype=float)).sum())
     pnl = float(trades_df.get("profit_loss", pd.Series(dtype=float)).sum())
     divisor = total_days or 1

@@ -8,31 +8,31 @@ from ..core.base import BaseComponent
 
 
 class TalibIndicators(BaseComponent):
-    """Technical indicators using TA-Lib library."""
+    """基于 TA-Lib 的技术指标计算器。"""
     
     def __init__(self, **kwargs):
-        """Initialize technical indicators."""
+        """初始化技术指标计算器。"""
         super().__init__(**kwargs)
         self.logger.info("初始化 TA-Lib 技术指标计算器")
     
     def sma(self, data: pd.Series, period: int) -> pd.Series:
-        """Calculate Simple Moving Average (SMA) using TA-Lib."""
-        self.logger.info(f"Calculating SMA(period={period})")
+        """计算简单移动均线（SMA）。"""
+        self.logger.info(f"计算 SMA(period={period})")
         return pd.Series(talib.SMA(data.values.astype(float), timeperiod=period), index=data.index)
     
     def ema(self, data: pd.Series, period: int) -> pd.Series:
-        """Calculate Exponential Moving Average (EMA) using TA-Lib."""
-        self.logger.info(f"Calculating EMA(period={period})")
+        """计算指数移动均线（EMA）。"""
+        self.logger.info(f"计算 EMA(period={period})")
         return pd.Series(talib.EMA(data.values.astype(float), timeperiod=period), index=data.index)
     
     def rsi(self, data: pd.Series, period: int = 14) -> pd.Series:
-        """Calculate Relative Strength Index (RSI) using TA-Lib."""
-        self.logger.info(f"Calculating RSI(period={period})")
+        """计算相对强弱指数（RSI）。"""
+        self.logger.info(f"计算 RSI(period={period})")
         return pd.Series(talib.RSI(data.values.astype(float), timeperiod=period), index=data.index)
     
     def kdj(self, high: pd.Series, low: pd.Series, close: pd.Series, 
             n: int = 9, m1: int = 3, m2: int = 3) -> pd.DataFrame:
-        """Calculate KDJ indicator using TA-Lib."""
+        """计算 KDJ 指标。"""
         self.logger.info(f"计算 KDJ(n={n}, m1={m1}, m2={m2})")
         k, d = talib.STOCH(high.values.astype(float), low.values.astype(float), close.values.astype(float),
                            fastk_period=n, slowk_period=m1, slowd_period=m2)
@@ -43,8 +43,8 @@ class TalibIndicators(BaseComponent):
         })
     
     def boll(self, data: pd.Series, period: int = 20, std_dev: float = 2) -> pd.DataFrame:
-        """Calculate Bollinger Bands using TA-Lib."""
-        self.logger.info(f"Calculating BOLL(period={period}, std_dev={std_dev})")
+        """计算布林带（BOLL）。"""
+        self.logger.info(f"计算 BOLL(period={period}, std_dev={std_dev})")
         upper, middle, lower = talib.BBANDS(data.values.astype(float), timeperiod=period, 
                                             nbdevup=std_dev, nbdevdn=std_dev, matype=0)
         return pd.DataFrame({
@@ -53,15 +53,15 @@ class TalibIndicators(BaseComponent):
             'lower': pd.Series(lower, index=data.index)
         })
     
-    # Note: No separate alias; use boll() for consistency across providers
+    # 与 TechnicalIndicators 接口对齐，统一使用 boll()
     
     def atr(self, high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> pd.Series:
-        """Calculate Average True Range (ATR) using TA-Lib."""
-        self.logger.info(f"Calculating ATR(period={period})")
+        """计算平均真实波幅（ATR）。"""
+        self.logger.info(f"计算 ATR(period={period})")
         return pd.Series(talib.ATR(high.values.astype(float), low.values.astype(float), 
                                    close.values.astype(float), timeperiod=period), index=close.index)
     
     def obv(self, close: pd.Series, volume: pd.Series) -> pd.Series:
-        """Calculate On-Balance Volume (OBV) using TA-Lib."""
+        """计算能量潮（OBV）。"""
         self.logger.info("计算 OBV")
         return pd.Series(talib.OBV(close.values.astype(float), volume.values.astype(float)), index=close.index)
