@@ -35,18 +35,13 @@ class SimpleMAStrategy(BaseStrategy):
 
 
 def main() -> None:
-    # initialize backtest engine
-    engine = BacktestEngine() # data_source="yahoo" as default / "baostock" / "miniqmt"
-    
-    # set parameters
-    engine.set_parameters(
-        symbol="AAPL",
+    engine = BacktestEngine(
+        ticker="AAPL",
         start_date="2024-01-01",
         end_date="2024-06-30",
-        benchmark="SPY"
+        benchmark="SPY",
     )
-    
-    # load data
+
     engine.load_data()    
     # add strategy
     strategy = SimpleMAStrategy(fast_period=10, slow_period=30)
