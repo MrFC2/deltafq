@@ -90,18 +90,17 @@ class BacktestEngine(BaseComponent, ABC):
         self.price_series = self.data['Close']
     
     def run_backtest(self, symbol: Optional[str] = None, signals: Optional[pd.Series] = None, price_series: Optional[pd.Series] = None,
-                   save_csv: bool = False, strategy_name: Optional[str] = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
+                   save_csv: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """Execute a historical replay for a single symbol."""
         if symbol is None and self.symbol is None:
             raise ValueError("Symbol must be set. Call set_parameters() first.")
         if signals is None and self.signals is None:
             raise ValueError("Signals must be set. Call add_strategy() first.")
-        
-        try:            
+
+        try:
             symbol = symbol if symbol is not None else self.symbol
             signals = signals if signals is not None else self.signals
             price_series = price_series if price_series is not None else self.price_series
-            strategy_name = strategy_name if strategy_name is not None else self.strategy.name
             
             df_sig = pd.DataFrame({'Signal': signals, 'Close': price_series})
             values_records: List[Dict[str, Any]] = []

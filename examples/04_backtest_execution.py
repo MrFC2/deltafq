@@ -28,7 +28,7 @@ def main() -> None:
     boll = indicators.boll(data["Close"], period=20, std_dev=2, method="population")
     signals = generator.boll_signals(price=data["Close"], bands=boll, method="touch")
 
-    trades_df, values_df = engine.run_backtest(symbol=symbol, signals=signals, price_series=data["Close"], strategy_name="BOLL")
+    trades_df, values_df = engine.run_backtest(symbol=symbol, signals=signals, price_series=data["Close"])
 
     print("Trades:")
     print(trades_df)
