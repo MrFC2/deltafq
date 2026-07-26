@@ -186,7 +186,9 @@ class PerformanceChart(BaseComponent):
         )
 
         if has_metrics:
-            self._add_metrics_table(fig, metrics, go)
+            tip_map = self._add_metrics_table(fig, metrics, go)
+        else:
+            tip_map = {}
 
         self._add_chart_traces(
             fig, df, strategy_nv, drawdown, returns_pct,
@@ -207,14 +209,25 @@ class PerformanceChart(BaseComponent):
         if save_path:
             html_path = (save_path if str(save_path).lower().endswith(".html")
                          else f"{save_path}.html")
-            fig.write_html(html_path, include_plotlyjs="cdn")
+        else:
+            import tempfile
+            html_path = tempfile.mktemp(suffix=".html", prefix="deltafq_")
+
+        html_str = fig.to_html(include_plotlyjs=True, full_html=True)
+        if tip_map:
+            html_str = _inject_cell_click_panel(html_str, tip_map)
+        with open(html_path, "w", encoding="utf-8") as f:
+            f.write(html_str)
+
+        if save_path:
             self.logger.info(f"图表已保存至 {html_path}")
         else:
-            fig.show()
+            import webbrowser
+            webbrowser.open(f"file://{html_path}")
 
     @staticmethod
-    def _add_metrics_table(fig, metrics: dict, go) -> None:
-        """在 row=1 添加指标汇总表格。"""
+    def _add_metrics_table(fig, metrics: dict, go) -> dict:
+        """在 row=1 添加指标汇总表格，返回 {cell文本: (标题, 说明)} 用于 JS 注入。"""
         m = metrics
         total_return = m.get("total_return", 0.0)
         end_capital = float(m.get("end_capital", 0.0))
@@ -223,7 +236,21 @@ class PerformanceChart(BaseComponent):
 
         headers = ["交易时间", "资金概况", "收益指标", "风险指标", "绩效指标", "交易统计"]
 
-        # cells[col][row]
+        # 收益指标
+        c_total = f"总收益: {total_return:.2%}"
+        c_annual = f"年化收益: {m.get('annualized_return', 0.0):.2%}"
+        c_daily_r = f"日均收益: {m.get('avg_daily_return', 0.0):.2%}"
+        # 风险指标
+        c_dd = f"最大回撤: {m.get('max_drawdown', 0.0):.2%}"
+        c_std = f"收益标准差: {m.get('return_std', 0.0):.2%}"
+        c_vol = f"年化波动率: {m.get('volatility', 0.0):.2%}"
+        # 绩效指标
+        c_sharpe = f"夏普比率: {m.get('sharpe_ratio', 0.0):.2f}"
+        c_calmar = f"收益回撤比: {m.get('return_drawdown_ratio', 0.0):.2f}"
+        c_wr = f"胜率: {m.get('win_rate', 0.0):.2%}"
+        c_plr = f"盈亏比: {m.get('profit_loss_ratio', 0.0):.2f}"
+        c_avgwin = f"平均盈利: {m.get('avg_win', 0.0):,.0f}"
+
         cells = [
             [
                 f"首笔: {m.get('first_trade_date', '-')}",
@@ -238,25 +265,9 @@ class PerformanceChart(BaseComponent):
                 f"资金增长: {growth:,.0f} ({total_return:.2%})",
                 "", "",
             ],
-            [
-                f"总收益: {total_return:.2%}",
-                f"年化收益: {m.get('annualized_return', 0.0):.2%}",
-                f"日均收益: {m.get('avg_daily_return', 0.0):.2%}",
-                "", "",
-            ],
-            [
-                f"最大回撤: {m.get('max_drawdown', 0.0):.2%}",
-                f"收益标准差: {m.get('return_std', 0.0):.2%}",
-                f"年化波动率: {m.get('volatility', 0.0):.2%}",
-                "", "",
-            ],
-            [
-                f"夏普比率: {m.get('sharpe_ratio', 0.0):.2f}",
-                f"收益回撤比: {m.get('return_drawdown_ratio', 0.0):.2f}",
-                f"胜率: {m.get('win_rate', 0.0):.2%}",
-                f"盈亏比: {m.get('profit_loss_ratio', 0.0):.2f}",
-                f"平均盈利: {m.get('avg_win', 0.0):,.0f}",
-            ],
+            [c_total, c_annual, c_daily_r, "", ""],
+            [c_dd, c_std, c_vol, "", ""],
+            [c_sharpe, c_calmar, c_wr, c_plr, c_avgwin],
             [
                 f"总盈亏: {m.get('total_pnl', 0.0):,.0f}",
                 f"总手续费: {m.get('total_commission', 0.0):,.0f}",
@@ -265,6 +276,86 @@ class PerformanceChart(BaseComponent):
                 f"日均盈亏: {m.get('avg_daily_pnl', 0.0):,.0f}",
             ],
         ]
+
+        # cell文本 -> (标题, 定义, 公式详解)
+        tip_map = {
+            c_total: (
+                "总收益率",
+                "回测期间账户总盈亏占初始资金的比例，反映策略整体赚了多少。",
+                "总收益率 = (期末资金 ÷ 初始资金) - 1\n"
+                "例：初始 100 万，期末 106.54 万 → (106.54 ÷ 100) - 1 = 6.54%",
+            ),
+            c_annual: (
+                "年化收益率",
+                "将总收益率折算为「每年」的等效收益，便于与其他投资横向比较。",
+                "年化收益率 = (1 + 总收益率)^(252 ÷ 交易日数) - 1\n"
+                "252 是 A 股全年交易日数（约定俗成的年化基数）。\n"
+                "^(252÷n) 表示「把 n 天的收益率复利折算到 252 天」。\n"
+                "例：6.54% / 241 天 → (1.0654)^(252÷241) - 1 ≈ 6.85%",
+            ),
+            c_daily_r: (
+                "日均收益率",
+                "所有交易日收益率的算术平均值，衡量每天平均赚多少。",
+                "日均收益率 = Σ(每日收益率) ÷ 交易日数\n"
+                "每日收益率 = (当日总资产 - 前日总资产) ÷ 前日总资产",
+            ),
+            c_dd: (
+                "最大回撤",
+                "回测期间净值从最高点下跌到最低点的最大幅度，衡量策略最坏情况下的亏损。",
+                "最大回撤 = min((当日净值 - 历史最高净值) ÷ 历史最高净值)\n"
+                "结果为负数，绝对值越大说明亏损越惨。\n"
+                "例：净值从 1.2 跌到 1.02 → (1.02 - 1.2) ÷ 1.2 = -15%",
+            ),
+            c_std: (
+                "收益标准差（日频）",
+                "日收益率序列的标准差，衡量每天收益的波动程度，标准差越大说明日内涨跌越剧烈。",
+                "收益标准差 = √[ Σ(每日收益率 - 日均收益率)² ÷ (n-1) ]\n"
+                "这是统计学中的样本标准差公式，n 为交易日数。",
+            ),
+            c_vol: (
+                "年化波动率",
+                "将日收益率标准差折算为年度波动水平，是衡量策略风险最常用的指标。",
+                "年化波动率 = 日收益率标准差 × √252\n"
+                "乘以 √252 是因为波动率的年化需要乘以时间的平方根（统计学性质）。\n"
+                "例：日标准差 1.41% × √252 ≈ 22.40%",
+            ),
+            c_sharpe: (
+                "夏普比率",
+                "每承担一单位风险所获得的超额收益，越高说明策略「性价比」越好。",
+                "夏普比率 = (年化收益率 - 无风险利率) ÷ 年化波动率\n"
+                "本系统无风险利率取 0（简化处理）。\n"
+                "等价展开：(日均收益率 ÷ 日收益标准差) × √252\n"
+                "例：(0.022% ÷ 1.41%) × √252 ≈ 0.41\n"
+                "一般认为 > 1 良好，> 2 优秀。",
+            ),
+            c_calmar: (
+                "收益回撤比（Calmar）",
+                "年化收益率与最大回撤之比，衡量「用多大的亏损风险换来了多少年化收益」。",
+                "收益回撤比 = 年化收益率 ÷ |最大回撤|\n"
+                "例：年化 6.85% ÷ 14.58% ≈ 0.47\n"
+                "比值越高说明单位风险获取的收益越多，一般 > 1 较好。",
+            ),
+            c_wr: (
+                "胜率",
+                "盈利交易笔数占总交易笔数的比例，反映策略「赢的次数多不多」。",
+                "胜率 = 盈利交易笔数 ÷ 总有效交易笔数\n"
+                "基于每笔卖出单的实现盈亏（profit_loss > 0 算盈利）。\n"
+                "注意：高胜率不等于高收益，还需结合盈亏比综合判断。",
+            ),
+            c_plr: (
+                "盈亏比",
+                "平均每笔盈利与平均每笔亏损之比，反映策略「赚的是不是比亏的多」。",
+                "盈亏比 = 平均盈利 ÷ |平均亏损|\n"
+                "例：平均盈利 38,452 ÷ 平均亏损 21,128 ≈ 1.82\n"
+                "盈亏比 > 1 说明平均赚的比亏的多；结合胜率才能判断策略整体是否盈利。",
+            ),
+            c_avgwin: (
+                "平均盈利",
+                "所有盈利交易的平均获利金额。",
+                "平均盈利 = Σ(盈利交易的 profit_loss) ÷ 盈利交易笔数\n"
+                "profit_loss 为每笔卖出成交后的已实现盈亏（含手续费）。",
+            ),
+        }
 
         fig.add_trace(
             go.Table(
@@ -277,6 +368,7 @@ class PerformanceChart(BaseComponent):
             ),
             row=1, col=1,
         )
+        return tip_map
 
     @staticmethod
     def _add_chart_traces(
@@ -496,3 +588,61 @@ class PerformanceChart(BaseComponent):
         ax.fill_between(x_range, 0, frequency, color=COLOR_DIST_FILL, alpha=0.7)
         ax.plot(x_range, frequency, color=COLOR_DIST_LINE, linewidth=2)
         ax.axvline(x=0, color="gray", linestyle="--", linewidth=1, alpha=0.7)
+
+
+# ── 模块级辅助：向 HTML 注入单元格点击说明面板 ──────────────────────────
+
+def _inject_cell_click_panel(html: str, tip_map: dict) -> str:
+    """
+    向 Plotly 生成的 HTML 注入 JS，点击表格 cell 时右侧弹出说明面板。
+    tip_map: {cell显示文本: (标题, 定义, 公式详解)}
+    """
+    import json
+
+    tips = {k: list(v) for k, v in tip_map.items()}
+
+    js = f"""
+<div id="kiro-panel" style="
+  display:none; position:fixed; top:60px; right:20px;
+  background:#fff; border:1px solid #e0e0e0; border-radius:10px;
+  padding:18px 20px; min-width:300px; max-width:380px;
+  box-shadow:0 6px 24px rgba(0,0,0,0.13); z-index:9999;
+  font-family:sans-serif; font-size:13px; line-height:1.6;
+">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <strong id="kiro-panel-title" style="font-size:15px;color:#2E86AB;"></strong>
+    <span onclick="document.getElementById('kiro-panel').style.display='none'"
+          style="cursor:pointer;color:#bbb;font-size:20px;line-height:1;margin-left:12px;">&#x2715;</span>
+  </div>
+  <div id="kiro-panel-desc" style="color:#333;margin-bottom:12px;font-size:13px;"></div>
+  <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;
+    letter-spacing:0.5px;margin-bottom:6px;">公式 / 计算方式</div>
+  <div id="kiro-panel-formula" style="
+    background:#f5f7fa;border-radius:6px;padding:10px 12px;
+    font-size:12px;color:#444;white-space:pre-wrap;line-height:1.8;
+    border-left:3px solid #2E86AB;"></div>
+</div>
+<script>
+(function() {{
+  var TIPS = {json.dumps(tips, ensure_ascii=False)};
+  function attach() {{
+    var els = document.querySelectorAll("text.cell-text");
+    if (els.length === 0) {{ setTimeout(attach, 300); return; }}
+    els.forEach(function(el) {{
+      var t = el.textContent.trim();
+      if (!TIPS[t]) return;
+      el.style.cursor = "pointer";
+      el.addEventListener("click", function() {{
+        var info = TIPS[t];
+        document.getElementById("kiro-panel-title").textContent   = info[0];
+        document.getElementById("kiro-panel-desc").textContent    = info[1];
+        document.getElementById("kiro-panel-formula").textContent = info[2];
+        document.getElementById("kiro-panel").style.display = "block";
+      }});
+    }});
+  }}
+  setTimeout(attach, 300);
+}})();
+</script>
+"""
+    return html.replace("</body>", js + "\n</body>")
