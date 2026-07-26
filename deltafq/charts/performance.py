@@ -110,11 +110,16 @@ class PerformanceChart(BaseComponent):
         if tip_map:
             html_str = _inject_cell_click_panel(html_str, tip_map)
 
-        import tempfile, webbrowser
-        with tempfile.NamedTemporaryFile(suffix=".html", prefix="deltafq_",
-                                         delete=False, mode="w", encoding="utf-8") as f:
-            f.write(html_str)
-            webbrowser.open(f"file://{f.name}")
+        import webbrowser
+        from pathlib import Path
+
+        temp_dir = Path(__file__).parents[2] / "temp"
+        temp_dir.mkdir(exist_ok=True)
+
+        html_path = temp_dir / "deltafq_chart.html"
+        html_path.write_text(html_str, encoding="utf-8")
+
+        webbrowser.open(f"file://{html_path}")
 
     # ------------------------------------------------------------------
     # 数据准备
