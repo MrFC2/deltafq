@@ -145,14 +145,14 @@ class BacktestEngine(BaseComponent, ABC):
         """计算绩效指标、打印报告、展示图表。"""
         if trades_df is None or values_df is None:
             raise ValueError("trades_df 或 values_df 为空，请先执行回测。")
-        # 计算绩效指标并打印报告
-        self.reporter.print_summary(ticker=self.ticker, trades_df=trades_df, values_df=values_df)
-        # 展示图表
+        # 计算绩效指标
+        _, metrics = self.reporter.compute(self.ticker, trades_df, values_df)
+        # 展示图表（含指标表格）
         benchmark_close = None
         if self.benchmark is not None:
             benchmark_close = \
                 self.data_fetcher.fetch_data(self.benchmark, self.start_date, self.end_date)['Close']
-        self.chart.plot_backtest_charts(values_df=values_df, benchmark_close=benchmark_close)
+        self.chart.plot_backtest_charts(values_df=values_df, benchmark_close=benchmark_close, metrics=metrics)
 
     def save_backtest_results(self, trades_df: pd.DataFrame, values_df: pd.DataFrame) -> None:
         """将回测结果保存为 CSV 文件。"""

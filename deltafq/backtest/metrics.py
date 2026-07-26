@@ -31,8 +31,12 @@ def calculate_total_return(equity: pd.Series) -> float:
 
 
 def calculate_annualized_return(returns: pd.Series, periods: int = 252) -> float:
-    """计算年化收益率。"""
-    return float((1 + returns.mean()) ** periods - 1)
+    """计算年化收益率（几何复利：(1+R_total)^(periods/n) - 1）。"""
+    n = len(returns)
+    if n == 0:
+        return 0.0
+    total_return = float((1 + returns).prod() - 1)
+    return float((1 + total_return) ** (periods / n) - 1)
 
 
 def calculate_volatility(returns: pd.Series, periods: int = 252) -> float:
