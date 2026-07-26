@@ -13,25 +13,17 @@ except ImportError:  # pragma: no cover
     gaussian_kde = None
 
 # ── 颜色常量 ──────────────────────────────────────────────
-COLOR_STRATEGY = "#2E86AB"  # 策略曲线：蓝色
-COLOR_BENCHMARK = "#E63946"  # 基准曲线：红色
-COLOR_DRAWDOWN_LINE = "#C1121F"  # 回撤折线：深红
-COLOR_DRAWDOWN_FILL = "#F24236"  # 回撤填充：橙红
-COLOR_GAIN = "#ef4444"  # 正收益柱：红（A 股涨红）
-COLOR_LOSS = "#22c55e"  # 负收益柱：绿（A 股跌绿）
-COLOR_DIST_FILL = "#6B4C3F"  # 分布填充：棕色
-COLOR_DIST_LINE = "#8B6F5E"  # 分布轮廓：浅棕
+COLOR_STRATEGY     = "#2E86AB"  # 策略曲线：蓝色
+COLOR_BENCHMARK    = "#E63946"  # 基准曲线：红色
+COLOR_DRAWDOWN_LINE = "#C1121F" # 回撤折线：深红
+COLOR_DRAWDOWN_FILL = "#F24236" # 回撤填充：橙红
+COLOR_GAIN         = "#ef4444"  # 涨：红（A 股）
+COLOR_LOSS         = "#22c55e"  # 跌：绿（A 股）
+COLOR_DIST_FILL    = "#6B4C3F"  # 分布填充：棕色
+COLOR_DIST_LINE    = "#8B6F5E"  # 分布轮廓：浅棕
 
-# ── 字体候选列表（按优先级，用于 Matplotlib 中文显示）──────
-CHINESE_FONTS = ["Microsoft YaHei", "SimHei", "Heiti TC", "Arial Unicode MS", "DejaVu Sans"]
-
-# ── 其他常量 ──────────────────────────────────────────────
+# KDE 曲线采样点数
 KDE_N_POINTS = 300
-FIG_WIDTH = 16
-FIG_HEIGHT_WITH_PRICE = 14
-FIG_HEIGHT_WITHOUT_PRICE = 12
-DATE_FMT = "%Y-%m"
-DATE_INTERVAL_MONTHS = 6
 
 
 def _end_label(series, text: str) -> list:
@@ -39,8 +31,17 @@ def _end_label(series, text: str) -> list:
     return [None] * (len(series) - 1) + [text]
 
 
+def _to_ohlc(ohlcv_df: pd.DataFrame) -> pd.DataFrame:
+    """统一 OHLCV DataFrame 的 index 为 DatetimeIndex。"""
+    ohlc = ohlcv_df.copy()
+    if "date" in ohlc.columns:
+        ohlc = ohlc.set_index("date")
+    ohlc.index = pd.to_datetime(ohlc.index)
+    return ohlc
+
+
 class PerformanceChart(BaseComponent):
-    """多面板回测绩效图表（Plotly 交互 / Matplotlib 静态）。"""
+    """多面板回测绩效图表（Plotly 交互）。"""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -52,6 +53,8 @@ class PerformanceChart(BaseComponent):
     def plot_backtest_charts(
             self,
             values_df: pd.DataFrame,
+            ohlcv_df: pd.DataFrame,
+            trades_df: pd.DataFrame,
             benchmark_close: Optional[pd.Series] = None,
             metrics: Optional[dict] = None,
     ) -> None:
@@ -69,41 +72,52 @@ class PerformanceChart(BaseComponent):
 
         has_metrics = bool(metrics)
         offset = 1 if has_metrics else 0
+        # 固定面板：K线 + 成交量 + 5个基础面板
+        total_rows = offset + 7
 
-        # 行高：表格 18%，其余五面板按比例分配
-        table_h = 0.18 if has_metrics else 0.0
-        panel_ratios = [0.13, 0.15, 0.14, 0.14, 0.13]
+        # 行高比例：表格、K线、成交量、价格对比、净值、回撤、每日盈亏、分布
+        table_h = 0.16 if has_metrics else 0.0
+        panel_ratios = [0.20, 0.08, 0.13, 0.15, 0.14, 0.14, 0.13]
         scale = (1.0 - table_h) / sum(panel_ratios)
         row_heights = ([table_h] if has_metrics else []) + [r * scale for r in panel_ratios]
 
-        specs = ([[{"type": "domain"}]] if has_metrics else []) + [[{"type": "scatter"}]] * 5
+        specs = ([[{"type": "domain"}]] if has_metrics else []) + [[{"type": "scatter"}]] * 7
 
         fig = make_subplots(
-            rows=5 + offset, cols=1,
+            rows=total_rows, cols=1,
             shared_xaxes=False,
-            vertical_spacing=0.025,
+            vertical_spacing=0.02,
             specs=specs,
             row_heights=row_heights,
         )
+
+        # 关闭所有行的 rangeslider（Candlestick 默认会开启）
+        for i in range(1, total_rows + 1):
+            fig.update_layout(**{f"xaxis{i if i > 1 else ''}": dict(rangeslider_visible=False)})
 
         if has_metrics:
             tip_map = self._add_metrics_table(fig, metrics, go)
         else:
             tip_map = {}
 
+        # K 线 + 买卖点
+        self._add_candle_traces(fig, go, ohlcv_df, trades_df, row=offset + 1)
+        # 成交量
+        self._add_volume_trace(fig, go, ohlcv_df, row=offset + 2)
+        # 5 个基础面板
         self._add_chart_traces(
             fig, df, strategy_nv, drawdown, returns_pct,
             price_norm, bench_norm_price, bench_norm_nv,
-            has_price, offset, go,
+            has_price, offset + 2, go,
         )
 
-        self._update_axes(fig, offset)
+        self._update_axes(fig, offset + 2, candle_row=offset + 1, volume_row=offset + 2)
 
         fig.update_layout(
             title=f"策略表现分析<br><sup>{date_text}</sup>",
             template="plotly_white",
             showlegend=False,
-            height=1600,
+            height=2000,
         )
 
         html_str = fig.to_html(include_plotlyjs=True, full_html=True)
@@ -165,8 +179,9 @@ class PerformanceChart(BaseComponent):
             return None, None
 
         bench = (
-            pd.Series(benchmark_close).astype(float)
-            .pipe(lambda s: s.set_axis(pd.to_datetime(s.index)))
+            pd.Series(benchmark_close, dtype=float)
+            .rename_axis(None)
+            .set_axis(pd.to_datetime(pd.Series(benchmark_close).index))
             .sort_index()
             .reindex(df.index)
             .ffill()
@@ -179,6 +194,97 @@ class PerformanceChart(BaseComponent):
         bench_norm_nv = bench_nv / bench_nv.iloc[0]
         bench_norm_price = bench / bench.iloc[0] if has_price else None
         return bench_norm_price, bench_norm_nv
+
+    @staticmethod
+    def _add_candle_traces(fig, go, ohlcv_df: pd.DataFrame,
+                           trades_df: Optional[pd.DataFrame], row: int) -> None:
+        """K 线图 + 买入/卖出标注。"""
+        ohlc = _to_ohlc(ohlcv_df)
+
+        # K 线
+        fig.add_trace(
+            go.Candlestick(
+                x=ohlc.index,
+                open=ohlc["Open"], high=ohlc["High"],
+                low=ohlc["Low"],   close=ohlc["Close"],
+                name="K线",
+                increasing=dict(line=dict(color=COLOR_GAIN), fillcolor=COLOR_GAIN),
+                decreasing=dict(line=dict(color=COLOR_LOSS), fillcolor=COLOR_LOSS),
+                showlegend=False,
+            ),
+            row=row, col=1,
+        )
+
+        if trades_df is None or trades_df.empty:
+            return
+        if "timestamp" not in trades_df.columns:
+            return
+
+        trades = trades_df.copy()
+        trades["timestamp"] = pd.to_datetime(trades["timestamp"])
+        buys  = trades[trades["type"] == "buy"]
+        sells = trades[trades["type"] == "sell"]
+
+        # 买入：红色向上三角，标在 low 下方
+        if not buys.empty:
+            buy_dates  = pd.to_datetime(buys["timestamp"].values)
+            buy_prices = buys["price"].values
+            lows = ohlc["Low"].reindex(buy_dates)
+            y    = np.where(lows.isna(), buy_prices, lows.values) * 0.995
+            fig.add_trace(
+                go.Scatter(
+                    x=buy_dates, y=y,
+                    mode="markers+text",
+                    marker=dict(symbol="triangle-up", size=10,
+                                color=COLOR_GAIN, line=dict(color="#fff", width=1)),
+                    text=["买"] * len(buys),
+                    textposition="bottom center",
+                    textfont=dict(size=9, color=COLOR_GAIN),
+                    showlegend=False,
+                    hovertemplate="买入 %{x}<br>价格: %{customdata:.2f}<extra></extra>",
+                    customdata=buy_prices,
+                ),
+                row=row, col=1,
+            )
+
+        # 卖出：绿色向下三角，标在 high 上方
+        if not sells.empty:
+            sell_dates  = pd.to_datetime(sells["timestamp"].values)
+            sell_prices = sells["price"].values
+            highs = ohlc["High"].reindex(sell_dates)
+            y     = np.where(highs.isna(), sell_prices, highs.values) * 1.005
+            fig.add_trace(
+                go.Scatter(
+                    x=sell_dates, y=y,
+                    mode="markers+text",
+                    marker=dict(symbol="triangle-down", size=10,
+                                color=COLOR_LOSS, line=dict(color="#fff", width=1)),
+                    text=["卖"] * len(sells),
+                    textposition="top center",
+                    textfont=dict(size=9, color=COLOR_LOSS),
+                    showlegend=False,
+                    hovertemplate="卖出 %{x}<br>价格: %{customdata:.2f}<extra></extra>",
+                    customdata=sell_prices,
+                ),
+                row=row, col=1,
+            )
+
+    @staticmethod
+    def _add_volume_trace(fig, go, ohlcv_df: pd.DataFrame, row: int) -> None:
+        """成交量柱状图，涨红跌绿。"""
+        ohlc = _to_ohlc(ohlcv_df)
+
+        colors = [COLOR_GAIN if c >= o else COLOR_LOSS
+                  for c, o in zip(ohlc["Close"], ohlc["Open"])]
+        fig.add_trace(
+            go.Bar(
+                x=ohlc.index, y=ohlc["Volume"],
+                name="成交量",
+                marker_color=colors,
+                showlegend=False,
+            ),
+            row=row, col=1,
+        )
 
     @staticmethod
     def _add_metrics_table(fig, metrics: dict, go) -> dict:
@@ -422,14 +528,25 @@ class PerformanceChart(BaseComponent):
             )
 
     @staticmethod
-    def _update_axes(fig, offset: int) -> None:
+    def _update_axes(fig, offset: int, candle_row: int, volume_row: int) -> None:
         """设置各面板 Y 轴标签、X 轴日期格式及边框。"""
         date_tickformat = [
-            dict(dtickrange=[None, 86400000], value="%m-%d"),
+            dict(dtickrange=[None, 86400000],       value="%m-%d"),
             dict(dtickrange=[86400000, 2592000000], value="%Y-%m-%d"),
-            dict(dtickrange=[2592000000, None], value="%Y-%m"),
+            dict(dtickrange=[2592000000, None],      value="%Y-%m"),
         ]
 
+        # K 线面板
+        fig.update_yaxes(title_text="价格", row=candle_row, col=1)
+        fig.update_xaxes(showticklabels=True, tickangle=0,
+                         tickformatstops=date_tickformat, row=candle_row, col=1)
+
+        # 成交量面板
+        fig.update_yaxes(title_text="成交量", row=volume_row, col=1)
+        fig.update_xaxes(showticklabels=True, tickangle=0,
+                         tickformatstops=date_tickformat, row=volume_row, col=1)
+
+        # 5 个基础面板
         y_labels = ["价格(归一化)", "净值", "回撤 (%)", "收益率 (%)", "频数"]
         for i, label in enumerate(y_labels, start=1):
             fig.update_yaxes(title_text=label, row=i + offset, col=1)

@@ -153,6 +153,8 @@ class BacktestEngine(BaseComponent, ABC):
                 self.data_fetcher.fetch_data(self.benchmark, self.start_date, self.end_date)['Close']
         self.chart.plot_backtest_charts(
             values_df=values_df,
+            ohlcv_df=ohlcv_df,
+            trades_df=trades_df,
             benchmark_close=benchmark_close,
             metrics=metrics,
         )
