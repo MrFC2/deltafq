@@ -211,6 +211,13 @@ class PerformanceChart(BaseComponent):
                 increasing=dict(line=dict(color=COLOR_GAIN), fillcolor=COLOR_GAIN),
                 decreasing=dict(line=dict(color=COLOR_LOSS), fillcolor=COLOR_LOSS),
                 showlegend=False,
+                hovertemplate=(
+                    "%{x}<br>"
+                    "开盘价: %{open:.2f}<br>"
+                    "最高价: %{high:.2f}<br>"
+                    "最低价: %{low:.2f}<br>"
+                    "收盘价: %{close:.2f}<extra></extra>"
+                ),
             ),
             row=row, col=1,
         )
