@@ -474,8 +474,16 @@ class PerformanceChart(BaseComponent):
             fig.update_yaxes(title_text=label, row=i + offset, col=1)
 
         for r in range(1 + offset, 5 + offset):
-            fig.update_xaxes(showticklabels=True, tickformat="%Y-%m",
-                             tickangle=0, row=r, col=1)
+            fig.update_xaxes(
+                showticklabels=True,
+                tickangle=0,
+                tickformatstops=[
+                    dict(dtickrange=[None, 86400000], value="%m-%d"),  # 日及以下
+                    dict(dtickrange=[86400000, 2592000000], value="%Y-%m-%d"),  # 日～月
+                    dict(dtickrange=[2592000000, None], value="%Y-%m"),  # 月及以上
+                ],
+                row=r, col=1,
+            )
         fig.update_xaxes(title_text="收益率 (%)", tickangle=0, row=5 + offset, col=1)
 
         fig.update_xaxes(showline=True, linewidth=1, linecolor="#cccccc", mirror=True)
