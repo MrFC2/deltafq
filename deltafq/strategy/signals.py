@@ -2,8 +2,9 @@
 
 import pandas as pd
 import numpy as np
-from typing import Dict, Any, Optional
+from typing import Dict, Optional
 from ..core.base import BaseComponent
+from ..enums import CombineMethod
 
 
 class SignalGenerator(BaseComponent):
@@ -119,71 +120,51 @@ class SignalGenerator(BaseComponent):
     def combine_signals(
             self,
             signals_dict: Dict[str, pd.Series],
-            method: str = 'vote',
+            method: CombineMethod = CombineMethod.VOTE,
             weights: Optional[Dict[str, float]] = None,
-            threshold: float = 0.5
+            threshold: float = 0.33,
     ) -> pd.Series:
-        """合并多个 {-1,0,1} 信号序列，支持 vote / weighted / threshold 三种方式。"""
+        """合并多个 {-1,0,1} 信号序列，支持 vote / weighted 两种方式。
+
+        - VOTE:     多数投票，买票 > 卖票取 1，卖票 > 买票取 -1，否则 0。
+        - WEIGHTED: 加权求和，结果 >= threshold 取 1，<= -threshold 取 -1，否则 0。
+                    weights 为 None 时各信号等权；threshold 默认 0.33。
+        """
         if not signals_dict:
             raise ValueError("signals_dict 不能为空")
 
-        signal_names = list(signals_dict.keys())
-        first_signal = signals_dict[signal_names[0]]
-        index = first_signal.index
-
-        for name, signal in signals_dict.items():
-            if len(signal) != len(first_signal):
+        names = list(signals_dict.keys())
+        index = signals_dict[names[0]].index
+        aligned = {}
+        for name, sig in signals_dict.items():
+            if len(sig) != len(signals_dict[names[0]]):
                 raise ValueError(f"信号 '{name}' 长度不一致")
-            if not signal.index.equals(index):
-                signals_dict[name] = signal.reindex(index)
-                self.logger.info(f"已对齐信号 '{name}' 的索引")
+            aligned[name] = sig.reindex(index) if not sig.index.equals(index) else sig
 
-        signals_df = pd.DataFrame(signals_dict)
+        signals_df = pd.DataFrame(aligned)
 
-        if method == 'vote':
+        if method == CombineMethod.VOTE:
             buy_votes = (signals_df == 1).sum(axis=1)
             sell_votes = (signals_df == -1).sum(axis=1)
-            combined = pd.Series(0, index=index, dtype=int)
-            combined = np.where(buy_votes > sell_votes, 1, combined)
-            combined = np.where(sell_votes > buy_votes, -1, combined)
+            combined = np.where(buy_votes > sell_votes, 1,
+                                np.where(sell_votes > buy_votes, -1, 0))
 
-        elif method == 'weighted':
+        elif method == CombineMethod.WEIGHTED:
             if weights is None:
-                weights = {name: 1.0 / len(signals_dict) for name in signal_names}
+                w = {n: 1.0 / len(names) for n in names}
             else:
-                total_weight = sum(weights.values())
-                if total_weight == 0:
+                total = sum(weights.values())
+                if total == 0:
                     raise ValueError("权重之和不能为零")
-                weights = {k: v / total_weight for k, v in weights.items()}
+                w = {k: v / total for k, v in weights.items()}
 
-            weighted_sum = pd.Series(0.0, index=index)
-            for name in signal_names:
-                weighted_sum += signals_df[name] * weights.get(name, 0)
-
-            combined = pd.Series(0, index=index, dtype=int)
-            combined = np.where(weighted_sum > 0.33, 1, combined)
-            combined = np.where(weighted_sum < -0.33, -1, combined)
-
-        elif method == 'threshold':
-            if weights is None:
-                weights = {name: 1.0 / len(signals_dict) for name in signal_names}
-            else:
-                total_weight = sum(weights.values())
-                if total_weight == 0:
-                    raise ValueError("权重之和不能为零")
-                weights = {k: v / total_weight for k, v in weights.items()}
-
-            weighted_sum = pd.Series(0.0, index=index)
-            for name in signal_names:
-                weighted_sum += signals_df[name] * weights.get(name, 0)
-
-            combined = pd.Series(0, index=index, dtype=int)
-            combined = np.where(weighted_sum >= threshold, 1, combined)
-            combined = np.where(weighted_sum <= -threshold, -1, combined)
+            weighted_sum = sum(signals_df[n] * w.get(n, 0) for n in names)
+            combined = np.where(weighted_sum >= threshold, 1,
+                                np.where(weighted_sum <= -threshold, -1, 0))
 
         else:
-            raise ValueError("无效的 method 参数")
+            raise ValueError(f"无效的 method: {method}，可选 CombineMethod.VOTE / CombineMethod.WEIGHTED")
 
-        combined_series = pd.Series(combined, index=index, dtype=int)
-        self._log_signal_counts(f"Combined ({method})", combined_series)
-        return combined_series
+        result = pd.Series(combined, index=index, dtype=int)
+        self._log_signal_counts(f"Combined ({method.value})", result)
+        return result

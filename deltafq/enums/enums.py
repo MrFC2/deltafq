@@ -16,3 +16,9 @@ class OrderStatus(Enum):
     PENDING = "pending"       # 待成交
     EXECUTED = "executed"     # 已成交
     CANCELLED = "cancelled"   # 已撤销
+
+
+class CombineMethod(Enum):
+    """多信号合并方式。"""
+    VOTE     = "vote"      # 多数投票
+    WEIGHTED = "weighted"  # 加权求和
