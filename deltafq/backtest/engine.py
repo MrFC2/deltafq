@@ -72,7 +72,7 @@ class BacktestEngine(BaseComponent, ABC):
             raise ValueError("行情数据为空，请先调用 _load_data()。")
         if 'Close' not in data.columns:
             raise ValueError("行情数据缺少 Close 列。")
-        return self.strategy.run(data)
+        return self.strategy.generate_signals(data)
 
     def _run_backtest(self, signals: pd.Series, price_series: pd.Series) -> tuple:
         """逐 bar 回放，返回 trades_df 和 values_df。"""

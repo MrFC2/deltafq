@@ -18,10 +18,3 @@ class BaseStrategy(BaseComponent, ABC):
     def generate_signals(self, data: pd.DataFrame) -> pd.Series:
         """返回 {-1, 0, 1} 信号序列。"""
         pass
-
-    def run(self, data: pd.DataFrame) -> pd.Series:
-        """运行策略，返回信号序列。"""
-        try:
-            return self.generate_signals(data).astype(int)
-        except Exception as exc:
-            raise RuntimeError(f"策略执行失败: {exc}") from exc

@@ -41,7 +41,7 @@ def main() -> None:
         strategy=strategy,
         start_date="2024-01-01",
         end_date="2024-12-31",
-        benchmark="sh.000300",  # 沪深300
+        # benchmark="sh.000300",  # 沪深300
         data_source="baostock",
     )
     engine.run()
