@@ -423,9 +423,9 @@ class PerformanceChart(BaseComponent):
     def _update_axes(fig, offset: int) -> None:
         """设置各面板 Y 轴标签、X 轴日期格式及边框。"""
         date_tickformat = [
-            dict(dtickrange=[None, 86400000],       value="%m-%d"),
+            dict(dtickrange=[None, 86400000], value="%m-%d"),
             dict(dtickrange=[86400000, 2592000000], value="%Y-%m-%d"),
-            dict(dtickrange=[2592000000, None],     value="%Y-%m"),
+            dict(dtickrange=[2592000000, None], value="%Y-%m"),
         ]
 
         y_labels = ["价格(归一化)", "净值", "回撤 (%)", "收益率 (%)", "频数"]
