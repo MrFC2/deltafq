@@ -12,12 +12,10 @@ class DataCleaner(BaseComponent):
     def __init__(self, **kwargs):
         """初始化数据清洗器。"""
         super().__init__(**kwargs)
-        self.logger.info("初始化数据清洗器")
 
     def dropna(self, data: pd.DataFrame) -> pd.DataFrame:
         """删除含 NaN 的行。"""
         cleaned_data = data.dropna()
-        self.logger.info(f"删除 NaN 行：{len(data)} -> {len(cleaned_data)} 行")
         return cleaned_data
 
     def fillna(self, data: pd.DataFrame, method: str = "forward") -> pd.DataFrame:
@@ -32,6 +30,5 @@ class DataCleaner(BaseComponent):
             filled_data = data.fillna(0)
 
         na_count_after = filled_data.isna().sum().sum()
-        self.logger.info(f"填充 NaN：{na_count_before} -> {na_count_after}（method={method}）")
 
         return filled_data

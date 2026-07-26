@@ -27,13 +27,11 @@ class DataFetcher(BaseComponent):
         super().__init__(**kwargs)
         self.source = source
         self._cleaner = DataCleaner()
-        self.logger.info(f"初始化数据拉取器，数据源: {self.source}")
 
     def fetch_data(self, ticker: str, start_date: str, end_date: Optional[str] = None,
                    interval: str = "1d") -> pd.DataFrame:
         """拉取行情数据并清洗。interval 示例：'1m'、'1h'、'1d'（默认）、'1wk'、'1mo'。"""
         try:
-            self.logger.info(f"拉取 {ticker} 数据，{start_date} 至 {end_date}，周期={interval}")
             if self.source == "baostock":
                 from ..adapters.data.baostock_bars import fetch_baostock_bars
                 data = fetch_baostock_bars(ticker, start_date, end_date, interval=interval)
@@ -61,7 +59,6 @@ class DataFetcher(BaseComponent):
         def _get_page(p: int) -> pd.DataFrame:
             params = {**base_params, "page": p}
             resp = requests.get(base_url, params=params)
-            self.logger.info(f"拉取基金 {code} 第 {p} 页")
             match = re.search(r'content:"([^"]+)"', resp.text, re.DOTALL)
             if not match:
                 raise ValueError(f"无法解析 API 响应（page={p}）")
@@ -76,14 +73,11 @@ class DataFetcher(BaseComponent):
                 match = re.search(r'pages:(\d+)', resp.text)
                 max_pages = int(match.group(1)) if match else 1
 
-                self.logger.info(f"拉取基金 {code} 全部数据，共 {max_pages} 页")
 
                 all_dfs = [_get_page(p) for p in range(1, max_pages + 1)]
                 result = pd.concat(all_dfs, ignore_index=True)
-                self.logger.info(f"共拉取 {len(result)} 条记录，{max_pages} 页")
                 return result
 
-            self.logger.info(f"拉取基金 {code} 第 {page} 页")
             return _get_page(page)
         except Exception as e:
             raise RuntimeError(f"拉取基金 {code} 数据失败: {str(e)}") from e

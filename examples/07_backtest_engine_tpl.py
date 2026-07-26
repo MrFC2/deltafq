@@ -44,7 +44,7 @@ def main() -> None:
         benchmark="sh.000300",  # 沪深300
         data_source="baostock",
     )
-    engine.run(save_results=False)
+    engine.run()
 
 
 if __name__ == "__main__":

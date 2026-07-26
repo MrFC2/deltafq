@@ -13,7 +13,6 @@ class BaseStrategy(BaseComponent, ABC):
 
     def __init__(self, name: str = None, **kwargs: Any) -> None:
         super().__init__(name=name, **kwargs)
-        self.logger.info(f"初始化策略: {self.name}")
 
     @abstractmethod
     def generate_signals(self, data: pd.DataFrame) -> pd.Series:
@@ -22,7 +21,6 @@ class BaseStrategy(BaseComponent, ABC):
 
     def run(self, data: pd.DataFrame) -> pd.Series:
         """运行策略，返回信号序列。"""
-        self.logger.info(f"运行策略: {self.name}")
         try:
             return self.generate_signals(data).astype(int)
         except Exception as exc:

@@ -38,12 +38,10 @@ class TraderEngine(BaseComponent):
             self.cash = cash
             # 手续费率
             self.commission = commission
-            self.logger.info(f"初始化模拟交易执行引擎，初始资金: {self.cash}")
         else:
             # 实盘：账户信息由 broker 提供
             self.cash = None
             self.commission = None
-            self.logger.info("初始化实盘交易执行引擎")
 
     def execute_order(self, ticker: str, quantity: int, order_type: OrderType = None,
                       price: Optional[float] = None, timestamp: Optional[datetime] = None) -> str:

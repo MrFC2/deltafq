@@ -15,7 +15,6 @@ class OrderManager(BaseComponent):
     def __init__(self, **kwargs):
         """初始化订单管理器。"""
         super().__init__(**kwargs)
-        self.logger.info("初始化订单管理器")
         self.orders = {}
 
     def create_order(self, ticker: str, quantity: int, order_type: OrderType = None,

@@ -21,7 +21,6 @@ class PerformanceChart(BaseComponent):
     def __init__(self, **kwargs):
         """初始化绩效图表。"""
         super().__init__(**kwargs)
-        self.logger.info("初始化绩效图表")
 
     def plot_backtest_charts(self, values_df: pd.DataFrame, benchmark_close: Optional[pd.Series] = None,
                              title: Optional[str] = None, save_path: Optional[str] = None,

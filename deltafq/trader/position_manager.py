@@ -13,7 +13,6 @@ class PositionManager(BaseComponent):
     def __init__(self, **kwargs):
         """初始化持仓管理器。"""
         super().__init__(**kwargs)
-        self.logger.info("初始化持仓管理器")
         self.positions = {}
 
     def add_position(self, ticker: str, quantity: int, price: Optional[float] = None) -> bool:

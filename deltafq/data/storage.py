@@ -34,7 +34,6 @@ class DataStorage(BaseComponent):
             base_path = config.get_cache_dir()
 
         self.base_path = Path(base_path)
-        self.logger.info(f"正在初始化数据存储，路径：{self.base_path}")
         self._init_directories()
 
     def _init_directories(self):

@@ -23,7 +23,6 @@ class BacktestEngine(BaseComponent, ABC):
                  data_source: str = "baostock", **kwargs):
         """初始化回测引擎。"""
         super().__init__(**kwargs)
-        self.logger.info("初始化回测引擎")
         # 回测标的代码
         self.ticker = ticker
         # 策略实例

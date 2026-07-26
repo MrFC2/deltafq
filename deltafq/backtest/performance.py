@@ -49,7 +49,6 @@ class PerformanceReporter(BaseComponent):
     def __init__(self, **kwargs):
         """初始化绩效报告器。"""
         super().__init__(**kwargs)
-        self.logger.info("初始化绩效报告器")
 
     def print_summary(self, ticker: str, trades_df: pd.DataFrame, values_df: pd.DataFrame) -> None:
         _, metrics = self.compute(ticker, trades_df, values_df)
