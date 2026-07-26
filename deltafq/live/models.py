@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
+from ..enums import OrderType
+
 
 @dataclass
 class TickData:
@@ -20,5 +22,5 @@ class OrderRequest:
     ticker: str
     quantity: int
     price: float
-    order_type: str = "limit"
+    order_type: OrderType = OrderType.LIMIT
     timestamp: Optional[datetime] = None

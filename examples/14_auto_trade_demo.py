@@ -12,7 +12,7 @@ if project_root not in sys.path:
 import pandas as pd
 from deltafq.data import DataFetcher, DataStorage
 from deltafq.strategy.base import BaseStrategy
-from deltafq.trader.engine import ExecutionEngine
+from deltafq.trader.engine import TraderEngine
 
 
 class SimpleMAStrategy(BaseStrategy):
@@ -55,8 +55,7 @@ def main():
     ticker = "000001.SS"
     fetcher = DataFetcher()
     storage = DataStorage()
-    engine = ExecutionEngine(broker=None, initial_capital=100_000, commission=0.001, match_on_tick=False)
-    engine.initialize()
+    engine = TraderEngine(cash=100_000, commission=0.001, match_on_tick=False)
     qty = 100
     # (interval, strategy, start, end, daily_only)
     tasks = [

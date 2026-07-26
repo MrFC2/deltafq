@@ -17,6 +17,7 @@ from typing import Optional
 
 from ...live.gateways import TradeGateway
 from ...live.models import OrderRequest
+from ...enums import OrderType
 from .miniqmt_client import MiniQmtXtTraderClient
 
 logger = logging.getLogger(__name__)
@@ -59,8 +60,8 @@ class MiniQmtTradeGateway(TradeGateway):
 
     def send_order(self, req: OrderRequest) -> str:
         """仅支持限价单；数量按 lot_size 向下对齐；返回字符串委托号。"""
-        if req.order_type != "limit":
-            raise ValueError("MiniQmtTradeGateway currently supports limit orders only (order_type=limit)")
+        if req.order_type != OrderType.LIMIT:
+            raise ValueError("MiniQmtTradeGateway 当前仅支持限价单")
         qty = int(req.quantity)
         if qty == 0:
             raise ValueError("数量不能为零")

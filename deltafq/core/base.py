@@ -3,6 +3,7 @@ Base classes for DeltaFQ components.
 """
 
 from abc import ABC
+from typing import Optional
 from .logger import Logger
 
 

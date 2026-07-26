@@ -23,14 +23,9 @@ class PerformanceChart(BaseComponent):
         super().__init__(**kwargs)
         self.logger.info("初始化绩效图表")
 
-    def plot_backtest_charts(
-        self,
-        values_df: pd.DataFrame,
-        benchmark_close: Optional[pd.Series] = None,
-        title: Optional[str] = None,
-        save_path: Optional[str] = None,
-        use_plotly: bool = False,
-    ) -> None:
+    def plot_backtest_charts(self, values_df: pd.DataFrame, benchmark_close: Optional[pd.Series] = None,
+                             title: Optional[str] = None, save_path: Optional[str] = None,
+                             use_plotly: bool = False) -> None:
         plt.rcParams["font.sans-serif"] = [
             "Microsoft YaHei",
             "SimHei",
@@ -60,7 +55,8 @@ class PerformanceChart(BaseComponent):
 
         # 预计算 matplotlib 和 plotly 共用的序列
         strategy_nv = df["total_value"] / df["total_value"].iloc[0]
-        drawdown = (df["total_value"].expanding().max() - df["total_value"]) / df["total_value"].expanding().max() * -100
+        drawdown = (df["total_value"].expanding().max() - df["total_value"]) / df[
+            "total_value"].expanding().max() * -100
         returns_pct = df["returns"] * 100
         price_norm = df["price"].astype(float) / df["price"].iloc[0] if has_price else None
         bench_norm_price = None
@@ -139,7 +135,8 @@ class PerformanceChart(BaseComponent):
                     col=1,
                 )
                 fig.add_trace(
-                    go.Bar(x=df.index, y=returns_pct, name="每日盈亏", marker_color=np.where(returns_pct >= 0, "#ef4444", "#22c55e")),
+                    go.Bar(x=df.index, y=returns_pct, name="每日盈亏",
+                           marker_color=np.where(returns_pct >= 0, "#ef4444", "#22c55e")),
                     row=4,
                     col=1,
                 )
@@ -207,7 +204,8 @@ class PerformanceChart(BaseComponent):
 
         idx = 0
         if has_price and price_norm is not None:
-            self._plot_price_compare(ax=axes[idx], df=df, benchmark_close=benchmark_close, price_norm=price_norm, bench_norm=bench_norm_price)
+            self._plot_price_compare(ax=axes[idx], df=df, benchmark_close=benchmark_close, price_norm=price_norm,
+                                     bench_norm=bench_norm_price)
             idx += 1
 
         self._plot_net_value(ax=axes[idx], df=df, strategy_nv=strategy_nv, bench_norm=bench_norm_nv)
@@ -233,17 +231,18 @@ class PerformanceChart(BaseComponent):
     # ------------------------------------------------------------------
 
     def _plot_price_compare(
-        self,
-        ax: plt.Axes,
-        df: pd.DataFrame,
-        benchmark_close: Optional[pd.Series],
-        price_norm: pd.Series,
-        bench_norm: Optional[pd.Series],
+            self,
+            ax: plt.Axes,
+            df: pd.DataFrame,
+            benchmark_close: Optional[pd.Series],
+            price_norm: pd.Series,
+            bench_norm: Optional[pd.Series],
     ) -> None:
         ax.plot(df.index, price_norm, linewidth=1.5, color="#2E86AB", label="策略收盘价")
 
         if bench_norm is not None:
-            ax.plot(bench_norm.index, bench_norm.values, linewidth=1.5, color="#E63946", linestyle="--", label="基准收盘价")
+            ax.plot(bench_norm.index, bench_norm.values, linewidth=1.5, color="#E63946", linestyle="--",
+                    label="基准收盘价")
             ax.legend()
 
         ax.set_title("价格对比", fontsize=14)
@@ -252,11 +251,11 @@ class PerformanceChart(BaseComponent):
         ax.grid(True, alpha=0.3, linestyle="--")
 
     def _plot_net_value(
-        self,
-        ax: plt.Axes,
-        df: pd.DataFrame,
-        strategy_nv: pd.Series,
-        bench_norm: Optional[pd.Series],
+            self,
+            ax: plt.Axes,
+            df: pd.DataFrame,
+            strategy_nv: pd.Series,
+            bench_norm: Optional[pd.Series],
     ) -> None:
         ax.plot(df.index, strategy_nv, linewidth=2, color="#2E86AB", label="策略净值")
 
@@ -317,4 +316,3 @@ class PerformanceChart(BaseComponent):
         ax.fill_between(x_range, 0, frequency, color="#6B4C3F", alpha=0.7)
         ax.plot(x_range, frequency, color="#8B6F5E", linewidth=2)
         ax.axvline(x=0, color="gray", linestyle="--", linewidth=1, alpha=0.7)
-

@@ -51,21 +51,13 @@ class PerformanceReporter(BaseComponent):
         super().__init__(**kwargs)
         self.logger.info("初始化绩效报告器")
 
-    def print_summary(
-        self,
-        ticker: str,
-        trades_df: pd.DataFrame,
-        values_df: pd.DataFrame,
-        title: str | None = None,
-        language: str = "zh",
-    ) -> None:
+    def print_summary(self, ticker: str, trades_df: pd.DataFrame, values_df: pd.DataFrame) -> None:
         _, metrics = self.compute(ticker, trades_df, values_df)
-        texts = _TEXTS_ZH if language == "zh" else _TEXTS_EN
-        _ensure_utf8(language)
+        texts = _TEXTS_ZH
+        _ensure_utf8("zh")
 
         print("\n" + "=" * 80)
-        header = title or texts["title_default"]
-        print(f"  {header}")
+        print(f"  {texts['title_default']}")
         print("=" * 80 + "\n")
 
         print(texts["date_info"])
@@ -115,12 +107,8 @@ class PerformanceReporter(BaseComponent):
         print(f"  {texts['avg_daily_trade_count']}: {metrics.get('avg_daily_trade_count', 0.0):.2f}\n")
         print("=" * 80 + "\n")
 
-    def compute(
-        self,
-        ticker: str,
-        trades_df: pd.DataFrame,
-        values_df: pd.DataFrame,
-    ) -> tuple[pd.DataFrame, Dict[str, Any]]:
+    def compute(self, ticker: str, trades_df: pd.DataFrame, values_df: pd.DataFrame) \
+            -> tuple[pd.DataFrame, Dict[str, Any]]:
         values = values_df.copy()
         trades = trades_df.copy()
 
@@ -172,32 +160,33 @@ class PerformanceReporter(BaseComponent):
 
         trade_metrics = _calculate_trade_metrics(trades)
         trading_metrics = _calculate_trading_metrics(trades, total_days)
-        
+
         # 检查是否有未平仓持仓，计算浮动盈亏
         realized_pnl = trade_metrics.get("total_pnl", 0.0)
         unrealized_pnl = 0.0
-        
+
         if not values_df.empty and not trades.empty and 'type' in trades.columns and 'cost' in trades.columns:
             last_row = values_df.iloc[-1]
             final_position = last_row.get('position', 0)
             final_position_value = last_row.get('position_value', 0.0)
-            
+
             if final_position > 0:
                 # 计算未平仓持仓的浮动盈亏
                 buy_trades = trades[trades['type'] == 'buy'].copy()
                 sell_trades = trades[trades['type'] == 'sell'].copy()
-                
+
                 if not buy_trades.empty and 'quantity' in buy_trades.columns:
                     # 计算总买入数量和总买入成本
                     total_bought_qty = buy_trades['quantity'].sum()
                     total_buy_cost = buy_trades['cost'].sum()
-                    
+
                     # 计算总卖出数量
-                    total_sold_qty = sell_trades['quantity'].sum() if not sell_trades.empty and 'quantity' in sell_trades.columns else 0
-                    
+                    total_sold_qty = sell_trades[
+                        'quantity'].sum() if not sell_trades.empty and 'quantity' in sell_trades.columns else 0
+
                     # 未平仓数量应该等于 final_position
                     open_qty = total_bought_qty - total_sold_qty
-                    
+
                     if open_qty > 0 and total_bought_qty > 0:
                         # 计算未平仓持仓的平均成本（加权平均）
                         # 如果部分卖出，需要按比例计算未平仓部分的成本
@@ -209,10 +198,10 @@ class PerformanceReporter(BaseComponent):
                         else:
                             # 全部未平仓
                             open_position_cost = total_buy_cost
-                        
+
                         # 浮动盈亏 = 当前持仓价值 - 持仓成本
                         unrealized_pnl = final_position_value - open_position_cost
-        
+
         total_pnl = realized_pnl + unrealized_pnl
 
         metrics: Dict[str, Any] = {
@@ -286,7 +275,9 @@ def _calculate_trading_metrics(trades_df: pd.DataFrame, total_days: int) -> Dict
 
     commission = float(trades_df.get("commission", pd.Series(dtype=float)).sum())
     # 总成交额 = 每笔交易的 |数量| * 价格 之和（买卖均计）
-    turnover = float((trades_df["quantity"].abs() * trades_df["price"]).sum()) if "quantity" in trades_df.columns and "price" in trades_df.columns else float(trades_df.get("gross_revenue", pd.Series(dtype=float)).sum())
+    turnover = float((trades_df["quantity"].abs() * trades_df[
+        "price"]).sum()) if "quantity" in trades_df.columns and "price" in trades_df.columns else float(
+        trades_df.get("gross_revenue", pd.Series(dtype=float)).sum())
     pnl = float(trades_df.get("profit_loss", pd.Series(dtype=float)).sum())
     divisor = total_days or 1
 
@@ -339,7 +330,6 @@ _TEXTS_ZH = {
     "avg_daily_trade_count": "日均成交笔数",
 }
 
-
 _TEXTS_EN = {
     "title_default": "Backtest Report",
     "date_info": "[Date Information]",
@@ -379,7 +369,6 @@ _TEXTS_EN = {
     "avg_daily_trade_count": "Avg Daily Trades",
 }
 
-
 __all__ = ["PerformanceReporter"]
 
 
@@ -391,4 +380,3 @@ def _ensure_utf8(language: str) -> None:
                 sys.stdout.reconfigure(encoding="utf-8")
             except AttributeError:
                 pass
-

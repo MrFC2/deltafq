@@ -46,15 +46,6 @@ def main() -> None:
 
     engine.run(save_results=False)
 
-    # print("Data:")
-    # print(pd.DataFrame(engine.data))
-    # print("Trades:")
-    # print(pd.DataFrame(engine.trades_df))
-    # print("Values:")
-    # print(pd.DataFrame(engine.values_df))
-    # print("Metrics:")
-    # print(pd.DataFrame([engine.metrics]).T)
-
 
 if __name__ == "__main__":
     main()

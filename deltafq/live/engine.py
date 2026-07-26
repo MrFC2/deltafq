@@ -62,6 +62,7 @@ from ..strategy.base import BaseStrategy
 from .event_engine import EventEngine, EVENT_TICK
 from .gateway_registry import create_data_gateway, create_trade_gateway
 from .models import OrderRequest
+from ..enums import OrderType
 
 
 # 各周期下「多久重拉一次 K 线」（秒）
@@ -513,7 +514,7 @@ class LiveEngine(BaseComponent):
         if signal == 1 and last <= 0:
             if sizing.qty > 0:
                 buy_px = float(getattr(tick, "ask", None)) if getattr(tick, "ask", None) is not None else px
-                req = OrderRequest(ticker=self.ticker, quantity=sizing.qty, price=buy_px, order_type="limit")
+                req = OrderRequest(ticker=self.ticker, quantity=sizing.qty, price=buy_px, order_type=OrderType.LIMIT)
                 self._last_pending_order_id = self._trade_gw.send_order(req)
                 self.logger.info(f"已发送买单: [{self.ticker}] qty={sizing.qty} @ {buy_px:.4f}")
         elif signal == -1 and last >= 0 and position > 0:
@@ -522,7 +523,7 @@ class LiveEngine(BaseComponent):
                 return
             sell_px = float(getattr(tick, "bid", None)) if getattr(tick, "bid", None) is not None else px
             req = OrderRequest(
-                ticker=self.ticker, quantity=-sizing.sell_order_qty, price=sell_px, order_type="limit"
+                ticker=self.ticker, quantity=-sizing.sell_order_qty, price=sell_px, order_type=OrderType.LIMIT
             )
             self._last_pending_order_id = self._trade_gw.send_order(req)
             self.logger.info(f"已发送卖单: [{self.ticker}] qty={sizing.sell_order_qty} @ {sell_px:.4f}")
