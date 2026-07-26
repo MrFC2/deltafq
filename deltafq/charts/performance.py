@@ -2,8 +2,6 @@
 
 from typing import Optional
 
-import matplotlib.dates as mdates
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
@@ -55,43 +53,71 @@ class PerformanceChart(BaseComponent):
             self,
             values_df: pd.DataFrame,
             benchmark_close: Optional[pd.Series] = None,
-            title: Optional[str] = None,
-            save_path: Optional[str] = None,
-            use_plotly: bool = True,
             metrics: Optional[dict] = None,
     ) -> None:
-        """绘制回测绩效图表。"""
-        plt.rcParams["font.sans-serif"] = CHINESE_FONTS
-        plt.rcParams["axes.unicode_minus"] = False
+        """绘制回测绩效图表，生成 HTML 并在浏览器打开。"""
+        try:
+            import plotly.graph_objects as go
+            from plotly.subplots import make_subplots
+        except ImportError as exc:  # pragma: no cover
+            raise ImportError(f"Plotly 不可用（{exc}），请安装 plotly") from exc
 
+        # 数据准备
         df, has_price, date_text = self._prepare_df(values_df)
         strategy_nv, drawdown, returns_pct, price_norm = self._calc_series(df, has_price)
         bench_norm_price, bench_norm_nv = self._calc_benchmark(benchmark_close, df, has_price)
 
-        if use_plotly:
-            try:
-                import plotly.graph_objects as go
-                from plotly.subplots import make_subplots
-            except ImportError as exc:  # pragma: no cover
-                self.logger.info(f"Plotly 不可用（{exc}），回退到 Matplotlib")
-            else:
-                self._plot_plotly(
-                    df=df, strategy_nv=strategy_nv, drawdown=drawdown,
-                    returns_pct=returns_pct, price_norm=price_norm,
-                    bench_norm_price=bench_norm_price, bench_norm_nv=bench_norm_nv,
-                    has_price=has_price, title=title, date_text=date_text,
-                    save_path=save_path, metrics=metrics, go=go,
-                    make_subplots=make_subplots,
-                )
-                return
+        has_metrics = bool(metrics)
+        offset = 1 if has_metrics else 0
 
-        self._plot_matplotlib(
-            df=df, strategy_nv=strategy_nv, drawdown=drawdown,
-            returns_pct=returns_pct, price_norm=price_norm,
-            bench_norm_price=bench_norm_price, bench_norm_nv=bench_norm_nv,
-            has_price=has_price, title=title, date_text=date_text,
-            save_path=save_path,
+        # 行高：表格 18%，其余五面板按比例分配
+        table_h = 0.18 if has_metrics else 0.0
+        panel_ratios = [0.13, 0.15, 0.14, 0.14, 0.13]
+        scale = (1.0 - table_h) / sum(panel_ratios)
+        row_heights = ([table_h] if has_metrics else []) + [r * scale for r in panel_ratios]
+
+        specs = ([[{"type": "domain"}]] if has_metrics else []) + [[{"type": "scatter"}]] * 5
+
+        fig = make_subplots(
+            rows=5 + offset, cols=1,
+            shared_xaxes=False,
+            vertical_spacing=0.025,
+            specs=specs,
+            row_heights=row_heights,
         )
+
+        if has_metrics:
+            tip_map = self._add_metrics_table(fig, metrics, go)
+        else:
+            tip_map = {}
+
+        self._add_chart_traces(
+            fig, df, strategy_nv, drawdown, returns_pct,
+            price_norm, bench_norm_price, bench_norm_nv,
+            has_price, offset, go,
+        )
+
+        self._update_axes(fig, offset)
+
+        fig.update_layout(
+            title=f"策略表现分析<br><sup>{date_text}</sup>",
+            template="plotly_white",
+            showlegend=False,
+            height=1600,
+        )
+
+        import tempfile, webbrowser
+        tmp = tempfile.NamedTemporaryFile(suffix=".html", prefix="deltafq_", delete=False)
+        tmp.close()
+        html_path = tmp.name
+
+        html_str = fig.to_html(include_plotlyjs=True, full_html=True)
+        if tip_map:
+            html_str = _inject_cell_click_panel(html_str, tip_map)
+        with open(html_path, "w", encoding="utf-8") as f:
+            f.write(html_str)
+
+        webbrowser.open(f"file://{html_path}")
 
     # ------------------------------------------------------------------
     # 数据准备
@@ -151,79 +177,6 @@ class PerformanceChart(BaseComponent):
         bench_norm_nv = bench_nv / bench_nv.iloc[0]
         bench_norm_price = bench / bench.iloc[0] if has_price else None
         return bench_norm_price, bench_norm_nv
-
-    # ------------------------------------------------------------------
-    # Plotly 交互图
-    # ------------------------------------------------------------------
-
-    def _plot_plotly(
-            self, df, strategy_nv, drawdown, returns_pct,
-            price_norm, bench_norm_price, bench_norm_nv,
-            has_price, title, date_text, save_path, metrics, go, make_subplots,
-    ) -> None:
-        """绘制指标表格 + 五面板交互图，保存为 HTML 或在浏览器展示。"""
-        has_metrics = bool(metrics)
-        offset = 1 if has_metrics else 0
-        chart_rows = 5
-        total_rows = chart_rows + offset
-
-        # 行高：表格占 18%，剩余按比例分配给五个图表面板
-        table_h = 0.18 if has_metrics else 0.0
-        panel_ratios = [0.15, 0.18, 0.17, 0.17, 0.15]
-        scale = (1.0 - table_h) / sum(panel_ratios)
-        row_heights = (([table_h] if has_metrics else [])
-                       + [r * scale for r in panel_ratios])
-
-        specs = (([[{"type": "domain"}]] if has_metrics else [])
-                 + [[{"type": "scatter"}]] * chart_rows)
-
-        fig = make_subplots(
-            rows=total_rows, cols=1,
-            shared_xaxes=False,
-            vertical_spacing=0.03,
-            specs=specs,
-            row_heights=row_heights,
-        )
-
-        if has_metrics:
-            tip_map = self._add_metrics_table(fig, metrics, go)
-        else:
-            tip_map = {}
-
-        self._add_chart_traces(
-            fig, df, strategy_nv, drawdown, returns_pct,
-            price_norm, bench_norm_price, bench_norm_nv,
-            has_price, offset, go,
-        )
-
-        self._update_axes(fig, offset)
-
-        base_title = title or "策略表现分析"
-        fig.update_layout(
-            title=f"{base_title}<br><sup>{date_text}</sup>",
-            template="plotly_white",
-            showlegend=False,
-            height=1600,
-        )
-
-        if save_path:
-            html_path = (save_path if str(save_path).lower().endswith(".html")
-                         else f"{save_path}.html")
-        else:
-            import tempfile
-            html_path = tempfile.mktemp(suffix=".html", prefix="deltafq_")
-
-        html_str = fig.to_html(include_plotlyjs=True, full_html=True)
-        if tip_map:
-            html_str = _inject_cell_click_panel(html_str, tip_map)
-        with open(html_path, "w", encoding="utf-8") as f:
-            f.write(html_str)
-
-        if save_path:
-            self.logger.info(f"图表已保存至 {html_path}")
-        else:
-            import webbrowser
-            webbrowser.open(f"file://{html_path}")
 
     @staticmethod
     def _add_metrics_table(fig, metrics: dict, go) -> dict:
@@ -469,133 +422,23 @@ class PerformanceChart(BaseComponent):
     @staticmethod
     def _update_axes(fig, offset: int) -> None:
         """设置各面板 Y 轴标签、X 轴日期格式及边框。"""
+        date_tickformat = [
+            dict(dtickrange=[None, 86400000],       value="%m-%d"),
+            dict(dtickrange=[86400000, 2592000000], value="%Y-%m-%d"),
+            dict(dtickrange=[2592000000, None],     value="%Y-%m"),
+        ]
+
         y_labels = ["价格(归一化)", "净值", "回撤 (%)", "收益率 (%)", "频数"]
         for i, label in enumerate(y_labels, start=1):
             fig.update_yaxes(title_text=label, row=i + offset, col=1)
 
         for r in range(1 + offset, 5 + offset):
-            fig.update_xaxes(
-                showticklabels=True,
-                tickangle=0,
-                tickformatstops=[
-                    dict(dtickrange=[None, 86400000], value="%m-%d"),  # 日及以下
-                    dict(dtickrange=[86400000, 2592000000], value="%Y-%m-%d"),  # 日～月
-                    dict(dtickrange=[2592000000, None], value="%Y-%m"),  # 月及以上
-                ],
-                row=r, col=1,
-            )
+            fig.update_xaxes(showticklabels=True, tickangle=0,
+                             tickformatstops=date_tickformat, row=r, col=1)
         fig.update_xaxes(title_text="收益率 (%)", tickangle=0, row=5 + offset, col=1)
 
         fig.update_xaxes(showline=True, linewidth=1, linecolor="#cccccc", mirror=True)
         fig.update_yaxes(showline=True, linewidth=1, linecolor="#cccccc", mirror=True)
-
-    # ------------------------------------------------------------------
-    # Matplotlib 静态图
-    # ------------------------------------------------------------------
-
-    def _plot_matplotlib(
-            self, df, strategy_nv, drawdown, returns_pct,
-            price_norm, bench_norm_price, bench_norm_nv,
-            has_price, title, date_text, save_path,
-    ) -> None:
-        n_panels = 5 if has_price else 4
-        fig_height = FIG_HEIGHT_WITH_PRICE if has_price else FIG_HEIGHT_WITHOUT_PRICE
-        fig, axes = plt.subplots(n_panels, 1, figsize=(FIG_WIDTH, fig_height))
-
-        base_title = title or "策略表现分析"
-        fig.suptitle(f"{base_title} | {date_text}", fontsize=16, y=0.995)
-
-        idx = 0
-        if has_price and price_norm is not None:
-            self._plot_price_compare(axes[idx], df, price_norm, bench_norm_price)
-            idx += 1
-
-        self._plot_net_value(axes[idx], df, strategy_nv, bench_norm_nv)
-        self._plot_drawdown(axes[idx + 1], drawdown)
-        self._plot_daily_returns(axes[idx + 2], returns_pct)
-        self._plot_return_distribution(axes[idx + 3], returns_pct)
-
-        for ax in axes[:-1]:
-            ax.xaxis.set_major_formatter(mdates.DateFormatter(DATE_FMT))
-            ax.xaxis.set_major_locator(mdates.MonthLocator(interval=DATE_INTERVAL_MONTHS))
-            plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha="right")
-
-        plt.tight_layout(rect=[0, 0, 1, 0.97])
-
-        if save_path:
-            fig.savefig(save_path, dpi=300, bbox_inches="tight")
-            self.logger.info(f"图表已保存至 {save_path}")
-        else:
-            plt.show()
-
-    # ------------------------------------------------------------------
-    # Matplotlib 各面板静态方法
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _plot_price_compare(ax, df, price_norm, bench_norm):
-        ax.plot(df.index, price_norm, linewidth=1.5, color=COLOR_STRATEGY, label="策略收盘价")
-        if bench_norm is not None:
-            ax.plot(bench_norm.index, bench_norm.values,
-                    linewidth=1.5, color=COLOR_BENCHMARK, linestyle="--", label="基准收盘价")
-            ax.legend()
-        ax.set_title("价格对比", fontsize=14)
-        ax.set_ylabel("价格(归一化)", fontsize=11)
-        ax.grid(True, alpha=0.3, linestyle="--")
-
-    @staticmethod
-    def _plot_net_value(ax, df, strategy_nv, bench_norm):
-        ax.plot(df.index, strategy_nv, linewidth=2, color=COLOR_STRATEGY, label="策略净值")
-        if bench_norm is not None:
-            ax.plot(bench_norm.index, bench_norm.values,
-                    linewidth=2, color=COLOR_BENCHMARK, linestyle="--", label="基准净值")
-            ax.legend()
-        ax.set_title("账户净值", fontsize=14)
-        ax.set_ylabel("净值(起始=1)", fontsize=11)
-        ax.grid(True, alpha=0.3, linestyle="--")
-
-    @staticmethod
-    def _plot_drawdown(ax, drawdown):
-        ax.fill_between(drawdown.index, drawdown, 0, color=COLOR_DRAWDOWN_FILL, alpha=0.5)
-        ax.plot(drawdown.index, drawdown, color=COLOR_DRAWDOWN_LINE, linewidth=1.5)
-        ax.set_title("净值回撤", fontsize=14)
-        ax.set_ylabel("回撤 (%)", fontsize=11)
-        ax.grid(True, alpha=0.3, linestyle="--")
-
-    @staticmethod
-    def _plot_daily_returns(ax, returns_pct):
-        colors = [COLOR_GAIN if x >= 0 else COLOR_LOSS for x in returns_pct]
-        ax.bar(returns_pct.index, returns_pct, color=colors, alpha=0.7, width=0.8)
-        ax.axhline(y=0, color="black", linewidth=0.5)
-        y_max = max(abs(returns_pct.max()), abs(returns_pct.min()), 1) * 1.1
-        ax.set_ylim(-y_max, y_max)
-        ax.set_title("每日盈亏", fontsize=14)
-        ax.set_ylabel("收益率 (%)", fontsize=11)
-        ax.grid(True, alpha=0.3, linestyle="--", axis="y")
-
-    @staticmethod
-    def _plot_return_distribution(ax, returns_pct):
-        returns_for_dist = returns_pct[returns_pct != 0]
-        ax.set_title("盈亏分布（已交易日期）", fontsize=14)
-        ax.set_xlabel("盈亏值 (%)", fontsize=11)
-        ax.set_ylabel("频数", fontsize=11)
-        ax.grid(True, alpha=0.3, linestyle="--", axis="y")
-
-        if len(returns_for_dist) < 2:
-            return
-
-        if gaussian_kde is None:
-            ax.hist(returns_for_dist, bins=40, color=COLOR_DIST_FILL, alpha=0.7, edgecolor="white")
-            ax.axvline(x=0, color="gray", linestyle="--", linewidth=1, alpha=0.7)
-            return
-
-        kde = gaussian_kde(returns_for_dist)
-        kde.set_bandwidth(kde.factor * 0.5)
-        x_range = np.linspace(returns_for_dist.min(), returns_for_dist.max(), KDE_N_POINTS)
-        frequency = kde(x_range) * (x_range[1] - x_range[0]) * len(returns_for_dist)
-        ax.fill_between(x_range, 0, frequency, color=COLOR_DIST_FILL, alpha=0.7)
-        ax.plot(x_range, frequency, color=COLOR_DIST_LINE, linewidth=2)
-        ax.axvline(x=0, color="gray", linestyle="--", linewidth=1, alpha=0.7)
 
 
 # ── 模块级辅助：向 HTML 注入单元格点击说明面板 ──────────────────────────

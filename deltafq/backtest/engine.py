@@ -51,11 +51,11 @@ class BacktestEngine(BaseComponent, ABC):
         # 加载行情数据
         data = self._load_data()
         # 运行策略，生成信号
-        signals, price_series = self._run_strategy(data)
+        signals = self._run_strategy(data)
         # 逐 bar 回放
-        trades_df, values_df = self._run_backtest(signals, price_series)
+        trades_df, values_df = self._run_backtest(signals, data['Close'])
         # 计算绩效指标、打印报告、展示图表
-        self._report(trades_df, values_df)
+        self._report(trades_df, values_df, ohlcv_df=data)
         # 保存结果
         if save_results:
             self.save_backtest_results(trades_df, values_df)
@@ -66,14 +66,13 @@ class BacktestEngine(BaseComponent, ABC):
             raise ValueError("ticker 和 start_date 不能为空。")
         return self.data_fetcher.fetch_data(self.ticker, self.start_date, self.end_date)
 
-    def _run_strategy(self, data: pd.DataFrame):
-        """运行策略，返回信号序列和收盘价序列。"""
+    def _run_strategy(self, data: pd.DataFrame) -> pd.Series:
+        """运行策略，返回信号序列。"""
         if data is None or data.empty:
             raise ValueError("行情数据为空，请先调用 _load_data()。")
         if 'Close' not in data.columns:
             raise ValueError("行情数据缺少 Close 列。")
-        signals = self.strategy.run(data)
-        return signals, data['Close']
+        return self.strategy.run(data)
 
     def _run_backtest(self, signals: pd.Series, price_series: pd.Series) -> tuple:
         """逐 bar 回放，返回 trades_df 和 values_df。"""
@@ -141,7 +140,7 @@ class BacktestEngine(BaseComponent, ABC):
             self.logger.error(f"_run_backtest 执行失败: {e}")
             raise RuntimeError(f"回测执行失败: {e}") from e
 
-    def _report(self, trades_df: pd.DataFrame, values_df: pd.DataFrame) -> None:
+    def _report(self, trades_df: pd.DataFrame, values_df: pd.DataFrame, ohlcv_df: pd.DataFrame = None) -> None:
         """计算绩效指标、打印报告、展示图表。"""
         if trades_df is None or values_df is None:
             raise ValueError("trades_df 或 values_df 为空，请先执行回测。")
@@ -152,9 +151,13 @@ class BacktestEngine(BaseComponent, ABC):
         if self.benchmark is not None:
             benchmark_close = \
                 self.data_fetcher.fetch_data(self.benchmark, self.start_date, self.end_date)['Close']
-        self.chart.plot_backtest_charts(values_df=values_df, benchmark_close=benchmark_close, metrics=metrics)
+        self.chart.plot_backtest_charts(
+            values_df=values_df,
+            benchmark_close=benchmark_close,
+            metrics=metrics,
+        )
 
     def save_backtest_results(self, trades_df: pd.DataFrame, values_df: pd.DataFrame) -> None:
         """将回测结果保存为 CSV 文件。"""
         self.storage.save_backtest_results(trades_df=trades_df, values_df=values_df, ticker=self.ticker,
-                                            strategy_name=self.strategy.name if self.strategy is not None else None)
+                                           strategy_name=self.strategy.name if self.strategy is not None else None)
