@@ -35,18 +35,17 @@ class SimpleMAStrategy(BaseStrategy):
 
 
 def main() -> None:
-    strategy = SimpleMAStrategy(fast_period=10, slow_period=30)
+    strategy = SimpleMAStrategy(fast_period=5, slow_period=10)
     engine = BacktestEngine(
-        ticker="AAPL",
+        ticker="sz.000001",  # 平安银行
         strategy=strategy,
         start_date="2024-01-01",
-        end_date="2024-06-30",
-        benchmark="SPY",
+        end_date="2024-12-31",
+        benchmark="sh.000300",  # 沪深300
+        data_source="baostock",
     )
-
     engine.run(save_results=False)
 
 
 if __name__ == "__main__":
     main()
-

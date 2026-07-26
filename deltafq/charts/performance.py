@@ -25,7 +25,7 @@ class PerformanceChart(BaseComponent):
 
     def plot_backtest_charts(self, values_df: pd.DataFrame, benchmark_close: Optional[pd.Series] = None,
                              title: Optional[str] = None, save_path: Optional[str] = None,
-                             use_plotly: bool = False) -> None:
+                             use_plotly: bool = True) -> None:
         plt.rcParams["font.sans-serif"] = [
             "Microsoft YaHei",
             "SimHei",
