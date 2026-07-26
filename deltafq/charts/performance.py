@@ -106,18 +106,15 @@ class PerformanceChart(BaseComponent):
             height=1600,
         )
 
-        import tempfile, webbrowser
-        tmp = tempfile.NamedTemporaryFile(suffix=".html", prefix="deltafq_", delete=False)
-        tmp.close()
-        html_path = tmp.name
-
         html_str = fig.to_html(include_plotlyjs=True, full_html=True)
         if tip_map:
             html_str = _inject_cell_click_panel(html_str, tip_map)
-        with open(html_path, "w", encoding="utf-8") as f:
-            f.write(html_str)
 
-        webbrowser.open(f"file://{html_path}")
+        import tempfile, webbrowser
+        with tempfile.NamedTemporaryFile(suffix=".html", prefix="deltafq_",
+                                         delete=False, mode="w", encoding="utf-8") as f:
+            f.write(html_str)
+            webbrowser.open(f"file://{f.name}")
 
     # ------------------------------------------------------------------
     # 数据准备
