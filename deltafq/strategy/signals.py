@@ -8,7 +8,7 @@ from ..core.base import BaseComponent
 
 class SignalGenerator(BaseComponent):
     """从预计算指标生成交易信号，并支持多信号合并。"""
-    
+
     def __init__(self, **kwargs):
         """初始化信号生成器。"""
         super().__init__(**kwargs)
@@ -20,7 +20,7 @@ class SignalGenerator(BaseComponent):
         sell = int((series == -1).sum())
         flat = int((series == 0).sum())
         self.logger.info(f"{label} signals -> buy={buy}, sell={sell}, flat={flat}")
-        
+
     # --- SMA -----------------------------------------------------------------
     def sma_signals(self, fast_ma: pd.Series, slow_ma: pd.Series) -> pd.Series:
         """快线在慢线上方为多头，下方为空头。"""
@@ -115,38 +115,38 @@ class SignalGenerator(BaseComponent):
         )
         self._log_signal_counts("OBV slope", signals)
         return signals
-    
+
     def combine_signals(
-        self,
-        signals_dict: Dict[str, pd.Series],
-        method: str = 'vote',
-        weights: Optional[Dict[str, float]] = None,
-        threshold: float = 0.5
+            self,
+            signals_dict: Dict[str, pd.Series],
+            method: str = 'vote',
+            weights: Optional[Dict[str, float]] = None,
+            threshold: float = 0.5
     ) -> pd.Series:
         """合并多个 {-1,0,1} 信号序列，支持 vote / weighted / threshold 三种方式。"""
         if not signals_dict:
             raise ValueError("signals_dict 不能为空")
-        
+
         signal_names = list(signals_dict.keys())
         first_signal = signals_dict[signal_names[0]]
         index = first_signal.index
-        
+
         for name, signal in signals_dict.items():
             if len(signal) != len(first_signal):
                 raise ValueError(f"信号 '{name}' 长度不一致")
             if not signal.index.equals(index):
                 signals_dict[name] = signal.reindex(index)
                 self.logger.info(f"已对齐信号 '{name}' 的索引")
-        
+
         signals_df = pd.DataFrame(signals_dict)
-        
+
         if method == 'vote':
             buy_votes = (signals_df == 1).sum(axis=1)
             sell_votes = (signals_df == -1).sum(axis=1)
             combined = pd.Series(0, index=index, dtype=int)
             combined = np.where(buy_votes > sell_votes, 1, combined)
             combined = np.where(sell_votes > buy_votes, -1, combined)
-            
+
         elif method == 'weighted':
             if weights is None:
                 weights = {name: 1.0 / len(signals_dict) for name in signal_names}
@@ -155,15 +155,15 @@ class SignalGenerator(BaseComponent):
                 if total_weight == 0:
                     raise ValueError("权重之和不能为零")
                 weights = {k: v / total_weight for k, v in weights.items()}
-            
+
             weighted_sum = pd.Series(0.0, index=index)
             for name in signal_names:
                 weighted_sum += signals_df[name] * weights.get(name, 0)
-            
+
             combined = pd.Series(0, index=index, dtype=int)
             combined = np.where(weighted_sum > 0.33, 1, combined)
             combined = np.where(weighted_sum < -0.33, -1, combined)
-            
+
         elif method == 'threshold':
             if weights is None:
                 weights = {name: 1.0 / len(signals_dict) for name in signal_names}
@@ -172,18 +172,18 @@ class SignalGenerator(BaseComponent):
                 if total_weight == 0:
                     raise ValueError("权重之和不能为零")
                 weights = {k: v / total_weight for k, v in weights.items()}
-            
+
             weighted_sum = pd.Series(0.0, index=index)
             for name in signal_names:
                 weighted_sum += signals_df[name] * weights.get(name, 0)
-            
+
             combined = pd.Series(0, index=index, dtype=int)
             combined = np.where(weighted_sum >= threshold, 1, combined)
             combined = np.where(weighted_sum <= -threshold, -1, combined)
-            
+
         else:
             raise ValueError("无效的 method 参数")
-        
+
         combined_series = pd.Series(combined, index=index, dtype=int)
         self._log_signal_counts(f"Combined ({method})", combined_series)
         return combined_series
