@@ -35,7 +35,6 @@ class OrderManager(BaseComponent):
         }
 
         self.orders[order_id] = order
-        self.logger.info(f"+ 订单已创建: {order_id}")
         return order
 
     def get_order(self, order_id: str) -> Optional[Dict[str, Any]]:

@@ -64,17 +64,11 @@ class TraderEngine(BaseComponent):
                 order['broker_order_id'] = self.broker.place_order(
                     ticker=ticker, quantity=quantity, order_type=order_type, price=price
                 )
-                self.logger.info(f"订单已执行（券商）: {order_id} -> {order['broker_order_id']}，日期: {timestamp.date()}，价格: {price}，数量: {quantity}")
                 return order_id
 
             # 模拟：立即成交或挂单等待撮合
             if not self.match_on_tick:
                 self._on_trade(order_id, price, timestamp)
-                self.logger.info(f"订单已执行（模拟）: {order_id}，日期: {timestamp.date()}，价格: {price}，数量: {quantity}")
-                return order_id
-
-            side = "[SELL]" if quantity < 0 else "[BUY]"
-            self.logger.info(f"订单挂起: {order_id} {side} {ticker} qty={abs(quantity)} @ {price:.2f}")
             return order_id
 
         except Exception as e:
@@ -124,7 +118,6 @@ class TraderEngine(BaseComponent):
                     'commission': commission_amount,
                     'cost': total_cost
                 })
-                self.logger.info(f"✓ 订单成交: {order_id} [BUY] {ticker} qty={quantity} @ {execution_price:.2f}")
             else:
                 self.logger.warning(f"买入资金不足: 需要 {total_cost:.2f}，当前 {self.cash:.2f}")
                 self.order_manager.cancel_order(order_id)
@@ -157,7 +150,6 @@ class TraderEngine(BaseComponent):
                     'buy_cost': buy_cost,
                     'profit_loss': profit_loss
                 })
-                self.logger.info(f"✓ 订单成交: {order_id} [SELL] {ticker} qty={quantity} @ {execution_price:.2f}")
             else:
                 self.logger.warning(f"卖出持仓不足: {ticker}，需要 {quantity}")
                 self.order_manager.cancel_order(order_id)

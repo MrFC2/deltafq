@@ -40,7 +40,6 @@ class PositionManager(BaseComponent):
                 'created_at': datetime.now(),
             }
 
-        self.logger.info(f"↑ 持仓已更新: {ticker} -> {self.positions[ticker]['quantity']}")
         return True
 
     def reduce_position(self, ticker: str, quantity: int) -> bool:
@@ -61,7 +60,6 @@ class PositionManager(BaseComponent):
         else:
             self.positions[ticker]['quantity'] = new_quantity
 
-        self.logger.info(f"↓ 持仓已减少: {ticker} -> {new_quantity}")
         return True
 
     def get_position(self, ticker: str) -> int:
