@@ -161,7 +161,7 @@ class LiveEngine(BaseComponent):
 
     def run_live(self) -> None:
         """连接网关、注册 Tick、订阅标的并启动推送。"""
-        if not self.trade_gateway.connect() or not self.data_gateway.connect():
+        if not self.data_gateway.connect() or not self.trade_gateway.connect():
             raise RuntimeError("网关连接失败")
 
         self._event_engine.on(EVENT_TICK, self._on_tick_match)
