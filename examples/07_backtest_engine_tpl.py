@@ -12,6 +12,7 @@ if project_root not in sys.path:
 
 from deltafq.backtest import BacktestEngine
 from deltafq.strategy.base import BaseStrategy
+from deltafq.enums import DataSource
 
 
 class SimpleMAStrategy(BaseStrategy):
@@ -42,7 +43,7 @@ def main() -> None:
         start_date="2024-01-01",
         end_date="2024-12-31",
         # benchmark="sh.000300",  # 沪深300
-        data_source="baostock",
+        data_source=DataSource.BAOSTOCK,
     )
     engine.run()
 

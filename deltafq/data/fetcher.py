@@ -8,13 +8,12 @@
 """
 
 import pandas as pd
-import yfinance as yf
 import re
 import requests
-from typing import List, Optional, Dict, Any, Union
+from typing import List, Optional, Dict, Any
 from ..core.base import BaseComponent
 from .cleaner import DataCleaner
-from ..enums import DataSource
+from ..enums import DataSource, Interval
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -23,24 +22,25 @@ warnings.filterwarnings('ignore')
 class DataFetcher(BaseComponent):
     """多数据源行情拉取器。"""
 
-    def __init__(self, source: Union[DataSource, str] = DataSource.BAOSTOCK, **kwargs: Any) -> None:
+    def __init__(self, source: DataSource = DataSource.BAOSTOCK, **kwargs: Any) -> None:
         """初始化数据拉取器。"""
         super().__init__(**kwargs)
-        self.source = source.value if isinstance(source, DataSource) else source
+        self.source = source
         self._cleaner = DataCleaner()
 
     def fetch_data(self, ticker: str, start_date: str, end_date: Optional[str] = None,
-                   interval: str = "1d") -> pd.DataFrame:
-        """拉取行情数据并清洗。interval 示例：'1m'、'1h'、'1d'（默认）、'1wk'、'1mo'。"""
+                   interval: Interval = Interval.DAY_1) -> pd.DataFrame:
+        """拉取行情数据并清洗。"""
         try:
-            if self.source == "baostock":
-                from ..adapters.data.baostock_bars import fetch_baostock_bars
-                data = fetch_baostock_bars(ticker, start_date, end_date, interval=interval)
-            elif self.source == "miniqmt":
-                from ..adapters.data.miniqmt_bars import fetch_miniqmt_bars
-                data = fetch_miniqmt_bars(ticker, start_date, end_date, interval=interval)
-            else:
-                data = yf.download(ticker, start=start_date, end=end_date, interval=interval, progress=False)
+            if self.source == DataSource.BAOSTOCK:
+                from deltafq.data.baostock_fetcher import fetch_data
+                data = fetch_data(ticker, start_date, end_date, interval=interval)
+            elif self.source == DataSource.MINIQMT:
+                from deltafq.data.miniqmt_fetcher import fetch_data
+                data = fetch_data(ticker, start_date, end_date, interval=interval)
+            elif self.source == DataSource.YAHOO:
+                import yfinance as yf
+                data = yf.download(ticker, start=start_date, end=end_date, interval=interval.value, progress=False)
                 if isinstance(data.columns, pd.MultiIndex) and data.columns.nlevels > 1:
                     data = data.droplevel(level=1, axis=1)
             return self._cleaner.dropna(data)
@@ -48,7 +48,7 @@ class DataFetcher(BaseComponent):
             raise RuntimeError(f"拉取 {ticker} 数据失败: {str(e)}") from e
 
     def fetch_datas(self, tickers: List[str], start_date: str, end_date: Optional[str] = None,
-                    interval: str = "1d") -> Dict[str, pd.DataFrame]:
+                    interval: Interval = Interval.DAY_1) -> Dict[str, pd.DataFrame]:
         """批量拉取多个标的行情数据。"""
         return {s: self.fetch_data(s, start_date, end_date, interval) for s in tickers}
 

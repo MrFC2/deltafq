@@ -15,6 +15,7 @@ from deltafq.live import LiveEngine
 from deltafq.adapters.data.yfinance_gateway import YFinanceDataGateway
 from deltafq.adapters.trade.paper_gateway import PaperTradeGateway
 from deltafq.strategy.base import BaseStrategy
+from deltafq.enums import Interval
 
 
 class Every2BarFlipStrategy(BaseStrategy):
@@ -38,7 +39,7 @@ def main():
         trade_gateway=PaperTradeGateway(initial_capital=1_000_000),
         strategy=Every2BarFlipStrategy(name="Every2Flip"),
         lookback_bars=50,
-        signal_interval="1m",
+        signal_interval=Interval.MINUTE_1,
     )
     engine.run_live()
 

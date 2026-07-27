@@ -18,6 +18,8 @@ from typing import Any, Optional
 
 import pandas as pd
 
+from deltafq.enums import Interval
+
 # yfinance 风格周期映射到 xt 周期；未命中的键若本身合法可直接透传。
 _PERIOD_ALIASES = {
     "2m": "1m",
@@ -43,9 +45,9 @@ def import_xtdata() -> Any:
     return xtdata
 
 
-def interval_to_xt_period(interval: str) -> str:
-    """把输入周期转为 xt 周期并校验合法性。"""
-    m = (interval or "1d").strip().lower()
+def interval_to_xt_period(interval: Interval) -> str:
+    """把 Interval 枚举转为 xt 周期并校验合法性。"""
+    m = interval.value
     p = _PERIOD_ALIASES.get(m, m)
     if p not in _XT_PERIODS:
         raise ValueError(f"不支持的周期: {interval!r}")
@@ -68,12 +70,12 @@ def _end_exclusive_to_xt(end_date: Optional[str]) -> str:
         return ymd
 
 
-def fetch_miniqmt_bars(
-    ticker: str,
-    start_date: str,
-    end_date: Optional[str] = None,
-    interval: str = "1d",
-    dividend_type: str = "none",
+def fetch_data(
+        ticker: str,
+        start_date: str,
+        end_date: Optional[str] = None,
+        interval: Interval = Interval.DAY_1,
+        dividend_type: str = "none",
 ) -> pd.DataFrame:
     """拉取历史 K 线并返回 Open/High/Low/Close/Volume 列。"""
     xtdata = import_xtdata()

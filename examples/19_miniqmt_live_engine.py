@@ -14,6 +14,7 @@ from deltafq.live import LiveEngine
 from deltafq.adapters.data.miniqmt_gateway import MiniQmtDataGateway
 from deltafq.adapters.trade.miniqmt_gateway import MiniQmtTradeGateway
 from deltafq.strategy.base import BaseStrategy
+from deltafq.enums import Interval
 
 MIN_PATH = os.environ.get("QMT_USERDATA_MINI", r"D:\国金证券QMT交易端\userdata_mini")
 ACCOUNT_ID = os.environ.get("QMT_ACCOUNT_ID", "8886180407")
@@ -47,7 +48,7 @@ def main() -> None:
         ),
         strategy=DemoStrategy(name="SeqNeg010"),
         lookback_bars=10,
-        signal_interval="1m",
+        signal_interval=Interval.MINUTE_1,
     )
     engine.run_live()
     try:

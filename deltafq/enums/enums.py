@@ -26,9 +26,9 @@ class CombineMethod(Enum):
 
 class DataSource(Enum):
     """行情数据源。"""
-    YAHOO = "yahoo"  # yfinance
-    BAOSTOCK = "baostock"  # baostock（A 股历史 K 线）
-    MINIQMT = "miniqmt"  # xtquant（需本机运行 miniQMT 终端）
+    YAHOO = "yahoo"
+    BAOSTOCK = "baostock"
+    MINIQMT = "miniqmt"
 
 
 class EventType(Enum):
@@ -38,3 +38,16 @@ class EventType(Enum):
     TRADE = "trade"
     ACCOUNT = "account"
     POSITION = "position"
+
+
+class Interval(Enum):
+    """K 线周期。"""
+    TICK = "tick"
+    MINUTE_1 = "1m"
+    MINUTE_5 = "5m"
+    MINUTE_15 = "15m"
+    MINUTE_30 = "30m"
+    HOUR_1 = "1h"
+    DAY_1 = "1d"
+    WEEK_1 = "1wk"
+    MONTH_1 = "1mo"

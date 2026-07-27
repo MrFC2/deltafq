@@ -22,7 +22,8 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from .baostock_bars import to_bs_code
+from deltafq.data.baostock_fetcher import fetch_data
+from ...enums import Interval
 from ...live.gateways import DataGateway
 from ...live.models import TickData
 
@@ -31,23 +32,40 @@ class BaostockDataGateway(DataGateway):
     """轮询 baostock 5m 最新价；无真实 tick / Level2。"""
 
     def __init__(self, interval: float = 60.0, **kwargs: Any) -> None:
-        """轮询间隔（秒）。"""
+        """
+        初始化 BaostockDataGateway。
+
+        Args:
+            interval: 轮询间隔（秒），默认 60s。
+        """
         super().__init__(**kwargs)
-        self.interval = interval
+
+        # --- 配置参数 ---
+        # 轮询间隔（秒）
+        self.interval: float = interval
+
+        # --- 订阅状态 ---
+        # baostock 模块实例，connect 后赋值
+        self._baostock: Optional[Any] = None
+        # 已订阅标的列表
         self._tickers: List[str] = []
-        self._running = False
-        self._thread: Optional[threading.Thread] = None
-        self._bs = None
+        # 各标的最后一根 K 线时间戳，用于去重推送
         self._last_bar_ts: Dict[str, Any] = {}
+
+        # --- 运行时状态 ---
+        # 轮询线程运行标志
+        self._running: bool = False
+        # 轮询 daemon 线程
+        self._thread: Optional[threading.Thread] = None
+
         self.logger.info(f"初始化 BaostockDataGateway，轮询间隔: {self.interval}s")
 
     def connect(self) -> bool:
         """登录 baostock。"""
         try:
-            import baostock as bs  # type: ignore
+            import baostock as bs
             bs.login()
-            self._bs = bs
-            self.logger.info("已连接 baostock")
+            self._baostock = bs
             return True
         except Exception as e:
             self.logger.error(f"连接失败: {e}")
@@ -75,15 +93,15 @@ class BaostockDataGateway(DataGateway):
         self._running = False
         if self._thread:
             self._thread.join(timeout=2)
-        if self._bs is not None:
-            self._bs.logout()
-            self._bs = None
+        if self._baostock is not None:
+            self._baostock.logout()
+            self._baostock = None
         self.logger.info("已停止 baostock 轮询")
 
     def get_today_ohlc(self, ticker: str) -> Optional[Dict[str, float]]:
         """从最近日线取开、高、低；缺数据返回 None。"""
         try:
-            data = self._fetch_bars(ticker, "d")
+            data = self._fetch_recent_7_day_data(ticker, Interval.DAY_1)
             if data is None or data.empty:
                 return None
             row = data.iloc[-1]
@@ -99,7 +117,7 @@ class BaostockDataGateway(DataGateway):
         """
         levels = max(1, min(int(levels), 10))
         try:
-            data = self._fetch_bars(ticker, "5")
+            data = self._fetch_recent_7_day_data(ticker, Interval.MINUTE_5)
             if data is None or data.empty:
                 return {"bids": [], "asks": []}
             row = data.iloc[-1]
@@ -129,7 +147,7 @@ class BaostockDataGateway(DataGateway):
         """最近交易日 5m K 线，逐根合成暖机 tick（source=baostock_warmup）。"""
         self.logger.debug(f"正在用 baostock 5m 数据暖机 {ticker}...")
         try:
-            data = self._fetch_bars(ticker, "5")
+            data = self._fetch_recent_7_day_data(ticker, Interval.MINUTE_5)
             if data is None or data.empty:
                 self.logger.warning(f"{ticker} 暖机数据为空")
                 return
@@ -157,14 +175,16 @@ class BaostockDataGateway(DataGateway):
         while self._running:
             for ticker in self._tickers:
                 try:
-                    data = self._fetch_bars(ticker, "5")
+                    data = self._fetch_recent_7_day_data(ticker, Interval.MINUTE_5)
                     if data is None or data.empty:
                         continue
                     bar_ts = data.index[-1]
+                    # 同一根 K 线不重复推送
                     if self._last_bar_ts.get(ticker) == bar_ts:
                         continue
                     self._last_bar_ts[ticker] = bar_ts
                     row = data.iloc[-1]
+                    # 用收盘价和成交量合成 TickData
                     tick = TickData(
                         ticker=ticker,
                         price=float(row["Close"]),
@@ -179,34 +199,10 @@ class BaostockDataGateway(DataGateway):
                     continue
             time.sleep(self.interval)
 
-    def _fetch_bars(self, ticker: str, freq: str) -> Optional[pd.DataFrame]:
-        """已登录会话上拉近 7 日 K 线（frequency: d / 5）。"""
-        if self._bs is None:
+    def _fetch_recent_7_day_data(self, ticker: str, interval: Interval) -> Optional[pd.DataFrame]:
+        """用已登录会话拉近 7 日 K 线。"""
+        if self._baostock is None:
             return None
-        end = datetime.now().strftime("%Y-%m-%d")
         start = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
-        fields = "date,time,open,high,low,close,volume" if freq != "d" else "date,open,high,low,close,volume"
-        rs = self._bs.query_history_k_data_plus(
-            to_bs_code(ticker), fields, start_date=start, end_date=end, frequency=freq, adjustflag="3"
-        )
-        rows = []
-        while rs.error_code == "0" and rs.next():
-            rows.append(rs.get_row_data())
-        if not rows:
-            return pd.DataFrame()
-        raw = pd.DataFrame(rows, columns=rs.fields)
-        idx = (
-            pd.to_datetime(raw["time"].str[:14], format="%Y%m%d%H%M%S")
-            if "time" in raw.columns
-            else pd.to_datetime(raw["date"])
-        )
-        return pd.DataFrame(
-            {
-                "Open": pd.to_numeric(raw["open"]).to_numpy(),
-                "High": pd.to_numeric(raw["high"]).to_numpy(),
-                "Low": pd.to_numeric(raw["low"]).to_numpy(),
-                "Close": pd.to_numeric(raw["close"]).to_numpy(),
-                "Volume": pd.to_numeric(raw["volume"]).to_numpy(),
-            },
-            index=pd.DatetimeIndex(idx),
-        ).sort_index()
+        end = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+        return fetch_data(ticker, start, end, interval=interval, bs=self._baostock)

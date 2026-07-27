@@ -13,6 +13,8 @@ from typing import Optional
 
 import pandas as pd
 
+from deltafq.enums import Interval
+
 # yfinance 风格 → baostock frequency
 _FREQ = {
     "1d": "d", "1wk": "w", "1mo": "m",
@@ -31,12 +33,19 @@ def to_bs_code(ticker: str) -> str:
     return s.lower() if s[:3].lower() in ("sh.", "sz.") else s
 
 
-def fetch_baostock_bars(ticker: str, start_date: str, end_date: Optional[str] = None, interval: str = "1d",
-                        adjust_flag: str = "3") -> pd.DataFrame:
-    """拉取历史 K 线，返回 Open/High/Low/Close/Volume。end_date 排他（与 yahoo 一致）。"""
-    import baostock as bs  # type: ignore
+def fetch_data(ticker: str, start_date: str, end_date: Optional[str] = None,
+               interval: Interval = Interval.DAY_1,
+               adjust_flag: str = "3", bs=None) -> pd.DataFrame:
+    """拉取历史 K 线，返回 Open/High/Low/Close/Volume。end_date 排他（与 yahoo 一致）。
 
-    freq = _FREQ.get((interval or "1d").strip().lower(), (interval or "1d").strip().lower())
+    bs: 已登录的 baostock 模块实例；为 None 时自动 login/logout。
+    """
+    _owns_session = bs is None
+    if _owns_session:
+        import baostock as bs  # type: ignore
+        bs.login()
+
+    freq = _FREQ.get(interval.value, interval.value)
     # baostock end 为包含，故排他结束日减一天
     end = ""
     if end_date:
@@ -44,7 +53,6 @@ def fetch_baostock_bars(ticker: str, start_date: str, end_date: Optional[str] = 
 
     fields = "date,time,open,high,low,close,volume" if freq in ("5", "15", "30",
                                                                 "60") else "date,open,high,low,close,volume"
-    bs.login()
     try:
         rs = bs.query_history_k_data_plus(
             to_bs_code(ticker), fields,
@@ -74,4 +82,5 @@ def fetch_baostock_bars(ticker: str, start_date: str, end_date: Optional[str] = 
             index=pd.DatetimeIndex(idx),
         ).sort_index()
     finally:
-        bs.logout()
+        if _owns_session:
+            bs.logout()

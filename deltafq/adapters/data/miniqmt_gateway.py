@@ -24,9 +24,10 @@ import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-from .miniqmt_bars import fetch_miniqmt_bars, import_xtdata as _import_xtdata
+from deltafq.data.miniqmt_fetcher import fetch_data, import_xtdata as _import_xtdata
 from ...live.gateways import DataGateway
 from ...live.models import TickData
+from ...enums import Interval
 
 
 class MiniQmtDataGateway(DataGateway):
@@ -139,11 +140,11 @@ class MiniQmtDataGateway(DataGateway):
         try:
             end = datetime.now()
             start = end - timedelta(days=1)
-            data = fetch_miniqmt_bars(
+            data = fetch_data(
                 ticker,
                 start.strftime("%Y-%m-%d"),
                 None,
-                interval="1m",
+                interval=Interval.MINUTE_1,
                 dividend_type=self.dividend_type,
             )
             if data.empty:

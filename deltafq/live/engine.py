@@ -7,7 +7,7 @@
         data_gateway=YFinanceDataGateway(),
         trade_gateway=PaperTradeGateway(initial_capital=100000),
         strategy=MyStrategy(),
-        signal_interval="1m",
+        signal_interval=Interval.MINUTE_1,
         lookback_bars=50,
     )
     engine.run_live()
@@ -60,14 +60,17 @@ from ..strategy.base import BaseStrategy
 from .event_engine import EventEngine
 from .gateways import DataGateway, TradeGateway
 from .models import OrderRequest, TickData
-from ..enums import OrderType, DataSource, EventType
+from ..enums import OrderType, DataSource, EventType, Interval
 from ..adapters.data.yfinance_gateway import YFinanceDataGateway
 from ..adapters.data.miniqmt_gateway import MiniQmtDataGateway
 
 # 各周期下「多久重拉一次 K 线」（秒）
-_REFETCH_SEC = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "1d": 86400}
+_REFETCH_SEC = {
+    Interval.MINUTE_1: 60, Interval.MINUTE_5: 300, Interval.MINUTE_15: 900,
+    Interval.HOUR_1: 3600, Interval.DAY_1: 86400,
+}
 # 按信号周期估算「每根 K 线对应多少日历日」，用于拉足 lookback（1d≈252 交易日/365 日）
-_FETCH_DAYS_PER_BAR = {"1d": 365 / 252, "1wk": 365 / 52, "1mo": 365 / 12}
+_FETCH_DAYS_PER_BAR = {Interval.DAY_1: 365 / 252, Interval.WEEK_1: 365 / 52, Interval.MONTH_1: 365 / 12}
 _SIG_ICON = {1: "↑", -1: "↓", 0: "-"}
 _ACTION_ICON = {"buy": "↑", "sell": "↓", "skip": "x", "no_change": "-"}
 
@@ -111,7 +114,7 @@ class LiveEngine(BaseComponent):
             trade_gateway: TradeGateway,
             strategy: BaseStrategy,
             lookback_bars: int = 100,
-            signal_interval: str = "5m",
+            signal_interval: Interval = Interval.MINUTE_5,
             **kwargs,
     ):
         super().__init__(**kwargs)
@@ -121,8 +124,8 @@ class LiveEngine(BaseComponent):
         self.ticker: str = ticker
         # 策略所需历史 K 线根数
         self.lookback_bars: int = lookback_bars
-        # K 线周期（1m/5m/15m/1h/1d/tick）
-        self.signal_interval: str = (signal_interval or "5m").lower()
+        # K 线周期（Interval.TICK 时不拉 K 线）
+        self.signal_interval: Interval = signal_interval
 
         # --- 核心组件 ---
         # 行情网关
@@ -191,7 +194,7 @@ class LiveEngine(BaseComponent):
         if self._cached_bars is None or self._cached_signals is None or self._cached_bars.empty:
             return {"candles": [], "signals": []}
 
-        date_fmt = "%Y-%m-%d" if self.signal_interval == "1d" else "%Y-%m-%d %H:%M:%S"
+        date_fmt = "%Y-%m-%d" if self.signal_interval == Interval.DAY_1 else "%Y-%m-%d %H:%M:%S"
 
         candles: List[Dict[str, Any]] = []
         for idx, row in self._cached_bars.iterrows():
@@ -240,7 +243,7 @@ class LiveEngine(BaseComponent):
 
     def _create_data_fetcher(self) -> Optional[DataFetcher]:
         """非 tick 模式时按网关类型创建 DataFetcher，tick 模式返回 None。"""
-        if self.signal_interval == "tick":
+        if self.signal_interval == Interval.TICK:
             return None
         if isinstance(self.data_gateway, YFinanceDataGateway):
             return DataFetcher(source=DataSource.YAHOO)
@@ -250,7 +253,7 @@ class LiveEngine(BaseComponent):
 
     def _fetch_bars(self) -> Optional[pd.DataFrame]:
         """用 DataFetcher 拉当前 signal_interval 下最近 lookback_bars 根 K 线。"""
-        if self._data_fetcher is None or self.signal_interval == "tick":
+        if self._data_fetcher is None or self.signal_interval == Interval.TICK:
             return None
         now = datetime.now(timezone.utc)
         days_per_bar = _FETCH_DAYS_PER_BAR.get(self.signal_interval)
@@ -376,7 +379,7 @@ class LiveEngine(BaseComponent):
 
     def _build_signal_df(self, tick: TickData) -> Optional[pd.DataFrame]:
         """由当前 tick 构造策略输入 DataFrame；数据不足或未到重拉间隔时返回 None。"""
-        if self.signal_interval == "tick":
+        if self.signal_interval == Interval.TICK:
             self._prices.append(float(tick.price))
             self._timestamps.append(tick.timestamp)
             if len(self._prices) < self.lookback_bars:
