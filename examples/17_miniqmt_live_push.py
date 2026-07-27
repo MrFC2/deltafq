@@ -37,8 +37,8 @@ def main():
                 f"({t.timestamp.strftime('%H:%M:%S')}) [{src}]"
             )
 
-    event_engine.on(EVENT_TICK, on_tick)
-    gateway.set_tick_handler(lambda tick: event_engine.emit(EVENT_TICK, tick))
+    event_engine.register(EVENT_TICK, on_tick)
+    gateway.set_tick_handler(lambda tick: event_engine.trigger(EVENT_TICK, tick))
 
     if not gateway.connect():
         return

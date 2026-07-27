@@ -164,9 +164,9 @@ class LiveEngine(BaseComponent):
         if not self.data_gateway.connect() or not self.trade_gateway.connect():
             raise RuntimeError("网关连接失败")
 
-        self._event_engine.on(EVENT_TICK, self._on_tick_match)
-        self._event_engine.on(EVENT_TICK, self._on_tick_strategy)
-        self.data_gateway.set_tick_handler(lambda t: self._event_engine.emit(EVENT_TICK, t))
+        self._event_engine.register(EVENT_TICK, self._on_tick_match)
+        self._event_engine.register(EVENT_TICK, self._on_tick_strategy)
+        self.data_gateway.set_tick_handler(lambda t: self._event_engine.trigger(EVENT_TICK, t))
 
         self.data_gateway.subscribe([self.ticker])
         self.data_gateway.start()
