@@ -57,10 +57,9 @@ import pandas as pd
 from ..backtest.performance import PerformanceReporter
 from ..core.base import BaseComponent
 from ..data import DataFetcher
-from ..data.source_map import fetcher_source_for_data_gateway
 from ..strategy.base import BaseStrategy
 from .event_engine import EventEngine, EVENT_TICK
-from .gateway_registry import create_data_gateway, create_trade_gateway
+from .gateways import DataGateway, TradeGateway
 from .models import OrderRequest
 from ..enums import OrderType
 
@@ -113,24 +112,20 @@ class LiveEngine(BaseComponent):
         interval: float = 10.0,
         lookback_bars: int = 100,
         signal_interval: str = "5m",
-        data_gateway_name: str = "yfinance",
-        trade_gateway_name: str = "paper",
+        data_gateway: Optional[DataGateway] = None,
+        trade_gateway: Optional[TradeGateway] = None,
         **kwargs,
     ):
-        """构造；run_live 前可用 set_data_gateway / set_trade_gateway 传入网关参数。"""
+        """构造；run_live 前可用 set_data_gateway / set_trade_gateway 替换网关实例。"""
         super().__init__(**kwargs)
         self.ticker = ticker
         self.interval = interval
         self.lookback_bars = lookback_bars
         self.signal_interval = (signal_interval or "5m").lower()
-        self.data_gateway_name = data_gateway_name
-        self.trade_gateway_name = trade_gateway_name
-        self._data_gateway_params: dict = {}
-        self._trade_gateway_params: dict = {}
 
         self._event_engine = EventEngine()
-        self._data_gw = None
-        self._trade_gw = None
+        self._data_gw: Optional[DataGateway] = data_gateway
+        self._trade_gw: Optional[TradeGateway] = trade_gateway
         self._data_fetcher: Optional[DataFetcher] = None
         self._strategy: Optional[BaseStrategy] = None
         self._prices: deque = deque(maxlen=lookback_bars + 100)
@@ -161,18 +156,14 @@ class LiveEngine(BaseComponent):
         if signal_interval is not None:
             self.signal_interval = signal_interval.lower()
 
-    def set_data_gateway(self, name: str, **params: Any) -> None:
-        """设置数据网关；params 传给工厂（如 interval）；会清空已创建实例。"""
-        self.data_gateway_name = name
-        self._data_gateway_params = dict(params)
-        self._data_gw = None
+    def set_data_gateway(self, gateway: DataGateway) -> None:
+        """替换数据网关实例；会清空已缓存的 DataFetcher。"""
+        self._data_gw = gateway
         self._data_fetcher = None
 
-    def set_trade_gateway(self, name: str, **params: Any) -> None:
-        """设置交易网关；params 含 initial_capital、commission 等；会清空已创建实例。"""
-        self.trade_gateway_name = name
-        self._trade_gateway_params = dict(params)
-        self._trade_gw = None
+    def set_trade_gateway(self, gateway: TradeGateway) -> None:
+        """替换交易网关实例。"""
+        self._trade_gw = gateway
 
     def add_strategy(self, strategy: BaseStrategy) -> None:
         """绑定用于产生信号的策略。"""
@@ -183,6 +174,8 @@ class LiveEngine(BaseComponent):
     def run_live(self) -> None:
         """连接网关、注册 Tick、订阅标的并启动推送。"""
         self._ensure_gateways()
+        assert self._data_gw is not None
+        assert self._trade_gw is not None
         if not self._trade_gw.connect() or not self._data_gw.connect():
             raise RuntimeError("网关连接失败")
 
@@ -261,17 +254,21 @@ class LiveEngine(BaseComponent):
     # ---------- 内部：数据与网关 ----------
 
     def _ensure_gateways(self) -> None:
-        """懒创建数据/交易网关；非 tick 时创建 DataFetcher。"""
+        """校验网关已设置；非 tick 模式时按网关类名创建 DataFetcher。"""
         if self.ticker is None:
             raise ValueError("请先设置 ticker（构造参数或 set_parameters）")
         if self._data_gw is None:
-            gw_params = dict(self._data_gateway_params)
-            gw_params.setdefault("interval", self.interval)
-            self._data_gw = create_data_gateway(self.data_gateway_name, **gw_params)
+            raise ValueError("请先调用 set_data_gateway() 设置数据网关")
         if self._trade_gw is None:
-            self._trade_gw = create_trade_gateway(self.trade_gateway_name, **self._trade_gateway_params)
+            raise ValueError("请先调用 set_trade_gateway() 设置交易网关")
         if self._data_fetcher is None and self.signal_interval != "tick":
-            src = fetcher_source_for_data_gateway(self.data_gateway_name)
+            cls_name = type(self._data_gw).__name__.lower()
+            if "yfinance" in cls_name:
+                src = "yahoo"
+            elif "miniqmt" in cls_name:
+                src = "miniqmt"
+            else:
+                src = "baostock"
             self._data_fetcher = DataFetcher(source=src)
 
     def _fetch_bars(self) -> Optional[pd.DataFrame]:
@@ -498,6 +495,8 @@ class LiveEngine(BaseComponent):
         if signal == last:
             return
 
+        assert self._trade_gw is not None
+
         if self._last_pending_order_id:
             oid = self._last_pending_order_id
             if self._pending_order_no_cancel_needed(oid):
@@ -514,7 +513,7 @@ class LiveEngine(BaseComponent):
         if signal == 1 and last <= 0:
             if sizing.qty > 0:
                 buy_px = float(getattr(tick, "ask", None)) if getattr(tick, "ask", None) is not None else px
-                req = OrderRequest(ticker=self.ticker, quantity=sizing.qty, price=buy_px, order_type=OrderType.LIMIT)
+                req = OrderRequest(ticker=self.ticker, quantity=sizing.qty, price=buy_px, order_type=OrderType.LIMIT)  # type: ignore[arg-type]
                 self._last_pending_order_id = self._trade_gw.send_order(req)
                 self.logger.info(f"已发送买单: [{self.ticker}] qty={sizing.qty} @ {buy_px:.4f}")
         elif signal == -1 and last >= 0 and position > 0:
@@ -523,7 +522,7 @@ class LiveEngine(BaseComponent):
                 return
             sell_px = float(getattr(tick, "bid", None)) if getattr(tick, "bid", None) is not None else px
             req = OrderRequest(
-                ticker=self.ticker, quantity=-sizing.sell_order_qty, price=sell_px, order_type=OrderType.LIMIT
+                ticker=self.ticker, quantity=-sizing.sell_order_qty, price=sell_px, order_type=OrderType.LIMIT  # type: ignore[arg-type]
             )
             self._last_pending_order_id = self._trade_gw.send_order(req)
             self.logger.info(f"已发送卖单: [{self.ticker}] qty={sizing.sell_order_qty} @ {sell_px:.4f}")
