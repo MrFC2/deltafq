@@ -161,13 +161,15 @@ class LiveEngine(BaseComponent):
 
     def run_live(self) -> None:
         """连接网关、注册 Tick、订阅标的并启动推送。"""
+        # 建立行情和交易连接
         if not self.data_gateway.connect() or not self.trade_gateway.connect():
             raise RuntimeError("网关连接失败")
-
+        # 注册 tick 处理：撮合 + 策略信号
         self._event_engine.register(EVENT_TICK, self._on_tick_match)
         self._event_engine.register(EVENT_TICK, self._on_tick_strategy)
+        # 将网关推送的 tick 接入事件总线
         self.data_gateway.set_tick_handler(lambda t: self._event_engine.trigger(EVENT_TICK, t))
-
+        # 订阅标的并启动行情流
         self.data_gateway.subscribe([self.ticker])
         self.data_gateway.start()
         self.logger.info(f"运行中: {self.ticker} {self.signal_interval} lookback={self.lookback_bars}")
@@ -491,7 +493,7 @@ class LiveEngine(BaseComponent):
             if sizing.qty > 0:
                 buy_px = float(getattr(tick, "ask", None)) if getattr(tick, "ask", None) is not None else px
                 req = OrderRequest(ticker=self.ticker, quantity=sizing.qty, price=buy_px, order_type=OrderType.LIMIT)  # type: ignore[arg-type]
-                self._last_pending_order_id = self._trade_gw.send_order(req)
+                self._last_pending_order_id = self.trade_gateway.send_order(req)
                 self.logger.info(f"已发送买单: [{self.ticker}] qty={sizing.qty} @ {buy_px:.4f}")
         elif signal == -1 and last >= 0 and position > 0:
             if sizing.sell_order_qty <= 0:
