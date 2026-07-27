@@ -4,6 +4,8 @@ import sys
 import os
 import time
 
+from deltafq.adapters.data import BaostockDataGateway
+
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
@@ -32,7 +34,7 @@ class Every2BarFlipStrategy(BaseStrategy):
 def main():
     engine = LiveEngine(
         ticker="BTC-USD",
-        data_gateway=YFinanceDataGateway(interval=10.0),
+        data_gateway=BaostockDataGateway(interval=10.0),
         trade_gateway=PaperTradeGateway(initial_capital=1_000_000),
         strategy=Every2BarFlipStrategy(name="Every2Flip"),
         lookback_bars=50,
