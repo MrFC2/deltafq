@@ -57,10 +57,10 @@ from ..backtest.performance import PerformanceReporter
 from ..core.base import BaseComponent
 from ..data import DataFetcher
 from ..strategy.base import BaseStrategy
-from .event_engine import EventEngine, EVENT_TICK
+from .event_engine import EventEngine
 from .gateways import DataGateway, TradeGateway
 from .models import OrderRequest
-from ..enums import OrderType, DataSource
+from ..enums import OrderType, DataSource, EventType
 from ..adapters.data.yfinance_gateway import YFinanceDataGateway
 from ..adapters.data.miniqmt_gateway import MiniQmtDataGateway
 
@@ -165,10 +165,10 @@ class LiveEngine(BaseComponent):
         if not self.data_gateway.connect() or not self.trade_gateway.connect():
             raise RuntimeError("网关连接失败")
         # 注册 tick 处理：撮合 + 策略信号
-        self._event_engine.register(EVENT_TICK, self._on_tick_match)
-        self._event_engine.register(EVENT_TICK, self._on_tick_strategy)
+        self._event_engine.register(EventType.TICK, self._on_tick_match)
+        self._event_engine.register(EventType.TICK, self._on_tick_strategy)
         # 将网关推送的 tick 接入事件总线
-        self.data_gateway.set_tick_handler(lambda t: self._event_engine.trigger(EVENT_TICK, t))
+        self.data_gateway.set_tick_handler(lambda t: self._event_engine.trigger(EventType.TICK, t))
         # 订阅标的并启动行情流
         self.data_gateway.subscribe([self.ticker])
         self.data_gateway.start()

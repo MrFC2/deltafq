@@ -1,19 +1,15 @@
 from typing import Any, Callable, Dict, List
 
-EVENT_TICK = "tick"
-EVENT_ORDER = "order"
-EVENT_TRADE = "trade"
-EVENT_ACCOUNT = "account"
-EVENT_POSITION = "position"
+from ..enums import EventType
 
 
 class EventEngine:
     def __init__(self) -> None:
-        self._handlers: Dict[str, List[Callable[[Any], None]]] = {}
+        self._handlers: Dict[EventType, List[Callable[[Any], None]]] = {}
 
-    def register(self, event_type: str, handler: Callable[[Any], None]) -> None:
+    def register(self, event_type: EventType, handler: Callable[[Any], None]) -> None:
         self._handlers.setdefault(event_type, []).append(handler)
 
-    def trigger(self, event_type: str, data: Any) -> None:
+    def trigger(self, event_type: EventType, data: Any) -> None:
         for handler in self._handlers.get(event_type, []):
             handler(data)
