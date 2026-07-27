@@ -59,11 +59,10 @@ from ..data import DataFetcher
 from ..strategy.base import BaseStrategy
 from .event_engine import EventEngine
 from .gateways import DataGateway, TradeGateway
-from .models import OrderRequest
+from .models import OrderRequest, TickData
 from ..enums import OrderType, DataSource, EventType
 from ..adapters.data.yfinance_gateway import YFinanceDataGateway
 from ..adapters.data.miniqmt_gateway import MiniQmtDataGateway
-
 
 # 各周期下「多久重拉一次 K 线」（秒）
 _REFETCH_SEC = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "1d": 86400}
@@ -106,14 +105,14 @@ class LiveEngine(BaseComponent):
     """
 
     def __init__(
-        self,
-        ticker: str,
-        data_gateway: DataGateway,
-        trade_gateway: TradeGateway,
-        strategy: BaseStrategy,
-        lookback_bars: int = 100,
-        signal_interval: str = "5m",
-        **kwargs,
+            self,
+            ticker: str,
+            data_gateway: DataGateway,
+            trade_gateway: TradeGateway,
+            strategy: BaseStrategy,
+            lookback_bars: int = 100,
+            signal_interval: str = "5m",
+            **kwargs,
     ):
         super().__init__(**kwargs)
 
@@ -172,7 +171,6 @@ class LiveEngine(BaseComponent):
         # 订阅标的并启动行情流
         self.data_gateway.subscribe([self.ticker])
         self.data_gateway.start()
-        self.logger.info(f"运行中: {self.ticker} {self.signal_interval} lookback={self.lookback_bars}")
 
     def stop(self) -> None:
         """停止数据流与交易网关。"""
@@ -282,7 +280,7 @@ class LiveEngine(BaseComponent):
 
     # ---------- 内部：账户与挂单 ----------
 
-    def _account_snapshot(self, tick: Any) -> Tuple[float, int, float]:
+    def _account_snapshot(self) -> Tuple[float, int, float]:
         """返回 (现金, 持仓股数, 佣金率)，用于仓位与日志；纸面用引擎，否则 miniQMT 查询。"""
         gw = self.trade_gateway
         eng = getattr(gw, "_engine", None)
@@ -356,7 +354,7 @@ class LiveEngine(BaseComponent):
 
     # ---------- 内部：Tick ----------
 
-    def _on_tick_match(self, tick: Any) -> None:
+    def _on_tick_match(self, tick: TickData) -> None:
         """非 warmup：打 Tick 日志；若网关带执行引擎则转发 on_tick 做限价撮合。"""
         if getattr(tick, "source", None) not in ("yf_warmup", "miniqmt_warmup", "baostock_warmup"):
             t = tick.timestamp
@@ -376,7 +374,7 @@ class LiveEngine(BaseComponent):
         if eng is not None:
             eng.on_tick(tick)
 
-    def _build_signal_df(self, tick: Any) -> Optional[pd.DataFrame]:
+    def _build_signal_df(self, tick: TickData) -> Optional[pd.DataFrame]:
         """由当前 tick 构造策略输入 DataFrame；数据不足或未到重拉间隔时返回 None。"""
         if self.signal_interval == "tick":
             self._prices.append(float(tick.price))
@@ -398,7 +396,7 @@ class LiveEngine(BaseComponent):
         return df
 
     def _append_values_record(
-        self, tick: Any, signal: int, px: float, cash: float, position: int
+            self, tick: TickData, signal: int, px: float, cash: float, position: int
     ) -> None:
         """追加一条权益记录，供 get_values_df / calculate_metrics 使用。"""
         position_value = position * px
@@ -417,15 +415,15 @@ class LiveEngine(BaseComponent):
         })
 
     def _size_and_log_action(
-        self,
-        signal: int,
-        px: float,
-        cash: float,
-        position: int,
-        commission: float,
-        last_signal: int,
-        order_quantity: Optional[int],
-        order_amount: Optional[float],
+            self,
+            signal: int,
+            px: float,
+            cash: float,
+            position: int,
+            commission: float,
+            last_signal: int,
+            order_quantity: Optional[int],
+            order_amount: Optional[float],
     ) -> _SizingLogResult:
         """按当前信号与上次信号计算买卖数量，并打一行 Signal 日志。"""
         action_key = "no_change"
@@ -467,7 +465,7 @@ class LiveEngine(BaseComponent):
         return _SizingLogResult(action_key, action, qty, sell_order_qty)
 
     def _handle_signal_transition(
-        self, signal: int, px: float, position: int, sizing: _SizingLogResult, tick: Any
+            self, signal: int, px: float, position: int, sizing: _SizingLogResult, tick: TickData
     ) -> None:
         """相对 _last_signal 发生变化时：尝试撤上一笔挂单，再按规则下限价单。"""
         last = self._last_signal
@@ -492,7 +490,8 @@ class LiveEngine(BaseComponent):
         if signal == 1 and last <= 0:
             if sizing.qty > 0:
                 buy_px = float(getattr(tick, "ask", None)) if getattr(tick, "ask", None) is not None else px
-                req = OrderRequest(ticker=self.ticker, quantity=sizing.qty, price=buy_px, order_type=OrderType.LIMIT)  # type: ignore[arg-type]
+                req = OrderRequest(ticker=self.ticker, quantity=sizing.qty, price=buy_px,
+                                   order_type=OrderType.LIMIT)  # type: ignore[arg-type]
                 self._last_pending_order_id = self.trade_gateway.send_order(req)
                 self.logger.info(f"已发送买单: [{self.ticker}] qty={sizing.qty} @ {buy_px:.4f}")
         elif signal == -1 and last >= 0 and position > 0:
@@ -501,14 +500,15 @@ class LiveEngine(BaseComponent):
                 return
             sell_px = float(getattr(tick, "bid", None)) if getattr(tick, "bid", None) is not None else px
             req = OrderRequest(
-                ticker=self.ticker, quantity=-sizing.sell_order_qty, price=sell_px, order_type=OrderType.LIMIT  # type: ignore[arg-type]
+                ticker=self.ticker, quantity=-sizing.sell_order_qty, price=sell_px, order_type=OrderType.LIMIT
+                # type: ignore[arg-type]
             )
             self._last_pending_order_id = self.trade_gateway.send_order(req)
             self.logger.info(f"已发送卖单: [{self.ticker}] qty={sizing.sell_order_qty} @ {sell_px:.4f}")
 
         self._last_signal = signal
 
-    def _on_tick_strategy(self, tick: Any) -> None:
+    def _on_tick_strategy(self, tick: TickData) -> None:
         """编排：建 df → 信号 → 账户快照 → 权益 → sizing 与日志 → 信号翻转时撤单/下单。"""
         if getattr(tick, "source", None) in ("yf_warmup", "miniqmt_warmup", "baostock_warmup"):
             return
@@ -533,7 +533,7 @@ class LiveEngine(BaseComponent):
 
         signal = int(signals.iloc[-1])
         px = float(tick.price)
-        cash, position, commission = self._account_snapshot(tick)
+        cash, position, commission = self._account_snapshot()
 
         self._append_values_record(tick, signal, px, cash, position)
 
