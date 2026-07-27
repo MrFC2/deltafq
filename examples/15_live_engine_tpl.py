@@ -1,4 +1,4 @@
-"""Minimal LiveEngine demo: set ticker/params -> add_strategy -> run_live."""
+"""Minimal LiveEngine demo."""
 
 import sys
 import os
@@ -10,6 +10,8 @@ if project_root not in sys.path:
 
 import pandas as pd
 from deltafq.live import LiveEngine
+from deltafq.adapters.data.yfinance_gateway import YFinanceDataGateway
+from deltafq.adapters.trade.paper_gateway import PaperTradeGateway
 from deltafq.strategy.base import BaseStrategy
 
 
@@ -30,12 +32,12 @@ class Every2BarFlipStrategy(BaseStrategy):
 def main():
     engine = LiveEngine(
         ticker="BTC-USD",
-        interval=10.0,
+        data_gateway=YFinanceDataGateway(interval=10.0),
+        trade_gateway=PaperTradeGateway(initial_capital=1_000_000),
+        strategy=Every2BarFlipStrategy(name="Every2Flip"),
         lookback_bars=50,
         signal_interval="1m",
     )
-    engine.set_trade_gateway("paper", initial_capital=1_000_000)
-    engine.add_strategy(Every2BarFlipStrategy(name="Every2Flip"))
     engine.run_live()
 
     try:
@@ -59,7 +61,7 @@ def main():
     _print_section("Trades", df_t.to_string(float_format="%.2f"))
 
     # 2. Orders
-    eng = engine._trade_gw._engine if engine._trade_gw else None
+    eng = engine.trade_gateway._engine if engine.trade_gateway else None
     orders = eng.order_manager.get_order_history() if eng else []
     df_o = _fmt_dt_cols(pd.DataFrame(orders))
     _print_section("Orders", df_o.to_string(float_format="%.2f"))

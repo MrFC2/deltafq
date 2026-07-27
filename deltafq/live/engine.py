@@ -2,9 +2,14 @@
 实盘引擎：在实时 Tick 上运行策略，并通过数据/交易网关拉行情、下单。
 
 典型用法::
-    engine = LiveEngine(ticker="BTC-USD", signal_interval="1m", lookback_bars=50)
-    engine.set_trade_gateway("paper", initial_capital=100000)
-    engine.add_strategy(MyStrategy())
+    engine = LiveEngine(
+        ticker="BTC-USD",
+        data_gateway=YFinanceDataGateway(),
+        trade_gateway=PaperTradeGateway(initial_capital=100000),
+        strategy=MyStrategy(),
+        signal_interval="1m",
+        lookback_bars=50,
+    )
     engine.run_live()
     # KeyboardInterrupt 时: engine.stop()
 
@@ -13,14 +18,8 @@
 模块级
     _vol_str              将成交量格式化为 B/M/K 或整数字符串
 
-LiveEngine — 配置与策略
-    __init__              构造：ticker、轮询间隔、回看根数、信号周期、网关名
-    set_parameters        更新 ticker / interval / lookback_bars / signal_interval
-    set_data_gateway      指定数据网关名与参数，清空已缓存网关实例
-    set_trade_gateway     指定交易网关名与参数，清空已缓存网关实例
-    add_strategy          绑定用于 generate_signals 的策略实例
-
 LiveEngine — 运行
+    __init__              构造：ticker、网关实例、策略实例、回看根数、信号周期、DataFetcher
     run_live              连接网关、注册 Tick 处理、订阅标的并启动数据流
     stop                  停止数据网关与交易网关
 
@@ -31,7 +30,7 @@ LiveEngine — 对外查询与绩效
     calculate_metrics     基于成交与权益计算绩效指标（与回测接口一致）
 
 LiveEngine — 内部：数据与网关
-    _ensure_gateways      懒创建数据/交易网关；非 tick 模式时创建 DataFetcher
+    _create_data_fetcher  按网关类型推断数据源并创建 DataFetcher
     _fetch_bars           按 signal_interval 拉取最近 lookback_bars 根 K 线
 
 LiveEngine — 内部：账户与挂单
@@ -61,7 +60,9 @@ from ..strategy.base import BaseStrategy
 from .event_engine import EventEngine, EVENT_TICK
 from .gateways import DataGateway, TradeGateway
 from .models import OrderRequest
-from ..enums import OrderType
+from ..enums import OrderType, DataSource
+from ..adapters.data.yfinance_gateway import YFinanceDataGateway
+from ..adapters.data.miniqmt_gateway import MiniQmtDataGateway
 
 
 # 各周期下「多久重拉一次 K 线」（秒）
@@ -104,95 +105,79 @@ class LiveEngine(BaseComponent):
     同时设置时买入侧 ``order_quantity`` 优先于 ``order_amount``。
     """
 
-    # ---------- 配置与策略 ----------
-
     def __init__(
         self,
-        ticker: Optional[str] = None,
-        interval: float = 10.0,
+        ticker: str,
+        data_gateway: DataGateway,
+        trade_gateway: TradeGateway,
+        strategy: BaseStrategy,
         lookback_bars: int = 100,
         signal_interval: str = "5m",
-        data_gateway: Optional[DataGateway] = None,
-        trade_gateway: Optional[TradeGateway] = None,
         **kwargs,
     ):
-        """构造；run_live 前可用 set_data_gateway / set_trade_gateway 替换网关实例。"""
         super().__init__(**kwargs)
-        self.ticker = ticker
-        self.interval = interval
-        self.lookback_bars = lookback_bars
-        self.signal_interval = (signal_interval or "5m").lower()
 
-        self._event_engine = EventEngine()
-        self._data_gw: Optional[DataGateway] = data_gateway
-        self._trade_gw: Optional[TradeGateway] = trade_gateway
-        self._data_fetcher: Optional[DataFetcher] = None
-        self._strategy: Optional[BaseStrategy] = None
-        self._prices: deque = deque(maxlen=lookback_bars + 100)
-        self._timestamps: deque = deque(maxlen=lookback_bars + 100)
-        self._last_signal = 0
+        # --- 配置参数 ---
+        # 交易标的代码
+        self.ticker: str = ticker
+        # 策略所需历史 K 线根数
+        self.lookback_bars: int = lookback_bars
+        # K 线周期（1m/5m/15m/1h/1d/tick）
+        self.signal_interval: str = (signal_interval or "5m").lower()
+
+        # --- 核心组件 ---
+        # 行情网关
+        self.data_gateway: DataGateway = data_gateway
+        # 交易网关
+        self.trade_gateway: TradeGateway = trade_gateway
+        # 信号策略
+        self._strategy: BaseStrategy = strategy
+        # 事件总线，驱动 tick 分发
+        self._event_engine: EventEngine = EventEngine()
+        # K 线拉取器（tick 模式下为 None）
+        self._data_fetcher: Optional[DataFetcher] = self._create_data_fetcher()
+
+        # --- 运行时状态 ---
+        # 上次信号值，用于检测翻转
+        self._last_signal: int = 0
+        # 当前未成交挂单的委托号
         self._last_pending_order_id: Optional[str] = None
-        self._last_fetch_time = 0.0
+        # 上次拉 K 线的时间戳（秒）
+        self._last_fetch_time: float = 0.0
+        # 最近一次拉取的 K 线
         self._cached_bars: Optional[pd.DataFrame] = None
+        # 最近一次策略产生的信号序列
         self._cached_signals: Optional[pd.Series] = None
+        # tick 模式下的收盘价缓存
+        self._prices: deque = deque(maxlen=lookback_bars + 100)
+        # tick 模式下对应时间戳缓存
+        self._timestamps: deque = deque(maxlen=lookback_bars + 100)
+
+        # --- 统计记录 ---
+        # 权益曲线记录列表
         self._values_records: List[Dict[str, Any]] = []
-
-    def set_parameters(
-        self,
-        ticker: Optional[str] = None,
-        interval: Optional[float] = None,
-        lookback_bars: Optional[int] = None,
-        signal_interval: Optional[str] = None,
-    ) -> None:
-        """更新 ticker、轮询间隔、回看根数或信号周期。"""
-        if ticker is not None:
-            self.ticker = ticker
-        if interval is not None:
-            self.interval = interval
-        if lookback_bars is not None:
-            self.lookback_bars = lookback_bars
-            self._prices = deque(self._prices, maxlen=lookback_bars + 100)
-            self._timestamps = deque(self._timestamps, maxlen=lookback_bars + 100)
-        if signal_interval is not None:
-            self.signal_interval = signal_interval.lower()
-
-    def set_data_gateway(self, gateway: DataGateway) -> None:
-        """替换数据网关实例；会清空已缓存的 DataFetcher。"""
-        self._data_gw = gateway
-        self._data_fetcher = None
-
-    def set_trade_gateway(self, gateway: TradeGateway) -> None:
-        """替换交易网关实例。"""
-        self._trade_gw = gateway
-
-    def add_strategy(self, strategy: BaseStrategy) -> None:
-        """绑定用于产生信号的策略。"""
-        self._strategy = strategy
 
     # ---------- 运行 ----------
 
     def run_live(self) -> None:
         """连接网关、注册 Tick、订阅标的并启动推送。"""
-        self._ensure_gateways()
-        assert self._data_gw is not None
-        assert self._trade_gw is not None
-        if not self._trade_gw.connect() or not self._data_gw.connect():
+        if not self.trade_gateway.connect() or not self.data_gateway.connect():
             raise RuntimeError("网关连接失败")
 
         self._event_engine.on(EVENT_TICK, self._on_tick_match)
         self._event_engine.on(EVENT_TICK, self._on_tick_strategy)
-        self._data_gw.set_tick_handler(lambda t: self._event_engine.emit(EVENT_TICK, t))
+        self.data_gateway.set_tick_handler(lambda t: self._event_engine.emit(EVENT_TICK, t))
 
-        self._data_gw.subscribe([self.ticker])
-        self._data_gw.start()
+        self.data_gateway.subscribe([self.ticker])
+        self.data_gateway.start()
         self.logger.info(f"运行中: {self.ticker} {self.signal_interval} lookback={self.lookback_bars}")
 
     def stop(self) -> None:
         """停止数据流与交易网关。"""
-        if self._data_gw:
-            self._data_gw.stop()
-        if self._trade_gw:
-            self._trade_gw.stop()
+        if self.data_gateway:
+            self.data_gateway.stop()
+        if self.trade_gateway:
+            self.trade_gateway.stop()
 
     # ---------- 对外查询与绩效 ----------
 
@@ -224,9 +209,9 @@ class LiveEngine(BaseComponent):
 
     def get_trades_df(self) -> pd.DataFrame:
         """从交易网关内嵌执行引擎取成交列表（结构与回测一致）。"""
-        if self._trade_gw is None or not hasattr(self._trade_gw, "_engine"):
+        if self.trade_gateway is None or not hasattr(self.trade_gateway, "_engine"):
             return pd.DataFrame()
-        eng = getattr(self._trade_gw, "_engine", None)
+        eng = getattr(self.trade_gateway, "_engine", None)
         if eng is None or not hasattr(eng, "trades"):
             return pd.DataFrame()
         return pd.DataFrame(eng.trades)
@@ -253,23 +238,15 @@ class LiveEngine(BaseComponent):
 
     # ---------- 内部：数据与网关 ----------
 
-    def _ensure_gateways(self) -> None:
-        """校验网关已设置；非 tick 模式时按网关类名创建 DataFetcher。"""
-        if self.ticker is None:
-            raise ValueError("请先设置 ticker（构造参数或 set_parameters）")
-        if self._data_gw is None:
-            raise ValueError("请先调用 set_data_gateway() 设置数据网关")
-        if self._trade_gw is None:
-            raise ValueError("请先调用 set_trade_gateway() 设置交易网关")
-        if self._data_fetcher is None and self.signal_interval != "tick":
-            cls_name = type(self._data_gw).__name__.lower()
-            if "yfinance" in cls_name:
-                src = "yahoo"
-            elif "miniqmt" in cls_name:
-                src = "miniqmt"
-            else:
-                src = "baostock"
-            self._data_fetcher = DataFetcher(source=src)
+    def _create_data_fetcher(self) -> Optional[DataFetcher]:
+        """非 tick 模式时按网关类型创建 DataFetcher，tick 模式返回 None。"""
+        if self.signal_interval == "tick":
+            return None
+        if isinstance(self.data_gateway, YFinanceDataGateway):
+            return DataFetcher(source=DataSource.YAHOO)
+        if isinstance(self.data_gateway, MiniQmtDataGateway):
+            return DataFetcher(source=DataSource.MINIQMT)
+        return DataFetcher(source=DataSource.BAOSTOCK)
 
     def _fetch_bars(self) -> Optional[pd.DataFrame]:
         """用 DataFetcher 拉当前 signal_interval 下最近 lookback_bars 根 K 线。"""
@@ -305,7 +282,7 @@ class LiveEngine(BaseComponent):
 
     def _account_snapshot(self, tick: Any) -> Tuple[float, int, float]:
         """返回 (现金, 持仓股数, 佣金率)，用于仓位与日志；纸面用引擎，否则 miniQMT 查询。"""
-        gw = self._trade_gw
+        gw = self.trade_gateway
         eng = getattr(gw, "_engine", None)
         if eng is not None:
             position = int(eng.position_manager.get_position(self.ticker))
@@ -341,7 +318,7 @@ class LiveEngine(BaseComponent):
         若上一笔委托已结束则返回 True：不必再向柜台撤单，并应清空本地 pending id。
         纸面：OrderManager 状态；miniQMT：order_status 属终态或委托列表中已无该单。
         """
-        gw = self._trade_gw
+        gw = self.trade_gateway
         eng = getattr(gw, "_engine", None)
         if eng is not None:
             o = eng.order_manager.get_order(order_id)
@@ -393,7 +370,7 @@ class LiveEngine(BaseComponent):
             self.logger.info(
                 f"Tick: [{tick.ticker}] {tick.price:.4f}{ba} vol={v}({_vol_str(v)}) @ {ts}"
             )
-        eng = getattr(self._trade_gw, "_engine", None) if self._trade_gw else None
+        eng = getattr(self.trade_gateway, "_engine", None) if self.trade_gateway else None
         if eng is not None:
             eng.on_tick(tick)
 
@@ -445,8 +422,8 @@ class LiveEngine(BaseComponent):
         position: int,
         commission: float,
         last_signal: int,
-        order_quantity: Optional[Any],
-        order_amount: Optional[Any],
+        order_quantity: Optional[int],
+        order_amount: Optional[float],
     ) -> _SizingLogResult:
         """按当前信号与上次信号计算买卖数量，并打一行 Signal 日志。"""
         action_key = "no_change"
@@ -495,7 +472,7 @@ class LiveEngine(BaseComponent):
         if signal == last:
             return
 
-        assert self._trade_gw is not None
+        assert self.trade_gateway is not None
 
         if self._last_pending_order_id:
             oid = self._last_pending_order_id
@@ -503,7 +480,7 @@ class LiveEngine(BaseComponent):
                 self.logger.info(f"挂单 {oid} 已完成，跳过撤单")
                 self._last_pending_order_id = None
             else:
-                cancelled = self._trade_gw.cancel_order(oid)
+                cancelled = self.trade_gateway.cancel_order(oid)
                 if cancelled:
                     self.logger.info(f"已撤销挂单: {oid}")
                 else:
@@ -524,7 +501,7 @@ class LiveEngine(BaseComponent):
             req = OrderRequest(
                 ticker=self.ticker, quantity=-sizing.sell_order_qty, price=sell_px, order_type=OrderType.LIMIT  # type: ignore[arg-type]
             )
-            self._last_pending_order_id = self._trade_gw.send_order(req)
+            self._last_pending_order_id = self.trade_gateway.send_order(req)
             self.logger.info(f"已发送卖单: [{self.ticker}] qty={sizing.sell_order_qty} @ {sell_px:.4f}")
 
         self._last_signal = signal

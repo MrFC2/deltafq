@@ -45,7 +45,6 @@ class BaostockDataGateway(DataGateway):
         """登录 baostock。"""
         try:
             import baostock as bs  # type: ignore
-
             bs.login()
             self._bs = bs
             self.logger.info("已连接 baostock")

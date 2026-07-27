@@ -11,9 +11,10 @@ import pandas as pd
 import yfinance as yf
 import re
 import requests
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from ..core.base import BaseComponent
 from .cleaner import DataCleaner
+from ..enums import DataSource
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -22,10 +23,10 @@ warnings.filterwarnings('ignore')
 class DataFetcher(BaseComponent):
     """多数据源行情拉取器。"""
 
-    def __init__(self, source: str = "baostock", **kwargs: Any) -> None:
+    def __init__(self, source: Union[DataSource, str] = DataSource.BAOSTOCK, **kwargs: Any) -> None:
         """初始化数据拉取器。"""
         super().__init__(**kwargs)
-        self.source = source
+        self.source = source.value if isinstance(source, DataSource) else source
         self._cleaner = DataCleaner()
 
     def fetch_data(self, ticker: str, start_date: str, end_date: Optional[str] = None,

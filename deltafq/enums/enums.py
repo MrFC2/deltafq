@@ -22,3 +22,10 @@ class CombineMethod(Enum):
     """多信号合并方式。"""
     VOTE     = "vote"      # 多数投票
     WEIGHTED = "weighted"  # 加权求和
+
+
+class DataSource(Enum):
+    """行情数据源。"""
+    YAHOO    = "yahoo"     # yfinance
+    BAOSTOCK = "baostock"  # baostock（A 股历史 K 线）
+    MINIQMT  = "miniqmt"   # xtquant（需本机运行 miniQMT 终端）
