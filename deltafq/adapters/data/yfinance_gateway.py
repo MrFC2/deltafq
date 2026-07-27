@@ -32,7 +32,7 @@ class YFinanceDataGateway(DataGateway):
         """轮询间隔（秒）。"""
         super().__init__(**kwargs)
         self.interval = interval
-        self._symbols: List[str] = []
+        self._tickers: List[str] = []
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self.logger.info(f"YFinanceDataGateway 已初始化，轮询间隔: {self.interval}s")
@@ -47,11 +47,11 @@ class YFinanceDataGateway(DataGateway):
             self.logger.error(f"连接失败: {e}")
             return False
 
-    def subscribe(self, symbols: List[str]) -> bool:
+    def subscribe(self, tickers: List[str]) -> bool:
         """追加订阅；新标的拉近一日 1m 数据暖机并逐根回调。"""
-        new_symbols = [s for s in symbols if s not in self._symbols]
-        for ticker in new_symbols:
-            self._symbols.append(ticker)
+        new_tickers = [s for s in tickers if s not in self._tickers]
+        for ticker in new_tickers:
+            self._tickers.append(ticker)
             self._warm_up(ticker)
         return True
 
@@ -154,7 +154,7 @@ class YFinanceDataGateway(DataGateway):
     def _run(self) -> None:
         """轮询各标的 fast_info，组 TickData 回调。"""
         while self._running:
-            for ticker in self._symbols:
+            for ticker in self._tickers:
                 try:
                     ticker = yf.Ticker(ticker)
                     info = ticker.fast_info

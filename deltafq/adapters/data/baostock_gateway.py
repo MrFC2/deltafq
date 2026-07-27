@@ -34,7 +34,7 @@ class BaostockDataGateway(DataGateway):
         """轮询间隔（秒）。"""
         super().__init__(**kwargs)
         self.interval = interval
-        self._symbols: List[str] = []
+        self._tickers: List[str] = []
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._bs = None
@@ -54,11 +54,11 @@ class BaostockDataGateway(DataGateway):
             self.logger.error(f"连接失败: {e}")
             return False
 
-    def subscribe(self, symbols: List[str]) -> bool:
+    def subscribe(self, tickers: List[str]) -> bool:
         """追加订阅；新标的拉最近交易日 5m 暖机并逐根回调。"""
-        new_symbols = [s for s in symbols if s not in self._symbols]
-        for ticker in new_symbols:
-            self._symbols.append(ticker)
+        new_ticker = [s for s in tickers if s not in self._tickers]
+        for ticker in new_ticker:
+            self._tickers.append(ticker)
             self._warm_up(ticker)
         return True
 
@@ -156,7 +156,7 @@ class BaostockDataGateway(DataGateway):
     def _run(self) -> None:
         """轮询各标的最新 5m；仅 bar 时间变化时组 TickData 回调。"""
         while self._running:
-            for ticker in self._symbols:
+            for ticker in self._tickers:
                 try:
                     data = self._fetch_bars(ticker, "5")
                     if data is None or data.empty:

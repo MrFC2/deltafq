@@ -27,7 +27,7 @@ class DataGateway(BaseComponent, ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def subscribe(self, symbols: List[str]) -> bool:
+    def subscribe(self, tickers: List[str]) -> bool:
         """订阅一个或多个标的。"""
         raise NotImplementedError
 

@@ -46,7 +46,7 @@ class MiniQmtDataGateway(DataGateway):
         self.mode = (mode or "poll").strip().lower()
         if self.mode not in ("poll", "push"):
             raise ValueError("mode 必须为 poll 或 push")
-        self._symbols: List[str] = []
+        self._tickers: List[str] = []
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._quote_seqs: List[int] = []
@@ -62,11 +62,11 @@ class MiniQmtDataGateway(DataGateway):
             self.logger.error(f"miniQMT 连接失败: {e}")
             return False
 
-    def subscribe(self, symbols: List[str]) -> bool:
+    def subscribe(self, tickers: List[str]) -> bool:
         """追加订阅；新标的用近一日 1m K 线逐根暖机回调。"""
-        new_symbols = [s for s in symbols if s not in self._symbols]
-        for ticker in new_symbols:
-            self._symbols.append(ticker)
+        new_tickers = [s for s in tickers if s not in self._tickers]
+        for ticker in new_tickers:
+            self._tickers.append(ticker)
             self._warm_up(ticker)
         return True
 
@@ -191,7 +191,7 @@ class MiniQmtDataGateway(DataGateway):
     def _run_poll(self) -> None:
         """对每个标的拉全快照，组 TickData，调 tick 回调。"""
         while self._running:
-            for ticker in self._symbols:
+            for ticker in self._tickers:
                 tick, err = self._get_full_tick(ticker)
                 if err or not tick:
                     self.logger.debug(f"跳过 tick {ticker}: {err}")
@@ -221,13 +221,13 @@ class MiniQmtDataGateway(DataGateway):
     def _run_push(self) -> None:
         """等标的有列表后逐只 subscribe_quote，最后阻塞 xd.run。"""
         # 启动可能早于订阅，先空转等到标的非空。
-        while self._running and not self._symbols:
+        while self._running and not self._tickers:
             time.sleep(0.1)
         if not self._running:
             return
         xd = _import_xtdata()
         self._quote_seqs = []
-        for ticker in list(self._symbols):
+        for ticker in list(self._tickers):
             if not self._running:
                 break
             seq = xd.subscribe_quote(
