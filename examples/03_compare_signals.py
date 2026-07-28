@@ -11,13 +11,13 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from deltafq.data import DataFetcher
+from deltafq.data import BaostockDataFetcher
 from deltafq.indicators import TechnicalIndicators
 from deltafq.strategy import SignalGenerator
 
 
 def main() -> None:
-    fetcher = DataFetcher() # source="baostock" as default / "yahoo" / "miniqmt"
+    fetcher = BaostockDataFetcher() # "baostock" as default / switch to YahooDataFetcher / MiniQmtDataFetcher
     indicators = TechnicalIndicators()
     signals = SignalGenerator()
 

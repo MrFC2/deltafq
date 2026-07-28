@@ -55,12 +55,12 @@ import pandas as pd
 
 from ..backtest.performance import PerformanceReporter
 from ..core.base import BaseComponent
-from ..data import DataFetcher
+from ..data import DataFetcher, YahooDataFetcher, BaostockDataFetcher, MiniQmtDataFetcher
 from ..strategy.base import BaseStrategy
 from .event_engine import EventEngine
 from .gateways import DataGateway, TradeGateway
 from .models import OrderRequest, TickData
-from ..enums import OrderType, DataSource, EventType, Interval
+from ..enums import OrderType, EventType, Interval
 from ..adapters.data.yfinance_gateway import YFinanceDataGateway
 from ..adapters.data.miniqmt_gateway import MiniQmtDataGateway
 
@@ -242,14 +242,14 @@ class LiveEngine(BaseComponent):
     # ---------- 内部：数据与网关 ----------
 
     def _create_data_fetcher(self) -> Optional[DataFetcher]:
-        """非 tick 模式时按网关类型创建 DataFetcher，tick 模式返回 None。"""
+        """非 tick 模式时按网关类型创建对应 DataFetcher，tick 模式返回 None。"""
         if self.signal_interval == Interval.TICK:
             return None
         if isinstance(self.data_gateway, YFinanceDataGateway):
-            return DataFetcher(source=DataSource.YAHOO)
+            return YahooDataFetcher()
         if isinstance(self.data_gateway, MiniQmtDataGateway):
-            return DataFetcher(source=DataSource.MINIQMT)
-        return DataFetcher(source=DataSource.BAOSTOCK)
+            return MiniQmtDataFetcher()
+        return BaostockDataFetcher()
 
     def _fetch_bars(self) -> Optional[pd.DataFrame]:
         """用 DataFetcher 拉当前 signal_interval 下最近 lookback_bars 根 K 线。"""

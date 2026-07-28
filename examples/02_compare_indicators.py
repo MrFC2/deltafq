@@ -11,7 +11,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from deltafq.data import DataFetcher
+from deltafq.data import BaostockDataFetcher
 from deltafq.indicators import TechnicalIndicators, TalibIndicators
 
 
@@ -30,7 +30,7 @@ def compare_frame(name: str, custom_df: pd.DataFrame, talib_df: pd.DataFrame) ->
 
 
 def main() -> None:
-    fetcher = DataFetcher()
+    fetcher = BaostockDataFetcher()
     data = fetcher.fetch_data(ticker="AAPL", start_date="2024-01-01", end_date="2024-02-20")
 
     close = data["Close"]

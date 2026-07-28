@@ -1,51 +1,38 @@
 """
-行情数据拉取。
+行情数据拉取抽象基类。
 
-- yahoo: yfinance api
-- miniQMT: xtquant api，需要本机运行 miniQMT 终端
-- baostock: baostock api（A 股历史 K 线）
-- eastmoney: 东方财富 api
+子类实现：
+- YahooDataFetcher    — yahoo_fetcher.py
+- BaostockDataFetcher — baostock_fetcher.py
+- MiniQmtDataFetcher  — miniqmt_fetcher.py
 """
 
-import pandas as pd
 import re
 import requests
+import pandas as pd
+from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Any
+
 from ..core.base import BaseComponent
 from .cleaner import DataCleaner
-from ..enums import DataSource, Interval
-import warnings
+from ..enums import Interval
 
+import warnings
 warnings.filterwarnings('ignore')
 
 
-class DataFetcher(BaseComponent):
-    """多数据源行情拉取器。"""
+class DataFetcher(BaseComponent, ABC):
+    """行情数据拉取器抽象基类。"""
 
-    def __init__(self, source: DataSource = DataSource.BAOSTOCK, **kwargs: Any) -> None:
-        """初始化数据拉取器。"""
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self.source = source
         self._cleaner = DataCleaner()
 
+    @abstractmethod
     def fetch_data(self, ticker: str, start_date: str, end_date: Optional[str] = None,
                    interval: Interval = Interval.DAY_1) -> pd.DataFrame:
-        """拉取行情数据并清洗。"""
-        try:
-            if self.source == DataSource.BAOSTOCK:
-                from deltafq.data.baostock_fetcher import fetch_data
-                data = fetch_data(ticker, start_date, end_date, interval=interval)
-            elif self.source == DataSource.MINIQMT:
-                from deltafq.data.miniqmt_fetcher import fetch_data
-                data = fetch_data(ticker, start_date, end_date, interval=interval)
-            elif self.source == DataSource.YAHOO:
-                import yfinance as yf
-                data = yf.download(ticker, start=start_date, end=end_date, interval=interval.value, progress=False)
-                if isinstance(data.columns, pd.MultiIndex) and data.columns.nlevels > 1:
-                    data = data.droplevel(level=1, axis=1)
-            return self._cleaner.dropna(data)
-        except Exception as e:
-            raise RuntimeError(f"拉取 {ticker} 数据失败: {str(e)}") from e
+        """拉取单个标的行情数据并清洗。"""
+        raise NotImplementedError
 
     def fetch_datas(self, tickers: List[str], start_date: str, end_date: Optional[str] = None,
                     interval: Interval = Interval.DAY_1) -> Dict[str, pd.DataFrame]:
@@ -69,16 +56,11 @@ class DataFetcher(BaseComponent):
 
         try:
             if page is None:
-                params = {**base_params, "page": 1}
-                resp = requests.get(base_url, params=params)
+                resp = requests.get(base_url, params={**base_params, "page": 1})
                 match = re.search(r'pages:(\d+)', resp.text)
                 max_pages = int(match.group(1)) if match else 1
-
-
                 all_dfs = [_get_page(p) for p in range(1, max_pages + 1)]
-                result = pd.concat(all_dfs, ignore_index=True)
-                return result
-
+                return pd.concat(all_dfs, ignore_index=True)
             return _get_page(page)
         except Exception as e:
             raise RuntimeError(f"拉取基金 {code} 数据失败: {str(e)}") from e

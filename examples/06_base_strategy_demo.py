@@ -10,7 +10,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from deltafq.data import DataFetcher
+from deltafq.data import BaostockDataFetcher
 from deltafq.strategy.base import BaseStrategy
 
 
@@ -37,7 +37,7 @@ class DemoStrategy(BaseStrategy):
 def run_strategy_demo() -> None:
     print("=== BaseStrategy Demo Strategy ===")
 
-    fetcher = DataFetcher() # source="yahoo" as default / "baostock" / "miniqmt"
+    fetcher = BaostockDataFetcher() # switch to YahooDataFetcher / MiniQmtDataFetcher as needed
     strategy = DemoStrategy(name="DemoStrategy", fast_period=10, slow_period=30)
 
     data = fetcher.fetch_data(

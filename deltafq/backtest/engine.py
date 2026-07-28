@@ -5,10 +5,10 @@
 import pandas as pd
 from typing import Dict, Any, Optional, List
 from ..core.base import BaseComponent
-from ..data import DataFetcher, DataStorage
+from ..data import DataFetcher, DataStorage, BaostockDataFetcher
 from ..strategy.base import BaseStrategy
 from ..trader.engine import TraderEngine
-from ..enums import OrderType, DataSource
+from ..enums import OrderType
 from .performance import PerformanceReporter
 from ..charts.performance import PerformanceChart
 from abc import ABC
@@ -20,7 +20,7 @@ class BacktestEngine(BaseComponent, ABC):
     def __init__(self, ticker: str, strategy: BaseStrategy, start_date: str,
                  end_date: Optional[str] = None, benchmark: Optional[str] = None,
                  initial_capital: float = 1000000, commission: float = 0.001,
-                 data_source: DataSource = DataSource.BAOSTOCK, **kwargs):
+                 data_fetcher: Optional[DataFetcher] = None, **kwargs):
         """初始化回测引擎。"""
         super().__init__(**kwargs)
         # 回测标的代码
@@ -33,10 +33,8 @@ class BacktestEngine(BaseComponent, ABC):
         self.end_date = end_date
         # 基准标的代码，用于图表对比
         self.benchmark = benchmark
-        # 行情数据源
-        self.data_source: DataSource = data_source
-        # 行情拉取器
-        self.data_fetcher = DataFetcher(source=self.data_source)
+        # 行情拉取器（默认 baostock）
+        self.data_fetcher: DataFetcher = data_fetcher or BaostockDataFetcher()
         # 订单执行与持仓管理引擎
         self.trader = TraderEngine(cash=initial_capital, commission=commission)
         # 绩效报告生成器

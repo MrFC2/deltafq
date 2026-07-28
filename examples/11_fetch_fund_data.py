@@ -9,7 +9,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from deltafq.data import DataFetcher
+from deltafq.data import BaostockDataFetcher
 
 
 def fetch_watchlist_funds(output_dir: str = "fund_data") -> None:
@@ -19,7 +19,7 @@ def fetch_watchlist_funds(output_dir: str = "fund_data") -> None:
     # 自选基金列表
     watchlist_codes = ["050025", "270042", "160119", "510300", "000071", "510880"]
     
-    fetcher = DataFetcher()
+    fetcher = BaostockDataFetcher()
     
     print("=" * 60)
     print("Fetching watchlist funds data")
@@ -48,7 +48,7 @@ def fetch_watchlist_funds(output_dir: str = "fund_data") -> None:
 
 
 def main() -> None:
-    fetcher = DataFetcher()
+    fetcher = BaostockDataFetcher()
     
     # Example 1: Fetch a single page
     print("=" * 60)

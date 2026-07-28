@@ -1,9 +1,5 @@
 """
 baostock 历史 K 线适配。
-
-对外
-    fetch_baostock_bars    拉取并返回标准 OHLCV DataFrame
-    to_bs_code             标的转 baostock 格式（sh./sz.）
 """
 
 from __future__ import annotations
@@ -13,6 +9,7 @@ from typing import Optional
 
 import pandas as pd
 
+from deltafq.data.fetcher import DataFetcher
 from deltafq.enums import Interval
 
 # yfinance 风格 → baostock frequency
@@ -20,6 +17,18 @@ _FREQ = {
     "1d": "d", "1wk": "w", "1mo": "m",
     "5m": "5", "15m": "15", "30m": "30", "60m": "60", "1h": "60",
 }
+
+
+class BaostockDataFetcher(DataFetcher):
+    """基于 baostock 的行情拉取器（A 股历史 K 线）。"""
+
+    def fetch_data(self, ticker: str, start_date: str, end_date: Optional[str] = None,
+                   interval: Interval = Interval.DAY_1) -> pd.DataFrame:
+        try:
+            data = fetch_data(ticker, start_date, end_date, interval=interval)
+            return self._cleaner.dropna(data)
+        except Exception as e:
+            raise RuntimeError(f"拉取 {ticker} 数据失败: {str(e)}") from e
 
 
 def to_bs_code(ticker: str) -> str:
@@ -34,8 +43,8 @@ def to_bs_code(ticker: str) -> str:
 
 
 def fetch_data(ticker: str, start_date: str, end_date: Optional[str] = None,
-               interval: Interval = Interval.DAY_1,
-               adjust_flag: str = "3", bs=None) -> pd.DataFrame:
+                interval: Interval = Interval.DAY_1,
+                adjust_flag: str = "3", bs=None) -> pd.DataFrame:
     """拉取历史 K 线，返回 Open/High/Low/Close/Volume。end_date 排他（与 yahoo 一致）。
 
     bs: 已登录的 baostock 模块实例；为 None 时自动 login/logout。

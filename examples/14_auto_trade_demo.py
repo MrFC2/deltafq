@@ -10,7 +10,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 import pandas as pd
-from deltafq.data import DataFetcher, DataStorage
+from deltafq.data import BaostockDataFetcher, DataStorage
 from deltafq.strategy.base import BaseStrategy
 from deltafq.trader.engine import TraderEngine
 
@@ -53,7 +53,7 @@ def try_trade(engine, ticker, signal, price, qty, now):
 
 def main():
     ticker = "000001.SS"
-    fetcher = DataFetcher()
+    fetcher = BaostockDataFetcher()
     storage = DataStorage()
     engine = TraderEngine(cash=100_000, commission=0.001, match_on_tick=False)
     qty = 100
