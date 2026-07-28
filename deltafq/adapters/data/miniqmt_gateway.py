@@ -164,8 +164,8 @@ class MiniQmtDataGateway(DataGateway):
                     volume=volume,
                     source="miniqmt_warmup",
                 )
-                if self._tick_handler:
-                    self._tick_handler(tick)
+                if self._on_tick:
+                    self._on_tick(tick)
                 pushed += 1
             self.logger.info(f"已订阅并暖机 {ticker}（{pushed} 根）")
         except Exception as e:
@@ -213,8 +213,8 @@ class MiniQmtDataGateway(DataGateway):
                         bid=bid,
                         ask=ask,
                     )
-                    if self._tick_handler:
-                        self._tick_handler(t)
+                    if self._on_tick:
+                        self._on_tick(t)
                 except Exception as e:
                     self.logger.error(f"轮询 {ticker} 出错: {e}")
             time.sleep(self.interval)
@@ -274,8 +274,8 @@ class MiniQmtDataGateway(DataGateway):
                     bid=bid,
                     ask=ask,
                 )
-                if self._tick_handler:
-                    self._tick_handler(t)
+                if self._on_tick:
+                    self._on_tick(t)
 
     def _get_full_tick(self, ticker: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
         """调 get_full_tick；成功返回快照和 None，失败返回 None 和错误说明。"""

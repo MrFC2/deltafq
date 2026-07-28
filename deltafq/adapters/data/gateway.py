@@ -10,16 +10,11 @@ class DataGateway(BaseComponent, ABC):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self._tick_handler: Optional[Callable[[TickData], None]] = None
+        self._on_tick: Optional[Callable[[TickData], None]] = None
 
-    def set_tick_handler(self, handler: Callable[[TickData], None]) -> None:
+    def set_on_tick(self, callback: Callable[[TickData], None]) -> None:
         """注册 Tick 回调。"""
-        self._tick_handler = handler
-
-    def emit_tick(self, tick: TickData) -> None:
-        """分发 Tick（已注册回调时才触发）。"""
-        if self._tick_handler:
-            self._tick_handler(tick)
+        self._on_tick = callback
 
     @abstractmethod
     def connect(self) -> bool:

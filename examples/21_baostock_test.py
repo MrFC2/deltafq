@@ -20,7 +20,7 @@ def main() -> None:
 
     # 实时：暖机后持续轮询（Ctrl+C 退出）
     gw = create_data_gateway("baostock", interval=5.0)
-    gw.set_tick_handler(lambda t: print(f"[{t.source}] {t.symbol} {t.price} {t.timestamp}"))
+    gw.set_on_tick(lambda t: print(f"[{t.source}] {t.symbol} {t.price} {t.timestamp}"))
     assert gw.connect()
     gw.subscribe(["sh.600000"])
     print("today_ohlc:", gw.get_today_ohlc("sh.600000"))

@@ -162,8 +162,8 @@ class BaostockDataGateway(DataGateway):
                     volume=int(row["Volume"]),
                     source="baostock_warmup",  # 标记来源，让 engine 跳过撮合和信号计算
                 )
-                if self._tick_handler:
-                    self._tick_handler(tick)
+                if self._on_tick:
+                    self._on_tick(tick)
                 pushed_count += 1
             # 记录最后一根 bar 时间戳，防止轮询时重复推送同一根
             self._last_data_timestamp[ticker] = data.index[-1]
@@ -193,8 +193,8 @@ class BaostockDataGateway(DataGateway):
                         volume=int(row["Volume"]),
                         source="baostock",
                     )
-                    if self._tick_handler:
-                        self._tick_handler(tick)
+                    if self._on_tick:
+                        self._on_tick(tick)
                 except Exception as e:
                     self.logger.error(f"拉取 {ticker} 数据出错: {str(e)}")
                     continue

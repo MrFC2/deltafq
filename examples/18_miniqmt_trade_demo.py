@@ -68,7 +68,7 @@ def run_orders(gw: MiniQmtTradeGateway) -> None:
         latest["price"] = float(tick.price)
         done.set()
 
-    data_gw.set_tick_handler(on_tick)
+    data_gw.set_on_tick(on_tick)
     data_gw.start()
     data_gw.subscribe([code])
     ok = done.wait(timeout=5.0)

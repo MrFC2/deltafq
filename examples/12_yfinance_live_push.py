@@ -29,7 +29,7 @@ def main():
             print(f"[Live]    {t.symbol} -> {t.price} | Vol: {t.volume} ({t.timestamp.strftime('%H:%M:%S')})")
 
     event_engine.register(EVENT_TICK, on_tick)
-    gateway.set_tick_handler(lambda tick: event_engine.trigger(EVENT_TICK, tick))
+    gateway.set_on_tick(lambda tick: event_engine.trigger(EVENT_TICK, tick))
     
     # 3. Connect and start
     if not gateway.connect():

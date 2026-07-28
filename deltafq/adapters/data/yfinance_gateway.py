@@ -144,8 +144,8 @@ class YFinanceDataGateway(DataGateway):
                     volume=volume,
                     source="yf_warmup",
                 )
-                if self._tick_handler:
-                    self._tick_handler(tick)
+                if self._on_tick:
+                    self._on_tick(tick)
                 pushed_count += 1
             self.logger.info(f"已订阅并完成 {ticker} 暖机（{pushed_count} 根K线）")
         except Exception as e:
@@ -169,8 +169,8 @@ class YFinanceDataGateway(DataGateway):
                         volume=int(volume),
                         source="yfinance",
                     )
-                    if self._tick_handler:
-                        self._tick_handler(tick)
+                    if self._on_tick:
+                        self._on_tick(tick)
                 except Exception as e:
                     self.logger.error(f"拉取 {ticker} 数据出错: {str(e)}")
                     continue

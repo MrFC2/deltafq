@@ -38,7 +38,7 @@ def main():
             )
 
     event_engine.register(EVENT_TICK, on_tick)
-    gateway.set_tick_handler(lambda tick: event_engine.trigger(EVENT_TICK, tick))
+    gateway.set_on_tick(lambda tick: event_engine.trigger(EVENT_TICK, tick))
 
     if not gateway.connect():
         return

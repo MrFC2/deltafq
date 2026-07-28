@@ -79,11 +79,8 @@ if __name__ == "__main__":
         if n_live[0] >= 5: # 5 次后结束
             done.set()
 
-    sec("emit_tick")
     # 注册 Tick 回调
-    gw.set_tick_handler(on_tick)
-    # 主动触发一次回调，验证分发链路
-    gw.emit_tick(TickData(symbol=SYMBOL, price=0.0, timestamp=datetime.utcnow(), source="tpl_emit"))
+    gw.set_on_tick(on_tick)
 
     sec("live")
     # 启动网关循环（轮询/推送）

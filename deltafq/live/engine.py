@@ -171,7 +171,7 @@ class LiveEngine(BaseComponent):
         self._event_engine.register(EventType.TICK, self._on_tick_match)
         self._event_engine.register(EventType.TICK, self._on_tick_strategy)
         # 将网关推送的 tick 接入事件总线
-        self.data_gateway.set_tick_handler(lambda t: self._event_engine.trigger(EventType.TICK, t))
+        self.data_gateway.set_on_tick(lambda t: self._event_engine.trigger(EventType.TICK, t))
         # 订阅标的并启动行情流
         self.data_gateway.subscribe([self.ticker])
         self.data_gateway.start()
