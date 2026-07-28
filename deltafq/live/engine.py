@@ -7,8 +7,8 @@
         data_gateway=YFinanceDataGateway(),
         trade_gateway=PaperTradeGateway(initial_capital=100000),
         strategy=MyStrategy(),
-        signal_interval=Interval.MINUTE_1,
-        lookback_bars=50,
+        strategy_interval=Interval.MINUTE_1,
+        strategy_input_size=50,
     )
     engine.run_live()
     # KeyboardInterrupt 时: engine.stop()
@@ -19,19 +19,19 @@
     _vol_str              将成交量格式化为 B/M/K 或整数字符串
 
 LiveEngine — 运行
-    __init__              构造：ticker、网关实例、策略实例、回看根数、信号周期、DataFetcher
+    __init__              构造：ticker、网关实例、策略实例、数据点数、信号周期、DataFetcher
     run_live              连接网关、注册 Tick 处理、订阅标的并启动数据流
     stop                  停止数据网关与交易网关
 
 LiveEngine — 对外查询与绩效
     get_chart_data        返回缓存 K 线与信号列表（不落库、不重算）
     get_trades_df         从交易网关的执行引擎取成交明细 DataFrame
-    get_values_df         权益曲线记录（去重按日期取最后一条）
-    calculate_metrics     基于成交与权益计算绩效指标（与回测接口一致）
+    get_values_df         净值记录（去重按日期取最后一条）
+    calculate_metrics     基于成交与净值计算绩效指标（与回测接口一致）
 
 LiveEngine — 内部：数据与网关
     _create_data_fetcher  按网关类型推断数据源并创建 DataFetcher
-    _fetch_bars           按 signal_interval 拉取最近 lookback_bars 根 K 线
+    _fetch_data           按 strategy_interval 拉取最近 strategy_input_size 根 K 线
 
 LiveEngine — 内部：账户与挂单
     _account_snapshot     当前现金、持仓股数、佣金率（纸面引擎或 miniQMT 查询）
@@ -39,14 +39,13 @@ LiveEngine — 内部：账户与挂单
 
 LiveEngine — 内部：Tick
     _on_tick_match              将 Tick 交给纸面撮合引擎（若有）；打印非 warmup 的 Tick 日志
-    _on_tick_strategy           编排：建 df → 信号 → 快照 → 权益 → sizing 日志 → 翻转处理
-    _build_signal_df            由 tick 与缓存构造策略用 K 线 / tick 序列 DataFrame
-    _append_values_record       追加一条权益曲线记录（与回测 values 形状一致）
+    _on_tick_strategy           编排：建 df → 信号 → 快照 → 净值 → sizing 日志 → 翻转处理
+    _build_strategy_input       由 tick 与缓存构造策略输入 DataFrame（K 线或 tick 滑动窗口）
+    _append_values_record       追加一条净值记录（与回测 values 形状一致）
     _size_and_log_action        按信号与策略 order_* 计算买卖数量并打一行 Signal 日志
     _handle_signal_transition   信号相对上次变化时：撤挂单、下限价、更新 _last_signal
 """
 
-import time
 from collections import deque
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Any, Dict, List, NamedTuple, Tuple
@@ -58,15 +57,15 @@ from ..core.base import BaseComponent
 from ..data import DataFetcher, YahooDataFetcher, BaostockDataFetcher, MiniQmtDataFetcher
 from ..strategy.base import BaseStrategy
 from .event_engine import EventEngine
-from ..adapters.data.gateway import DataGateway
-from ..adapters.trade.gateway import TradeGateway
+from ..adapters.data.base import DataGateway
+from ..adapters.trade.base import TradeGateway
 from .models import OrderRequest, TickData
 from ..enums import OrderType, EventType, Interval
 from ..adapters.data.yfinance_gateway import YFinanceDataGateway
 from ..adapters.data.miniqmt_gateway import MiniQmtDataGateway
 
 # 各周期下「多久重拉一次 K 线」（秒）
-_REFETCH_SEC = {
+_REFETCH_INTERVAL = {
     Interval.MINUTE_1: 60, Interval.MINUTE_5: 300, Interval.MINUTE_15: 900,
     Interval.HOUR_1: 3600, Interval.DAY_1: 86400,
 }
@@ -114,8 +113,8 @@ class LiveEngine(BaseComponent):
             data_gateway: DataGateway,
             trade_gateway: TradeGateway,
             strategy: BaseStrategy,
-            lookback_bars: int = 100,
-            signal_interval: Interval = Interval.MINUTE_5,
+            strategy_input_size: int = 100,
+            strategy_interval: Interval = Interval.MINUTE_5,
             **kwargs,
     ):
         super().__init__(**kwargs)
@@ -123,10 +122,10 @@ class LiveEngine(BaseComponent):
         # --- 配置参数 ---
         # 交易标的代码
         self.ticker: str = ticker
-        # 策略所需历史 K 线根数
-        self.lookback_bars: int = lookback_bars
-        # K 线周期（Interval.TICK 时不拉 K 线）
-        self.signal_interval: Interval = signal_interval
+        # 策略所需数据点数（K 线根数或 tick 数）
+        self.strategy_input_size: int = strategy_input_size
+        # K 线周期（Interval.REALTIME 时不拉 K 线）
+        self.strategy_interval: Interval = strategy_interval
 
         # --- 核心组件 ---
         # 行情网关
@@ -145,19 +144,15 @@ class LiveEngine(BaseComponent):
         self._last_signal: int = 0
         # 当前未成交挂单的委托号
         self._last_pending_order_id: Optional[str] = None
-        # 上次拉 K 线的时间戳（秒）
-        self._last_fetch_time: float = 0.0
         # 最近一次拉取的 K 线
-        self._cached_bars: Optional[pd.DataFrame] = None
+        self._cached_strategy_input: Optional[pd.DataFrame] = None
         # 最近一次策略产生的信号序列
         self._cached_signals: Optional[pd.Series] = None
-        # tick 模式下的收盘价缓存
-        self._prices: deque = deque(maxlen=lookback_bars + 100)
-        # tick 模式下对应时间戳缓存
-        self._timestamps: deque = deque(maxlen=lookback_bars + 100)
+        # REALTIME 模式下的 tick 滑动窗口
+        self._tick_datas: deque = deque(maxlen=strategy_input_size)
 
         # --- 统计记录 ---
-        # 权益曲线记录列表
+        # 净值记录列表
         self._values_records: List[Dict[str, Any]] = []
 
     # ---------- 运行 ----------
@@ -191,13 +186,13 @@ class LiveEngine(BaseComponent):
         返回:
             candles: [{date, open, high, low, close}, ...]；signals: [int, ...]
         """
-        if self._cached_bars is None or self._cached_signals is None or self._cached_bars.empty:
+        if self._cached_strategy_input is None or self._cached_signals is None or self._cached_strategy_input.empty:
             return {"candles": [], "signals": []}
 
-        date_fmt = "%Y-%m-%d" if self.signal_interval == Interval.DAY_1 else "%Y-%m-%d %H:%M:%S"
+        date_fmt = "%Y-%m-%d" if self.strategy_interval == Interval.DAY_1 else "%Y-%m-%d %H:%M:%S"
 
         candles: List[Dict[str, Any]] = []
-        for idx, row in self._cached_bars.iterrows():
+        for idx, row in self._cached_strategy_input.iterrows():
             c = float(row.get("Close", 0) or 0)
             o = float(row.get("Open", c) or c)
             h = float(row.get("High", c) or c)
@@ -205,7 +200,7 @@ class LiveEngine(BaseComponent):
             date_str = idx.strftime(date_fmt) if hasattr(idx, "strftime") else str(idx)[:16]
             candles.append({"date": date_str, "open": o, "high": h, "low": l_, "close": c})
 
-        sigs = self._cached_signals.reindex(self._cached_bars.index, fill_value=0)
+        sigs = self._cached_signals.reindex(self._cached_strategy_input.index, fill_value=0)
         signals = [int(x) if pd.notna(x) else 0 for x in sigs]
 
         return {"candles": candles, "signals": signals}
@@ -243,7 +238,7 @@ class LiveEngine(BaseComponent):
 
     def _create_data_fetcher(self) -> Optional[DataFetcher]:
         """非 tick 模式时按网关类型创建对应 DataFetcher，tick 模式返回 None。"""
-        if self.signal_interval == Interval.TICK:
+        if self.strategy_interval == Interval.REALTIME:
             return None
         if isinstance(self.data_gateway, YFinanceDataGateway):
             return YahooDataFetcher()
@@ -251,34 +246,32 @@ class LiveEngine(BaseComponent):
             return MiniQmtDataFetcher()
         return BaostockDataFetcher()
 
-    def _fetch_bars(self) -> Optional[pd.DataFrame]:
-        """用 DataFetcher 拉当前 signal_interval 下最近 lookback_bars 根 K 线。"""
-        if self._data_fetcher is None or self.signal_interval == Interval.TICK:
+    def _fetch_data(self) -> Optional[pd.DataFrame]:
+        """用 DataFetcher 拉当前 strategy_interval 下最近 strategy_input_size 根 K 线。"""
+        # REALTIME 模式不拉 K 线，数据由 tick 实时积累
+        if self._data_fetcher is None or self.strategy_interval == Interval.REALTIME:
             return None
         now = datetime.now(timezone.utc)
-        days_per_bar = _FETCH_DAYS_PER_BAR.get(self.signal_interval)
+        days_per_bar = _FETCH_DAYS_PER_BAR.get(self.strategy_interval)
         if days_per_bar is not None:
-            cal_days = int(self.lookback_bars * days_per_bar) + 60
+            # 日/周/月线：按每根 bar 对应日历天数估算拉取范围，多留 60 天缓冲
+            cal_days = int(self.strategy_input_size * days_per_bar) + 60
             start = (now - timedelta(days=max(cal_days, 60))).strftime("%Y-%m-%d")
         else:
-            start = (now - timedelta(days=max(7, min(60, self.lookback_bars // 10)))).strftime(
-                "%Y-%m-%d"
-            )
+            # 分钟/小时线：按 strategy_input_size 估算天数，最少 7 天、最多 60 天
+            start = (now - timedelta(days=max(7, min(60, self.strategy_input_size // 10)))).strftime("%Y-%m-%d")
         end = (now + timedelta(days=1)).strftime("%Y-%m-%d")
+
         try:
-            data = self._data_fetcher.fetch_data(
-                self.ticker, start, end, interval=self.signal_interval
-            )
+            data = self._data_fetcher.fetch_data(self.ticker, start, end, self.strategy_interval)
         except Exception as e:
             self.logger.warning(f"DataFetcher 拉取失败: {e}")
             return None
         if data.empty:
             return None
-        n = min(len(data), self.lookback_bars)
-        if len(data) < self.lookback_bars:
-            self.logger.warning(
-                f"Insufficient bars: got {len(data)}, need {self.lookback_bars}; using available {n} bars"
-            )
+
+        # 只取策略需要的 n 条数据，避免把过多历史数据传给策略
+        n = min(len(data), self.strategy_input_size)
         return data.tail(n)
 
     # ---------- 内部：账户与挂单 ----------
@@ -386,65 +379,92 @@ class LiveEngine(BaseComponent):
             return
 
         # 未到重拉间隔或数据不足时返回 None，跳过本次信号计算
-        df = self._build_signal_df(tick_data)
-        if df is None:
+        strategy_input_df = self._build_strategy_input(tick_data)
+        if strategy_input_df is None:
             return
 
+        # 执行策略，生成信号
         try:
-            signals = self._strategy.generate_signals(df)
+            signals = self._strategy.generate_signals(strategy_input_df)
         except Exception as e:
             self.logger.warning(f"策略信号执行失败: {e}")
             return
-
         if signals.empty:
             return
 
         # 缓存供 get_chart_data 使用
-        self._cached_bars = df
+        self._cached_strategy_input = strategy_input_df
         self._cached_signals = signals
 
         # 取最新一根 bar 的信号值
         signal = int(signals.iloc[-1])
-        px = float(tick_data.price)
+        price = float(tick_data.price)
         cash, position, commission = self._account_snapshot()
 
         # 追加权益曲线记录
-        self._append_values_record(tick_data, signal, px, cash, position)
+        self._append_values_record(tick_data, signal, price, cash, position)
 
         order_quantity = getattr(self._strategy, "order_quantity", None)
         order_amount = getattr(self._strategy, "order_amount", None)
         # 计算本次应买/卖数量并打 Signal 日志
-        sizing = self._size_and_log_action(
-            signal, px, cash, position, commission, self._last_signal, order_quantity, order_amount
-        )
+        sizing = self._size_and_log_action(signal, price, cash, position, commission, self._last_signal, order_quantity,
+                                           order_amount)
 
         # 信号相对上次发生变化时撤旧单、发新单
-        self._handle_signal_transition(signal, px, position, sizing, tick_data)
+        self._handle_signal_transition(signal, price, position, sizing, tick_data)
 
-    def _build_signal_df(self, tick: TickData) -> Optional[pd.DataFrame]:
-        """由当前 tick 构造策略输入 DataFrame；数据不足或未到重拉间隔时返回 None。"""
-        if self.signal_interval == Interval.TICK:
-            self._prices.append(float(tick.price))
-            self._timestamps.append(tick.timestamp)
-            if len(self._prices) < self.lookback_bars:
-                return None
-            n = self.lookback_bars
+    def _build_strategy_input(self, tick_data: TickData) -> Optional[pd.DataFrame]:
+        """由当前 tick 构造策略输入 DataFrame；未到重拉间隔时返回 None。"""
+        if self.strategy_interval == Interval.REALTIME:
+            # REALTIME 模式：把每个 tick 攒成滑动窗口，由策略自己判断数据是否足够
+            self._tick_datas.append(tick_data)
             return pd.DataFrame(
-                {"Close": list(self._prices)[-n:]},
-                index=list(self._timestamps)[-n:],
+                {
+                    "Open": [t.open for t in self._tick_datas],
+                    "High": [t.high for t in self._tick_datas],
+                    "Low": [t.low for t in self._tick_datas],
+                    "Close": [t.price for t in self._tick_datas],
+                    "Volume": [t.volume for t in self._tick_datas],
+                },
+                index=[t.timestamp for t in self._tick_datas],
             )
-        refetch_sec = _REFETCH_SEC.get(self.signal_interval, 60)
-        if time.time() - self._last_fetch_time < refetch_sec:
-            return None
-        df = self._fetch_bars()
+
+        # K 线模式：_tick_datas 最后一根的时间戳未超过重拉间隔时跳过
+        refetch_interval = _REFETCH_INTERVAL.get(self.strategy_interval, 60)
+        if self._tick_datas:
+            interval = (datetime.now() - self._tick_datas[-1].timestamp).total_seconds()
+            if interval < refetch_interval:
+                return None
+
+        # 用 fetch 结果覆盖 _tick_datas，每行 bar 转为 TickData
+        df = self._fetch_data()
         if df is None:
             return None
-        self._last_fetch_time = time.time()
-        return df
 
-    def _append_values_record(
-            self, tick: TickData, signal: int, px: float, cash: float, position: int
-    ) -> None:
+        self._tick_datas.clear()
+        for ts, row in df.iterrows():
+            ts_dt = pd.Timestamp(ts).to_pydatetime().replace(tzinfo=None)
+            self._tick_datas.append(TickData(
+                ticker=self.ticker,
+                timestamp=ts_dt,
+                price=float(row["Close"]),
+                open=float(row["Open"]) if "Open" in row else None,
+                high=float(row["High"]) if "High" in row else None,
+                low=float(row["Low"]) if "Low" in row else None,
+                volume=int(row["Volume"]) if "Volume" in row else None,
+            ))
+        return pd.DataFrame(
+            {
+                "Open": [t.open for t in self._tick_datas],
+                "High": [t.high for t in self._tick_datas],
+                "Low": [t.low for t in self._tick_datas],
+                "Close": [t.price for t in self._tick_datas],
+                "Volume": [t.volume for t in self._tick_datas],
+            },
+            index=[t.timestamp for t in self._tick_datas],
+        )
+
+    def _append_values_record(self, tick: TickData, signal: int, px: float, cash: float, position: int) -> None:
         """追加一条权益记录，供 get_values_df / calculate_metrics 使用。"""
         position_value = position * px
         total_value = cash + position_value

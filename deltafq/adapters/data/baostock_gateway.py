@@ -24,7 +24,7 @@ import pandas as pd
 
 from deltafq.data.baostock_fetcher import BaostockDataFetcher
 from ...enums import Interval
-from .gateway import DataGateway
+from .base import DataGateway
 from ...live.models import TickData
 
 
@@ -157,8 +157,11 @@ class BaostockDataGateway(DataGateway):
             for timestamp, row in data.iterrows():
                 tick = TickData(
                     ticker=ticker,
-                    price=float(row["Close"]),
                     timestamp=timestamp.to_pydatetime().replace(tzinfo=None),
+                    price=float(row["Close"]),
+                    open=float(row["Open"]),
+                    high=float(row["High"]),
+                    low=float(row["Low"]),
                     volume=int(row["Volume"]),
                     is_warm_up=True,
                 )
@@ -188,10 +191,12 @@ class BaostockDataGateway(DataGateway):
                     # 用收盘价和成交量合成 TickData
                     tick = TickData(
                         ticker=ticker,
-                        price=float(row["Close"]),
                         timestamp=data_timestamp.to_pydatetime().replace(tzinfo=None),
+                        price=float(row["Close"]),
+                        open=float(row["Open"]),
+                        high=float(row["High"]),
+                        low=float(row["Low"]),
                         volume=int(row["Volume"]),
-                        
                     )
                     if self._on_tick:
                         self._on_tick(tick)

@@ -38,8 +38,8 @@ def main():
         data_gateway=BaostockDataGateway(interval=10.0),
         trade_gateway=PaperTradeGateway(initial_capital=1_000_000),
         strategy=Every2BarFlipStrategy(name="Every2Flip"),
-        lookback_bars=50,
-        signal_interval=Interval.MINUTE_1,
+        strategy_input_size=50,
+        strategy_interval=Interval.MINUTE_1,
     )
     engine.run_live()
 

@@ -47,8 +47,8 @@ def main() -> None:
             lot_size=100,
         ),
         strategy=DemoStrategy(name="SeqNeg010"),
-        lookback_bars=10,
-        signal_interval=Interval.MINUTE_1,
+        strategy_input_size=10,
+        strategy_interval=Interval.MINUTE_1,
     )
     engine.run_live()
     try:

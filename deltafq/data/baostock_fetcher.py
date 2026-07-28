@@ -12,10 +12,10 @@ import pandas as pd
 from deltafq.data.fetcher import DataFetcher
 from deltafq.enums import Interval
 
-# yfinance 风格 → baostock frequency
+# Interval 枚举 → baostock frequency
 _FREQ = {
-    "1d": "d", "1wk": "w", "1mo": "m",
-    "5m": "5", "15m": "15", "30m": "30", "60m": "60", "1h": "60",
+    Interval.DAY_1: "d", Interval.WEEK_1: "w", Interval.MONTH_1: "m",
+    Interval.MINUTE_5: "5", Interval.MINUTE_15: "15", Interval.MINUTE_30: "30", Interval.HOUR_1: "60",
 }
 
 
@@ -49,7 +49,7 @@ class BaostockDataFetcher(DataFetcher):
             bs.login()
             owns_session = True
 
-        freq = _FREQ.get(interval.value, interval.value)
+        freq = _FREQ.get(interval, interval.value)
         # baostock end 为包含，故排他结束日减一天
         end = ""
         if end_date:

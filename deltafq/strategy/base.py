@@ -11,7 +11,7 @@ from ..core.base import BaseComponent
 class BaseStrategy(BaseComponent, ABC):
     """策略基类，子类实现 generate_signals 即可。"""
 
-    def __init__(self, name: str = None, **kwargs: Any) -> None:
+    def __init__(self, name: str, **kwargs: Any) -> None:
         super().__init__(name=name, **kwargs)
 
     @abstractmethod

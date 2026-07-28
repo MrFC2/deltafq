@@ -21,7 +21,8 @@ from typing import Any, Dict, List, Optional
 
 import yfinance as yf
 
-from .gateway import DataGateway
+from deltafq.enums import Interval
+from .base import DataGateway
 from ...live.models import TickData
 
 
@@ -128,7 +129,7 @@ class YFinanceDataGateway(DataGateway):
         """下载近一日 1m K 线，逐根合成暖机 tick。"""
         self.logger.debug(f"正在为 {ticker} 加载历史数据进行暖机...")
         try:
-            data = yf.download(ticker, period="1d", interval="1m", progress=False)
+            data = yf.download(ticker, period="1d", interval=Interval.MINUTE_1.value, progress=False)
             if data.empty:
                 self.logger.warning(f"{ticker} 无暖机数据")
                 return
@@ -139,9 +140,12 @@ class YFinanceDataGateway(DataGateway):
                 volume = int(row["Volume"])
                 tick = TickData(
                     ticker=ticker,
-                    price=price,
                     timestamp=local_ts,
-                    volume=volume,
+                    price=float(row["Close"]),
+                    open=float(row["Open"]),
+                    high=float(row["High"]),
+                    low=float(row["Low"]),
+                    volume=int(row["Volume"]),
                     is_warm_up=True,
                 )
                 if self._on_tick:

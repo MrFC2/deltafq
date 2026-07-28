@@ -8,11 +8,17 @@ from ..enums import OrderType
 @dataclass
 class TickData:
     ticker: str
-    price: float
     timestamp: datetime
+    # 最新价（close）
+    price: float
+    # K 线 OHLCV；纯 tick 场景 open/high/low 为 None
+    open: Optional[float] = None
+    high: Optional[float] = None
+    low: Optional[float] = None
     volume: Optional[int] = None
+    # 暖机标志；warmup tick 不触发策略
     is_warm_up: bool = False
-    # 行情侧若有买一/卖一（如 xtdata get_full_tick），由网关填入；无则默认 None
+    # 买一/卖一；网关有 L2 时填入
     bid: Optional[float] = None
     ask: Optional[float] = None
 

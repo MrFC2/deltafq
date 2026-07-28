@@ -25,7 +25,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from deltafq.data.miniqmt_fetcher import fetch_data, import_xtdata as _import_xtdata
-from .gateway import DataGateway
+from .base import DataGateway
 from ...live.models import TickData
 from ...enums import Interval
 
@@ -159,8 +159,11 @@ class MiniQmtDataGateway(DataGateway):
                 volume = int(row["Volume"])
                 tick = TickData(
                     ticker=ticker,
-                    price=price,
                     timestamp=ts,
+                    price=price,
+                    open=float(row["Open"]),
+                    high=float(row["High"]),
+                    low=float(row["Low"]),
                     volume=volume,
                     is_warm_up=True,
                 )
@@ -206,8 +209,11 @@ class MiniQmtDataGateway(DataGateway):
                     bid, ask = self._bid_ask_from_dict(tick)
                     t = TickData(
                         ticker=ticker,
-                        price=float(last),
                         timestamp=ts,
+                        price=float(last),
+                        open=float(tick["open"]) if tick.get("open") is not None else None,
+                        high=float(tick.get("high") or tick.get("highPrice") or 0) or None,
+                        low=float(tick.get("low") or tick.get("lowPrice") or 0) or None,
                         volume=int(vol) if vol is not None else None,
                         
                         bid=bid,

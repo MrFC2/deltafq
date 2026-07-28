@@ -12,15 +12,18 @@ import pandas as pd
 from deltafq.data.fetcher import DataFetcher
 from deltafq.enums import Interval
 
-# yfinance 风格周期映射到 xt 周期；未命中的键若本身合法可直接透传。
-_PERIOD_ALIASES = {
-    "2m": "1m",
-    "1h": "60m",
-    "5d": "1d",
-    "1wk": "1w",
-    "1mo": "1mon",
+# Interval 枚举 → xt 周期；未命中的 Interval 直接用其 value 透传。
+_PERIOD_MAP = {
+    Interval.MINUTE_1: "1m",
+    Interval.MINUTE_5: "5m",
+    Interval.MINUTE_15: "15m",
+    Interval.MINUTE_30: "30m",
+    Interval.HOUR_1: "60m",
+    Interval.DAY_1: "1d",
+    Interval.WEEK_1: "1w",
+    Interval.MONTH_1: "1mon",
 }
-_XT_PERIODS = frozenset({"1m", "5m", "15m", "30m", "60m", "1d", "1w", "1mon"})
+_XT_PERIODS = frozenset(_PERIOD_MAP.values())
 
 _OHLCV_FIELDS = ("open", "high", "low", "close", "volume")
 _OHLCV_COLUMNS = ("Open", "High", "Low", "Close", "Volume")
@@ -51,9 +54,8 @@ def import_xtdata() -> Any:
 
 def interval_to_xt_period(interval: Interval) -> str:
     """把 Interval 枚举转为 xt 周期并校验合法性。"""
-    m = interval.value
-    p = _PERIOD_ALIASES.get(m, m)
-    if p not in _XT_PERIODS:
+    p = _PERIOD_MAP.get(interval)
+    if p is None:
         raise ValueError(f"不支持的周期: {interval!r}")
     return p
 
