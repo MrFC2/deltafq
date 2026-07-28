@@ -39,11 +39,11 @@ LiveEngine — 内部：账户与挂单
 
 LiveEngine — 内部：Tick
     _on_tick_match              将 Tick 交给纸面撮合引擎（若有）；打印非 warmup 的 Tick 日志
+    _on_tick_strategy           编排：建 df → 信号 → 快照 → 权益 → sizing 日志 → 翻转处理
     _build_signal_df            由 tick 与缓存构造策略用 K 线 / tick 序列 DataFrame
     _append_values_record       追加一条权益曲线记录（与回测 values 形状一致）
     _size_and_log_action        按信号与策略 order_* 计算买卖数量并打一行 Signal 日志
     _handle_signal_transition   信号相对上次变化时：撤挂单、下限价、更新 _last_signal
-    _on_tick_strategy           编排：建 df → 信号 → 快照 → 权益 → sizing 日志 → 翻转处理
 """
 
 import time
@@ -97,8 +97,6 @@ def _vol_str(v: float) -> str:
     if v >= 1e3:
         return f"{v / 1e3:.1f}K"
     return str(int(v))
-
-
 
 
 class LiveEngine(BaseComponent):
@@ -378,6 +376,51 @@ class LiveEngine(BaseComponent):
         if eng is not None:
             eng.on_tick(tick_data)
 
+    def _on_tick_strategy(self, tick_data: TickData) -> None:
+        """编排：建 df → 信号 → 账户快照 → 权益 → sizing 与日志 → 信号翻转时撤单/下单。"""
+        # 暖机 tick 只用于喂价格撮合，不触发策略
+        if tick_data.is_warm_up:
+            return
+        # 非本标的或策略未挂载时跳过
+        if tick_data.ticker != self.ticker or self._strategy is None:
+            return
+
+        # 未到重拉间隔或数据不足时返回 None，跳过本次信号计算
+        df = self._build_signal_df(tick_data)
+        if df is None:
+            return
+
+        try:
+            signals = self._strategy.generate_signals(df)
+        except Exception as e:
+            self.logger.warning(f"策略信号执行失败: {e}")
+            return
+
+        if signals.empty:
+            return
+
+        # 缓存供 get_chart_data 使用
+        self._cached_bars = df
+        self._cached_signals = signals
+
+        # 取最新一根 bar 的信号值
+        signal = int(signals.iloc[-1])
+        px = float(tick_data.price)
+        cash, position, commission = self._account_snapshot()
+
+        # 追加权益曲线记录
+        self._append_values_record(tick_data, signal, px, cash, position)
+
+        order_quantity = getattr(self._strategy, "order_quantity", None)
+        order_amount = getattr(self._strategy, "order_amount", None)
+        # 计算本次应买/卖数量并打 Signal 日志
+        sizing = self._size_and_log_action(
+            signal, px, cash, position, commission, self._last_signal, order_quantity, order_amount
+        )
+
+        # 信号相对上次发生变化时撤旧单、发新单
+        self._handle_signal_transition(signal, px, position, sizing, tick_data)
+
     def _build_signal_df(self, tick: TickData) -> Optional[pd.DataFrame]:
         """由当前 tick 构造策略输入 DataFrame；数据不足或未到重拉间隔时返回 None。"""
         if self.signal_interval == Interval.TICK:
@@ -511,40 +554,3 @@ class LiveEngine(BaseComponent):
             self.logger.info(f"已发送卖单: [{self.ticker}] qty={sizing.sell_order_qty} @ {sell_px:.4f}")
 
         self._last_signal = signal
-
-    def _on_tick_strategy(self, tick_data: TickData) -> None:
-        """编排：建 df → 信号 → 账户快照 → 权益 → sizing 与日志 → 信号翻转时撤单/下单。"""
-        if tick_data.is_warm_up:
-            return
-        if tick_data.ticker != self.ticker or self._strategy is None:
-            return
-
-        df = self._build_signal_df(tick_data)
-        if df is None:
-            return
-
-        try:
-            signals = self._strategy.generate_signals(df)
-        except Exception as e:
-            self.logger.warning(f"策略信号执行失败: {e}")
-            return
-
-        if signals.empty:
-            return
-
-        self._cached_bars = df
-        self._cached_signals = signals
-
-        signal = int(signals.iloc[-1])
-        px = float(tick_data.price)
-        cash, position, commission = self._account_snapshot()
-
-        self._append_values_record(tick_data, signal, px, cash, position)
-
-        order_quantity = getattr(self._strategy, "order_quantity", None)
-        order_amount = getattr(self._strategy, "order_amount", None)
-        sizing = self._size_and_log_action(
-            signal, px, cash, position, commission, self._last_signal, order_quantity, order_amount
-        )
-
-        self._handle_signal_transition(signal, px, position, sizing, tick_data)
