@@ -48,7 +48,7 @@ class BaostockDataGateway(DataGateway):
         # 已订阅标的列表
         self._tickers: List[str] = []
         # 各标的最后一根 K 线时间戳，用于去重推送
-        self._last_bar_ts: Dict[str, Any] = {}
+        self._last_data_timestamp: Dict[str, Any] = {}
 
         # --- 运行时状态 ---
         # 轮询线程运行标志
@@ -149,6 +149,7 @@ class BaostockDataGateway(DataGateway):
             if data is None or data.empty:
                 self.logger.warning(f"{ticker} 暖机数据为空")
                 return
+            # 只取最近一个交易日的 bar，避免把历史数据当成实时 tick 推出去
             last_day = pd.Timestamp(data.index[-1])  # type: ignore[arg-type]
             last_day = last_day.normalize()
             data = data[data.index.normalize() == last_day]
@@ -159,12 +160,13 @@ class BaostockDataGateway(DataGateway):
                     price=float(row["Close"]),
                     timestamp=timestamp.to_pydatetime().replace(tzinfo=None),
                     volume=int(row["Volume"]),
-                    source="baostock_warmup",
+                    source="baostock_warmup",  # 标记来源，让 engine 跳过撮合和信号计算
                 )
                 if self._tick_handler:
                     self._tick_handler(tick)
                 pushed_count += 1
-            self._last_bar_ts[ticker] = data.index[-1]
+            # 记录最后一根 bar 时间戳，防止轮询时重复推送同一根
+            self._last_data_timestamp[ticker] = data.index[-1]
             self.logger.info(f"已订阅并暖机 {ticker}（{pushed_count} 根）")
         except Exception as e:
             self.logger.warning(f"{ticker} 暖机失败: {e}")
@@ -177,17 +179,17 @@ class BaostockDataGateway(DataGateway):
                     data = self._fetch_recent_7_day_data(ticker, Interval.MINUTE_5)
                     if data is None or data.empty:
                         continue
-                    bar_ts = data.index[-1]
+                    data_timestamp = data.index[-1]
                     # 同一根 K 线不重复推送
-                    if self._last_bar_ts.get(ticker) == bar_ts:
+                    if self._last_data_timestamp.get(ticker) == data_timestamp:
                         continue
-                    self._last_bar_ts[ticker] = bar_ts
+                    self._last_data_timestamp[ticker] = data_timestamp
                     row = data.iloc[-1]
                     # 用收盘价和成交量合成 TickData
                     tick = TickData(
                         ticker=ticker,
                         price=float(row["Close"]),
-                        timestamp=bar_ts.to_pydatetime().replace(tzinfo=None),
+                        timestamp=data_timestamp.to_pydatetime().replace(tzinfo=None),
                         volume=int(row["Volume"]),
                         source="baostock",
                     )
