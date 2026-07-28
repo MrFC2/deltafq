@@ -11,7 +11,7 @@ from .position_manager import PositionManager
 from ..enums import OrderType
 
 if TYPE_CHECKING:
-    from ..live.models import TickData
+    from ..live.models import TickerData
 
 
 class TraderEngine(BaseComponent):
@@ -72,17 +72,17 @@ class TraderEngine(BaseComponent):
         except Exception as e:
             raise RuntimeError(f"订单执行失败: {str(e)}") from e
 
-    def on_tick(self, tick: "TickData") -> None:
+    def on_tick(self, ticker_data: "TickerData") -> None:
         """对挂单进行 tick 撮合（EventEngine 驱动的模拟交易）。"""
         if self.broker is not None:
             return
         for order in self.order_manager.get_pending_orders():
-            if order["ticker"] != tick.ticker:
+            if order["ticker"] != ticker_data.ticker:
                 continue
             q, ot, p = order["quantity"], order["order_type"], order["price"]
-            match = ot == OrderType.MARKET or (q > 0 and tick.price <= p) or (q < 0 and tick.price >= p)
+            match = ot == OrderType.MARKET or (q > 0 and ticker_data.price <= p) or (q < 0 and ticker_data.price >= p)
             if match:
-                self._on_trade(order["id"], tick.price, tick.timestamp)
+                self._on_trade(order["id"], ticker_data.price, ticker_data.timestamp)
                 break  # 每个 tick 每标的只撮合一笔
 
     def _on_trade(self, order_id: str, execution_price: float, timestamp: Optional[datetime] = None):

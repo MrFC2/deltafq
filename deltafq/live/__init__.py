@@ -3,7 +3,7 @@ Live trading module for DeltaFQ.
 """
 
 from .event_engine import EventEngine
-from .models import TickData, OrderRequest
+from .models import TickerData, OrderRequest
 from ..adapters.data.base import DataGateway
 from ..adapters.trade.base import TradeGateway
 from ..adapters.data import YFinanceDataGateway
@@ -13,7 +13,7 @@ from .engine import LiveEngine
 __all__ = [
     "EventEngine",
     "LiveEngine",
-    "TickData",
+    "TickerData",
     "OrderRequest",
     "DataGateway",
     "TradeGateway",

@@ -25,7 +25,7 @@ import pandas as pd
 from deltafq.data.baostock_fetcher import BaostockDataFetcher
 from ...enums import Interval
 from .base import DataGateway
-from ...live.models import TickData
+from ...live.models import TickerData
 
 
 class BaostockDataGateway(DataGateway):
@@ -155,7 +155,7 @@ class BaostockDataGateway(DataGateway):
             data = data[data.index.normalize() == last_day]
             pushed_count = 0
             for timestamp, row in data.iterrows():
-                tick = TickData(
+                ticker_data = TickerData(
                     ticker=ticker,
                     timestamp=timestamp.to_pydatetime().replace(tzinfo=None),
                     price=float(row["Close"]),
@@ -166,7 +166,7 @@ class BaostockDataGateway(DataGateway):
                     is_warm_up=True,
                 )
                 if self._on_tick:
-                    self._on_tick(tick)
+                    self._on_tick(ticker_data)
                 pushed_count += 1
             # 记录最后一根 bar 时间戳，防止轮询时重复推送同一根
             self._last_data_timestamp[ticker] = data.index[-1]
@@ -175,7 +175,7 @@ class BaostockDataGateway(DataGateway):
             self.logger.warning(f"{ticker} 暖机失败: {e}")
 
     def _run(self) -> None:
-        """轮询各标的最新 5m；仅 bar 时间变化时组 TickData 回调。"""
+        """轮询各标的最新 5m；仅 bar 时间变化时组 TickerData 回调。"""
         while self._running:
             for ticker in self._tickers:
                 try:
@@ -188,8 +188,8 @@ class BaostockDataGateway(DataGateway):
                         continue
                     self._last_data_timestamp[ticker] = data_timestamp
                     row = data.iloc[-1]
-                    # 用收盘价和成交量合成 TickData
-                    tick = TickData(
+                    # 用收盘价和成交量合成 TickerData
+                    ticker_data = TickerData(
                         ticker=ticker,
                         timestamp=data_timestamp.to_pydatetime().replace(tzinfo=None),
                         price=float(row["Close"]),
@@ -199,7 +199,7 @@ class BaostockDataGateway(DataGateway):
                         volume=int(row["Volume"]),
                     )
                     if self._on_tick:
-                        self._on_tick(tick)
+                        self._on_tick(ticker_data)
                 except Exception as e:
                     self.logger.error(f"拉取 {ticker} 数据出错: {str(e)}")
                     continue

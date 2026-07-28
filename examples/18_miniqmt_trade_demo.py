@@ -11,7 +11,7 @@ if project_root not in sys.path:
 
 from deltafq.adapters.data import MiniQmtDataGateway
 from deltafq.adapters.trade import MiniQmtTradeGateway
-from deltafq.live.models import OrderRequest, TickData
+from deltafq.live.models import OrderRequest, TickerData
 
 # 配置 miniQMT 环境变量
 MIN_PATH = os.environ.get("QMT_USERDATA_MINI", r"D:\国金证券QMT交易端\userdata_mini")
@@ -62,10 +62,10 @@ def run_orders(gw: MiniQmtTradeGateway) -> None:
     done = threading.Event()
     latest = {"price": None}
 
-    def on_tick(tick: TickData) -> None:
-        if tick.symbol != code:
+    def on_tick(ticker_data: TickerData) -> None:
+        if ticker_data.symbol != code:
             return
-        latest["price"] = float(tick.price)
+        latest["price"] = float(ticker_data.price)
         done.set()
 
     data_gw.set_on_tick(on_tick)

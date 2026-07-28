@@ -14,7 +14,7 @@ miniQMT 行情（xtdata），类 MiniQmtDataGateway。
     _unsubscribe_push    push 停时退订
     _run_poll            按间隔拉全快照轮询
     _run_push            订分笔并阻塞 run
-    _on_push_datas       分笔回调里组 TickData
+    _on_push_datas       分笔回调里组 TickerData
     _get_full_tick       封装 get_full_tick
     _bid_ask_from_dict   快照 dict 取买一卖一
     _ts_from_millis_or_now  行情时间转 datetime
@@ -26,7 +26,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from deltafq.data.miniqmt_fetcher import fetch_data, import_xtdata as _import_xtdata
 from .base import DataGateway
-from ...live.models import TickData
+from ...live.models import TickerData
 from ...enums import Interval
 
 
@@ -157,7 +157,7 @@ class MiniQmtDataGateway(DataGateway):
                     ts = ts.replace(tzinfo=None)
                 price = float(row["Close"])
                 volume = int(row["Volume"])
-                tick = TickData(
+                ticker_data = TickerData(
                     ticker=ticker,
                     timestamp=ts,
                     price=price,
@@ -168,7 +168,7 @@ class MiniQmtDataGateway(DataGateway):
                     is_warm_up=True,
                 )
                 if self._on_tick:
-                    self._on_tick(tick)
+                    self._on_tick(ticker_data)
                 pushed += 1
             self.logger.info(f"已订阅并暖机 {ticker}（{pushed} 根）")
         except Exception as e:
@@ -193,7 +193,7 @@ class MiniQmtDataGateway(DataGateway):
             self.logger.warning(f"push 清理失败: {e}")
 
     def _run_poll(self) -> None:
-        """对每个标的拉全快照，组 TickData，调 tick 回调。"""
+        """对每个标的拉全快照，组 TickerData，调 tick 回调。"""
         while self._running:
             for ticker in self._tickers:
                 tick, err = self._get_full_tick(ticker)
@@ -207,7 +207,7 @@ class MiniQmtDataGateway(DataGateway):
                         continue
                     ts = self._ts_from_millis_or_now(tick.get("time"))
                     bid, ask = self._bid_ask_from_dict(tick)
-                    t = TickData(
+                    ticker_data = TickerData(
                         ticker=ticker,
                         timestamp=ts,
                         price=float(last),
@@ -220,7 +220,7 @@ class MiniQmtDataGateway(DataGateway):
                         ask=ask,
                     )
                     if self._on_tick:
-                        self._on_tick(t)
+                        self._on_tick(ticker_data)
                 except Exception as e:
                     self.logger.error(f"轮询 {ticker} 出错: {e}")
             time.sleep(self.interval)
@@ -258,7 +258,7 @@ class MiniQmtDataGateway(DataGateway):
                 self.logger.error(f"xtdata.run 异常: {e}")
 
     def _on_push_datas(self, datas: dict) -> None:
-        """分笔推送回调：行转 TickData 再交 tick 回调。"""
+        """分笔推送回调：行转 TickerData 再交 tick 回调。"""
         if not self._running:
             return
         for code, rows in (datas or {}).items():
@@ -271,7 +271,7 @@ class MiniQmtDataGateway(DataGateway):
                 vol = row.get("volume") or row.get("lastVolume")
                 ts = self._ts_from_millis_or_now(row.get("time"))
                 bid, ask = self._bid_ask_from_dict(row)
-                t = TickData(
+                ticker_data = TickerData(
                     ticker=code,
                     price=float(last),
                     timestamp=ts,
@@ -281,7 +281,7 @@ class MiniQmtDataGateway(DataGateway):
                     ask=ask,
                 )
                 if self._on_tick:
-                    self._on_tick(t)
+                    self._on_tick(ticker_data)
 
     def _get_full_tick(self, ticker: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
         """调 get_full_tick；成功返回快照和 None，失败返回 None 和错误说明。"""

@@ -6,7 +6,7 @@ from ..enums import OrderType
 
 
 @dataclass
-class TickData:
+class TickerData:
     ticker: str
     timestamp: datetime
     # 最新价（close）

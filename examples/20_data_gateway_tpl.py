@@ -10,7 +10,7 @@ if project_root not in sys.path:
 
 from deltafq.live import create_data_gateway
 from deltafq.adapters.data.base import DataGateway
-from deltafq.live.models import TickData
+from deltafq.live.models import TickerData
 
 NAME = "miniqmt"  # "yfinance" | "miniqmt" | "baostock"
 SYMBOL = "600000.SH" # "AAPL" | "600000.SH" | "sh.600000"
@@ -68,12 +68,12 @@ if __name__ == "__main__":
 
     _wu = ("yf_warmup", "miniqmt_warmup")
 
-    def on_tick(t: TickData) -> None:
-        if t.symbol != SYMBOL:
+    def on_tick(ticker_data: TickerData) -> None:
+        if ticker_data.symbol != SYMBOL:
             return
-        if t.source not in _wu:
-            kv("tick", f"{t.source} px={t.price}")
-        if live and t.source not in live:
+        if ticker_data.source not in _wu:
+            kv("tick", f"{ticker_data.source} px={ticker_data.price}")
+        if live and ticker_data.source not in live:
             return
         n_live[0] += 1
         if n_live[0] >= 5: # 5 次后结束

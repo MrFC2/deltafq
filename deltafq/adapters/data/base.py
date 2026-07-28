@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, List, Optional
 
-from ...live.models import TickData
+from ...live.models import TickerData
 from ...core.base import BaseComponent
 
 
@@ -10,9 +10,9 @@ class DataGateway(BaseComponent, ABC):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self._on_tick: Optional[Callable[[TickData], None]] = None
+        self._on_tick: Optional[Callable[[TickerData], None]] = None
 
-    def set_on_tick(self, callback: Callable[[TickData], None]) -> None:
+    def set_on_tick(self, callback: Callable[[TickerData], None]) -> None:
         """注册 Tick 回调。"""
         self._on_tick = callback
 
