@@ -25,7 +25,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from deltafq.data.miniqmt_fetcher import fetch_data, import_xtdata as _import_xtdata
-from ...live.gateways import DataGateway
+from .gateway import DataGateway
 from ...live.models import TickData
 from ...enums import Interval
 

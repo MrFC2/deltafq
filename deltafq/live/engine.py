@@ -58,7 +58,8 @@ from ..core.base import BaseComponent
 from ..data import DataFetcher, YahooDataFetcher, BaostockDataFetcher, MiniQmtDataFetcher
 from ..strategy.base import BaseStrategy
 from .event_engine import EventEngine
-from .gateways import DataGateway, TradeGateway
+from ..adapters.data.gateway import DataGateway
+from ..adapters.trade.gateway import TradeGateway
 from .models import OrderRequest, TickData
 from ..enums import OrderType, EventType, Interval
 from ..adapters.data.yfinance_gateway import YFinanceDataGateway

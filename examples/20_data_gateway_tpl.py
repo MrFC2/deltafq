@@ -9,7 +9,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from deltafq.live import create_data_gateway
-from deltafq.live.gateways import DataGateway
+from deltafq.adapters.data.gateway import DataGateway
 from deltafq.live.models import TickData
 
 NAME = "miniqmt"  # "yfinance" | "miniqmt" | "baostock"

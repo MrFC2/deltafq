@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from ...live.gateways import TradeGateway
+from .gateway import TradeGateway
 from ...live.models import OrderRequest
 from ...enums import OrderType
 from .miniqmt_client import MiniQmtXtTraderClient

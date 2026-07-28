@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional
 
 import yfinance as yf
 
-from ...live.gateways import DataGateway
+from .gateway import DataGateway
 from ...live.models import TickData
 
 

@@ -1,4 +1,4 @@
-from ...live.gateways import TradeGateway
+from .gateway import TradeGateway
 from ...live.models import OrderRequest
 from ...trader.engine import TraderEngine
 

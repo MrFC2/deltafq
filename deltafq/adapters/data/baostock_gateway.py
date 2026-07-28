@@ -24,7 +24,7 @@ import pandas as pd
 
 from deltafq.data.baostock_fetcher import BaostockDataFetcher
 from ...enums import Interval
-from ...live.gateways import DataGateway
+from .gateway import DataGateway
 from ...live.models import TickData
 
 
