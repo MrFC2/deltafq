@@ -39,7 +39,7 @@ class BaostockDataFetcher(DataFetcher):
         self.bs = bs
 
     def fetch_data(self, ticker: str, start_date: str, end_date: Optional[str] = None,
-                   interval: Interval = Interval.DAY_1, adjust_flag: str = "3") -> pd.DataFrame:
+                   interval: Interval = Interval.DAY_1) -> pd.DataFrame:
         """拉取历史 K 线，返回 Open/High/Low/Close/Volume。end_date 排他（与 yahoo 一致）。"""
         if self.bs is not None:
             bs = self.bs
@@ -61,7 +61,7 @@ class BaostockDataFetcher(DataFetcher):
             rs = bs.query_history_k_data_plus(
                 to_bs_code(ticker), fields,
                 start_date=start_date[:10], end_date=end,
-                frequency=freq, adjustflag=str(adjust_flag),
+                frequency=freq, adjustflag="3",
             )
             rows = []
             while rs.error_code == "0" and rs.next():
