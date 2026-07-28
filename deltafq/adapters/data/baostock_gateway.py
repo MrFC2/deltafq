@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from deltafq.data.baostock_fetcher import fetch_data
+from deltafq.data.baostock_fetcher import BaostockDataFetcher
 from ...enums import Interval
 from ...live.gateways import DataGateway
 from ...live.models import TickData
@@ -45,8 +45,6 @@ class BaostockDataGateway(DataGateway):
         self.interval: float = interval
 
         # --- 订阅状态 ---
-        # baostock 模块实例，connect 后赋值
-        self._baostock: Optional[Any] = None
         # 已订阅标的列表
         self._tickers: List[str] = []
         # 各标的最后一根 K 线时间戳，用于去重推送
@@ -58,14 +56,14 @@ class BaostockDataGateway(DataGateway):
         # 轮询 daemon 线程
         self._thread: Optional[threading.Thread] = None
 
-        self.logger.info(f"初始化 BaostockDataGateway，轮询间隔: {self.interval}s")
+        # 行情拉取器
+        import baostock as bs
+        self.data_fetcher: BaostockDataFetcher = BaostockDataFetcher(bs)
 
     def connect(self) -> bool:
-        """登录 baostock。"""
+        """登录 baostock，将 session 注入 fetcher。"""
         try:
-            import baostock as bs
-            bs.login()
-            self._baostock = bs
+            self.data_fetcher.bs.login()
             return True
         except Exception as e:
             self.logger.error(f"连接失败: {e}")
@@ -93,9 +91,9 @@ class BaostockDataGateway(DataGateway):
         self._running = False
         if self._thread:
             self._thread.join(timeout=2)
-        if self._baostock is not None:
-            self._baostock.logout()
-            self._baostock = None
+        if self.data_fetcher.bs is not None:
+            self.data_fetcher.bs.logout()
+            self.data_fetcher.bs = None
         self.logger.info("已停止 baostock 轮询")
 
     def get_today_ohlc(self, ticker: str) -> Optional[Dict[str, float]]:
@@ -151,7 +149,8 @@ class BaostockDataGateway(DataGateway):
             if data is None or data.empty:
                 self.logger.warning(f"{ticker} 暖机数据为空")
                 return
-            last_day = pd.Timestamp(data.index[-1]).normalize()
+            last_day = pd.Timestamp(data.index[-1])  # type: ignore[arg-type]
+            last_day = last_day.normalize()
             data = data[data.index.normalize() == last_day]
             pushed_count = 0
             for timestamp, row in data.iterrows():
@@ -201,8 +200,6 @@ class BaostockDataGateway(DataGateway):
 
     def _fetch_recent_7_day_data(self, ticker: str, interval: Interval) -> Optional[pd.DataFrame]:
         """用已登录会话拉近 7 日 K 线。"""
-        if self._baostock is None:
-            return None
         start = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
         end = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-        return fetch_data(ticker, start, end, interval=interval, bs=self._baostock)
+        return self.data_fetcher.fetch_data(ticker, start, end, interval=interval)
