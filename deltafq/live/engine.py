@@ -99,6 +99,8 @@ def _vol_str(v: float) -> str:
     return str(int(v))
 
 
+
+
 class LiveEngine(BaseComponent):
     """
     在实盘数据上跑策略并通过网关下单。
@@ -164,14 +166,13 @@ class LiveEngine(BaseComponent):
 
     def run_live(self) -> None:
         """连接网关、注册 Tick、订阅标的并启动推送。"""
-        # 建立行情和交易连接
         if not self.data_gateway.connect() or not self.trade_gateway.connect():
             raise RuntimeError("网关连接失败")
         # 注册 tick 处理：撮合 + 策略信号
         self._event_engine.register(EventType.TICK, self._on_tick_match)
         self._event_engine.register(EventType.TICK, self._on_tick_strategy)
         # 将网关推送的 tick 接入事件总线
-        self.data_gateway.set_on_tick(lambda t: self._event_engine.trigger(EventType.TICK, t))
+        self.data_gateway.set_on_tick(lambda tick_data: self._event_engine.trigger(EventType.TICK, tick_data))
         # 订阅标的并启动行情流
         self.data_gateway.subscribe([self.ticker])
         self.data_gateway.start()
@@ -358,25 +359,24 @@ class LiveEngine(BaseComponent):
 
     # ---------- 内部：Tick ----------
 
-    def _on_tick_match(self, tick: TickData) -> None:
+    def _on_tick_match(self, tick_data: TickData) -> None:
         """非 warmup：打 Tick 日志；若网关带执行引擎则转发 on_tick 做限价撮合。"""
-        if getattr(tick, "source", None) not in ("yf_warmup", "miniqmt_warmup", "baostock_warmup"):
-            t = tick.timestamp
-            ts = t.strftime("%H:%M:%S")
-            v = tick.volume
+        if not tick_data.is_warm_up:
+            ts = tick_data.timestamp.strftime("%H:%M:%S")
+            v = tick_data.volume
             ba = ""
-            if tick.bid is not None and tick.ask is not None:
-                ba = f" bid={tick.bid:.4f} ask={tick.ask:.4f}"
-            elif tick.bid is not None:
-                ba = f" bid={tick.bid:.4f}"
-            elif tick.ask is not None:
-                ba = f" ask={tick.ask:.4f}"
+            if tick_data.bid is not None and tick_data.ask is not None:
+                ba = f" bid={tick_data.bid:.4f} ask={tick_data.ask:.4f}"
+            elif tick_data.bid is not None:
+                ba = f" bid={tick_data.bid:.4f}"
+            elif tick_data.ask is not None:
+                ba = f" ask={tick_data.ask:.4f}"
             self.logger.info(
-                f"Tick: [{tick.ticker}] {tick.price:.4f}{ba} vol={v}({_vol_str(v)}) @ {ts}"
+                f"Tick: [{tick_data.ticker}] {tick_data.price:.4f}{ba} vol={v}({_vol_str(v)}) @ {ts}"
             )
         eng = getattr(self.trade_gateway, "_engine", None) if self.trade_gateway else None
         if eng is not None:
-            eng.on_tick(tick)
+            eng.on_tick(tick_data)
 
     def _build_signal_df(self, tick: TickData) -> Optional[pd.DataFrame]:
         """由当前 tick 构造策略输入 DataFrame；数据不足或未到重拉间隔时返回 None。"""
@@ -493,7 +493,7 @@ class LiveEngine(BaseComponent):
 
         if signal == 1 and last <= 0:
             if sizing.qty > 0:
-                buy_px = float(getattr(tick, "ask", None)) if getattr(tick, "ask", None) is not None else px
+                buy_px = float(tick.ask) if tick.ask is not None else px
                 req = OrderRequest(ticker=self.ticker, quantity=sizing.qty, price=buy_px,
                                    order_type=OrderType.LIMIT)  # type: ignore[arg-type]
                 self._last_pending_order_id = self.trade_gateway.send_order(req)
@@ -502,7 +502,7 @@ class LiveEngine(BaseComponent):
             if sizing.sell_order_qty <= 0:
                 self._last_signal = signal
                 return
-            sell_px = float(getattr(tick, "bid", None)) if getattr(tick, "bid", None) is not None else px
+            sell_px = float(tick.bid) if tick.bid is not None else px
             req = OrderRequest(
                 ticker=self.ticker, quantity=-sizing.sell_order_qty, price=sell_px, order_type=OrderType.LIMIT
                 # type: ignore[arg-type]
@@ -512,14 +512,14 @@ class LiveEngine(BaseComponent):
 
         self._last_signal = signal
 
-    def _on_tick_strategy(self, tick: TickData) -> None:
+    def _on_tick_strategy(self, tick_data: TickData) -> None:
         """编排：建 df → 信号 → 账户快照 → 权益 → sizing 与日志 → 信号翻转时撤单/下单。"""
-        if getattr(tick, "source", None) in ("yf_warmup", "miniqmt_warmup", "baostock_warmup"):
+        if tick_data.is_warm_up:
             return
-        if tick.ticker != self.ticker or self._strategy is None:
+        if tick_data.ticker != self.ticker or self._strategy is None:
             return
 
-        df = self._build_signal_df(tick)
+        df = self._build_signal_df(tick_data)
         if df is None:
             return
 
@@ -536,10 +536,10 @@ class LiveEngine(BaseComponent):
         self._cached_signals = signals
 
         signal = int(signals.iloc[-1])
-        px = float(tick.price)
+        px = float(tick_data.price)
         cash, position, commission = self._account_snapshot()
 
-        self._append_values_record(tick, signal, px, cash, position)
+        self._append_values_record(tick_data, signal, px, cash, position)
 
         order_quantity = getattr(self._strategy, "order_quantity", None)
         order_amount = getattr(self._strategy, "order_amount", None)
@@ -547,4 +547,4 @@ class LiveEngine(BaseComponent):
             signal, px, cash, position, commission, self._last_signal, order_quantity, order_amount
         )
 
-        self._handle_signal_transition(signal, px, position, sizing, tick)
+        self._handle_signal_transition(signal, px, position, sizing, tick_data)

@@ -11,7 +11,7 @@ class TickData:
     price: float
     timestamp: datetime
     volume: Optional[int] = None
-    source: Optional[str] = None
+    is_warm_up: bool = False
     # 行情侧若有买一/卖一（如 xtdata get_full_tick），由网关填入；无则默认 None
     bid: Optional[float] = None
     ask: Optional[float] = None

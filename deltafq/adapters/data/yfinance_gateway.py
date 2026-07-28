@@ -125,7 +125,7 @@ class YFinanceDataGateway(DataGateway):
     # ---------- 私有 ----------
 
     def _warm_up(self, ticker: str) -> None:
-        """下载近一日 1m K 线，逐根合成暖机 tick（source=yf_warmup）。"""
+        """下载近一日 1m K 线，逐根合成暖机 tick。"""
         self.logger.debug(f"正在为 {ticker} 加载历史数据进行暖机...")
         try:
             data = yf.download(ticker, period="1d", interval="1m", progress=False)
@@ -142,7 +142,7 @@ class YFinanceDataGateway(DataGateway):
                     price=price,
                     timestamp=local_ts,
                     volume=volume,
-                    source="yf_warmup",
+                    is_warm_up=True,
                 )
                 if self._on_tick:
                     self._on_tick(tick)
@@ -167,7 +167,7 @@ class YFinanceDataGateway(DataGateway):
                         price=float(price),
                         timestamp=datetime.utcnow(),
                         volume=int(volume),
-                        source="yfinance",
+                        
                     )
                     if self._on_tick:
                         self._on_tick(tick)

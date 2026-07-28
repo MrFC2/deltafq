@@ -142,7 +142,7 @@ class BaostockDataGateway(DataGateway):
     # ---------- 私有 ----------
 
     def _warm_up(self, ticker: str) -> None:
-        """最近交易日 5m K 线，逐根合成暖机 tick（source=baostock_warmup）。"""
+        """最近交易日 5m K 线，逐根合成暖机 tick。"""
         self.logger.debug(f"正在用 baostock 5m 数据暖机 {ticker}...")
         try:
             data = self._fetch_recent_7_day_data(ticker, Interval.MINUTE_5)
@@ -160,7 +160,7 @@ class BaostockDataGateway(DataGateway):
                     price=float(row["Close"]),
                     timestamp=timestamp.to_pydatetime().replace(tzinfo=None),
                     volume=int(row["Volume"]),
-                    source="baostock_warmup",  # 标记来源，让 engine 跳过撮合和信号计算
+                    is_warm_up=True,
                 )
                 if self._on_tick:
                     self._on_tick(tick)
@@ -191,7 +191,7 @@ class BaostockDataGateway(DataGateway):
                         price=float(row["Close"]),
                         timestamp=data_timestamp.to_pydatetime().replace(tzinfo=None),
                         volume=int(row["Volume"]),
-                        source="baostock",
+                        
                     )
                     if self._on_tick:
                         self._on_tick(tick)

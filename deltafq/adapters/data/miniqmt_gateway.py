@@ -135,7 +135,7 @@ class MiniQmtDataGateway(DataGateway):
     # ---------- 私有 ----------
 
     def _warm_up(self, ticker: str) -> None:
-        """近一日 1m 收盘合成暖机 tick，来源标记 miniqmt_warmup。"""
+        """近一日 1m 收盘合成暖机 tick。"""
         self.logger.debug(f"正在用 miniQMT 1m 数据暖机 {ticker}...")
         try:
             end = datetime.now()
@@ -162,7 +162,7 @@ class MiniQmtDataGateway(DataGateway):
                     price=price,
                     timestamp=ts,
                     volume=volume,
-                    source="miniqmt_warmup",
+                    is_warm_up=True,
                 )
                 if self._on_tick:
                     self._on_tick(tick)
@@ -209,7 +209,7 @@ class MiniQmtDataGateway(DataGateway):
                         price=float(last),
                         timestamp=ts,
                         volume=int(vol) if vol is not None else None,
-                        source="miniqmt",
+                        
                         bid=bid,
                         ask=ask,
                     )
@@ -270,7 +270,7 @@ class MiniQmtDataGateway(DataGateway):
                     price=float(last),
                     timestamp=ts,
                     volume=int(vol) if vol is not None else None,
-                    source="miniqmt_push",
+                    
                     bid=bid,
                     ask=ask,
                 )
