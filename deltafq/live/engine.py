@@ -381,14 +381,13 @@ class LiveEngine(BaseComponent):
         if ticker_data.ticker != self.ticker or self._strategy is None:
             return
 
-        # 未到重拉间隔或数据不足时返回 None，跳过本次信号计算
-        strategy_input = self._build_strategy_input(ticker_data)
-        if strategy_input is None:
+        # 未到重拉间隔或数据不足时跳过本次信号计算
+        if not self._append_tick_datas(ticker_data):
             return
 
         # 执行策略，生成信号
         try:
-            signals = self._strategy.generate_signals(strategy_input)
+            signals = self._strategy.generate_signals(list(self._tick_datas))
             if signals.empty:
                 return
         except Exception as e:
@@ -396,7 +395,7 @@ class LiveEngine(BaseComponent):
             return
 
         # 缓存供 get_chart_data 使用
-        self._cached_strategy_input = strategy_input
+        self._cached_strategy_input = list(self._tick_datas)
         self._cached_signals = signals
 
         # 取最新一根 bar 的信号值
@@ -416,28 +415,27 @@ class LiveEngine(BaseComponent):
         # 信号相对上次发生变化时撤旧单、发新单
         self._handle_signal_transition(signal, price, position, sizing, ticker_data)
 
-    def _build_strategy_input(self, ticker_data: TickerData) -> Optional[List[TickerData]]:
-        """由当前 tick 构造策略输入 List[TickerData]；未到重拉间隔时返回 None。"""
+    def _append_tick_datas(self, ticker_data: TickerData) -> bool:
+        """由当前 tick 更新 _tick_datas；未到重拉间隔时返回 False。"""
         if self.strategy_interval == Interval.REALTIME:
-            # REALTIME 模式：把每个 tick 攒成滑动窗口，由策略自己判断数据是否足够
             self._tick_datas.append(ticker_data)
-            return list(self._tick_datas)
+            return True
 
         # K 线模式：_tick_datas 最后一根的时间戳未超过重拉间隔时跳过
         refetch_interval = _REFETCH_INTERVAL.get(self.strategy_interval, 60)
         if self._tick_datas:
             interval = (datetime.now() - self._tick_datas[-1].timestamp).total_seconds()
             if interval < refetch_interval:
-                return None
+                return False
 
         data = self._fetch_data()
         if data is None:
-            return None
+            return False
 
         self._tick_datas.clear()
         for ticker_data in data:
             self._tick_datas.append(ticker_data)
-        return list(self._tick_datas)
+        return True
 
     def _append_values_record(self, ticker_data: TickerData, signal: int, px: float, cash: float, position: int) -> None:
         """追加一条权益记录，供 get_values_df / calculate_metrics 使用。"""
