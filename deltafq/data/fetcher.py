@@ -34,11 +34,6 @@ class DataFetcher(BaseComponent, ABC):
         """拉取单个标的行情数据并清洗。"""
         raise NotImplementedError
 
-    def fetch_datas(self, tickers: List[str], start_date: str, end_date: Optional[str] = None,
-                    interval: Interval = Interval.DAY_1) -> Dict[str, pd.DataFrame]:
-        """批量拉取多个标的行情数据。"""
-        return {s: self.fetch_data(s, start_date, end_date, interval) for s in tickers}
-
     def fetch_data_from_fund(self, code: str, page: Optional[int] = None) -> pd.DataFrame:
         """从东方财富 API 拉取基金净值数据。"""
         base_url = "https://fundf10.eastmoney.com/F10DataApi.aspx"
