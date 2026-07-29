@@ -5,12 +5,13 @@ baostock 历史 K 线适配。
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import List, Optional
 
 import pandas as pd
 
 from deltafq.data.fetcher import DataFetcher
 from deltafq.enums import Interval
+from deltafq.core.models import TickerData
 
 # Interval 枚举 → baostock frequency
 _FREQ = {
@@ -39,8 +40,8 @@ class BaostockDataFetcher(DataFetcher):
         self.bs = bs
 
     def fetch_data(self, ticker: str, start_date: str, end_date: Optional[str] = None,
-                   interval: Interval = Interval.DAY_1) -> pd.DataFrame:
-        """拉取历史 K 线，返回 Open/High/Low/Close/Volume。end_date 排他（与 yahoo 一致）。"""
+                   interval: Interval = Interval.DAY_1) -> List[TickerData]:
+        """拉取历史 K 线，返回 TickerData 列表。end_date 排他（与 yahoo 一致）。"""
         if self.bs is not None:
             bs = self.bs
             owns_session = False
@@ -67,7 +68,7 @@ class BaostockDataFetcher(DataFetcher):
             while rs.error_code == "0" and rs.next():
                 rows.append(rs.get_row_data())
             if not rows:
-                return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
+                return []
 
             raw = pd.DataFrame(rows, columns=rs.fields)
             # 分钟线用 time（YYYYMMDDHHmmssSSS），日线用 date
@@ -75,7 +76,7 @@ class BaostockDataFetcher(DataFetcher):
                 pd.to_datetime(raw["time"].str[:14], format="%Y%m%d%H%M%S")
                 if "time" in raw.columns else pd.to_datetime(raw["date"])
             )
-            return self._cleaner.dropna(pd.DataFrame(
+            df = self._cleaner.dropna(pd.DataFrame(
                 {
                     "Open": pd.to_numeric(raw["open"]).to_numpy(),
                     "High": pd.to_numeric(raw["high"]).to_numpy(),
@@ -85,6 +86,7 @@ class BaostockDataFetcher(DataFetcher):
                 },
                 index=pd.DatetimeIndex(idx),
             ).sort_index())
+            return self.df_to_ticker_data(ticker, df)
         except Exception as e:
             raise RuntimeError(f"拉取 {ticker} 数据失败: {str(e)}") from e
         finally:

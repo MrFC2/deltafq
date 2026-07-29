@@ -2,7 +2,7 @@
 
 import os
 import sys
-from typing import Any
+from typing import Any, List
 
 import pandas as pd
 
@@ -12,6 +12,7 @@ if project_root not in sys.path:
 
 from deltafq.data import BaostockDataFetcher
 from deltafq.strategy.base import BaseStrategy
+from deltafq.core.models import TickerData
 
 
 class DemoStrategy(BaseStrategy):
@@ -22,8 +23,8 @@ class DemoStrategy(BaseStrategy):
         self.fast_period = fast_period
         self.slow_period = slow_period
 
-    def generate_signals(self, data: pd.DataFrame) -> pd.Series:
-        closes = data["Close"].astype(float)
+    def generate_signals(self, data: List[TickerData]) -> pd.Series:
+        closes = pd.Series([t.price for t in data], index=[t.timestamp for t in data])
         fast_ma = closes.rolling(window=self.fast_period, min_periods=1).mean()
         slow_ma = closes.rolling(window=self.slow_period, min_periods=1).mean()
 

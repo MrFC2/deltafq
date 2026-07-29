@@ -5,12 +5,13 @@ miniQMT 历史 K 线适配（xtdata）。
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 import pandas as pd
 
 from deltafq.data.fetcher import DataFetcher
 from deltafq.enums import Interval
+from deltafq.core.models import TickerData
 
 # Interval 枚举 → xt 周期；未命中的 Interval 直接用其 value 透传。
 _PERIOD_MAP = {
@@ -33,10 +34,11 @@ class MiniQmtDataFetcher(DataFetcher):
     """基于 xtquant 的行情拉取器（需本机运行 miniQMT 终端）。"""
 
     def fetch_data(self, ticker: str, start_date: str, end_date: Optional[str] = None,
-                   interval: Interval = Interval.DAY_1) -> pd.DataFrame:
+                   interval: Interval = Interval.DAY_1) -> List[TickerData]:
         try:
             data = fetch_data(ticker, start_date, end_date, interval=interval)
-            return self._cleaner.dropna(data)
+            data = self._cleaner.dropna(data)
+            return self.df_to_ticker_data(ticker, data)
         except Exception as e:
             raise RuntimeError(f"拉取 {ticker} 数据失败: {str(e)}") from e
 

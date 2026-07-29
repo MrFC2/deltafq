@@ -16,7 +16,7 @@ import logging
 from typing import Optional
 
 from .base import TradeGateway
-from ...live.models import OrderRequest
+from ...core.models import OrderRequest
 from ...enums import OrderType
 from .miniqmt_client import MiniQmtXtTraderClient
 

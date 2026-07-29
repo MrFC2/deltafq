@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, List, Optional
 
-from ...live.models import TickerData
+from ...core.models import TickerData
 from ...core.base import BaseComponent
 
 

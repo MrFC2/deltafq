@@ -53,7 +53,7 @@ class PerformanceChart(BaseComponent):
     def plot_backtest_charts(
             self,
             values_df: pd.DataFrame,
-            ohlcv_df: pd.DataFrame,
+            ohlcv_df: Optional[pd.DataFrame],
             trades_df: pd.DataFrame,
             benchmark_close: Optional[pd.Series] = None,
             metrics: Optional[dict] = None,

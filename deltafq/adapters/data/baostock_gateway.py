@@ -25,7 +25,7 @@ import pandas as pd
 from deltafq.data.baostock_fetcher import BaostockDataFetcher
 from ...enums import Interval
 from .base import DataGateway
-from ...live.models import TickerData
+from ...core.models import TickerData
 
 
 class BaostockDataGateway(DataGateway):
@@ -100,10 +100,10 @@ class BaostockDataGateway(DataGateway):
         """从最近日线取开、高、低；缺数据返回 None。"""
         try:
             data = self._fetch_recent_7_day_data(ticker, Interval.DAY_1)
-            if data is None or data.empty:
+            if not data:
                 return None
-            row = data.iloc[-1]
-            return {"open": float(row["Open"]), "high": float(row["High"]), "low": float(row["Low"])}
+            row = data[-1]
+            return {"open": row.open, "high": row.high, "low": row.low}
         except Exception as e:
             self.logger.error(f"获取 {ticker} 当日 OHLC 失败: {e}")
             return None
@@ -116,14 +116,13 @@ class BaostockDataGateway(DataGateway):
         levels = max(1, min(int(levels), 10))
         try:
             data = self._fetch_recent_7_day_data(ticker, Interval.MINUTE_5)
-            if data is None or data.empty:
+            if not data:
                 return {"bids": [], "asks": []}
-            row = data.iloc[-1]
-            last_f = float(row["Close"])
+            row = data[-1]
+            last_f = row.price
             if last_f <= 0:
                 return {"bids": [], "asks": []}
-            vol_raw = row["Volume"]
-            base = int(vol_raw) if pd.notna(vol_raw) and int(vol_raw) > 0 else 1000
+            base = row.volume if row.volume and row.volume > 0 else 1000
         except Exception as e:
             self.logger.debug(f"get_depths {ticker}: {e}")
             return {"bids": [], "asks": []}
@@ -146,30 +145,30 @@ class BaostockDataGateway(DataGateway):
         self.logger.debug(f"正在用 baostock 5m 数据暖机 {ticker}...")
         try:
             data = self._fetch_recent_7_day_data(ticker, Interval.MINUTE_5)
-            if data is None or data.empty:
+            if not data:
                 self.logger.warning(f"{ticker} 暖机数据为空")
                 return
             # 只取最近一个交易日的 bar，避免把历史数据当成实时 tick 推出去
-            last_day = pd.Timestamp(data.index[-1])  # type: ignore[arg-type]
-            last_day = last_day.normalize()
-            data = data[data.index.normalize() == last_day]
+            last_day = data[-1].timestamp.date()
             pushed_count = 0
-            for timestamp, row in data.iterrows():
+            for row in data:
+                if row.timestamp.date() != last_day:
+                    continue
                 ticker_data = TickerData(
-                    ticker=ticker,
-                    timestamp=timestamp.to_pydatetime().replace(tzinfo=None),
-                    price=float(row["Close"]),
-                    open=float(row["Open"]),
-                    high=float(row["High"]),
-                    low=float(row["Low"]),
-                    volume=int(row["Volume"]),
+                    ticker=row.ticker,
+                    timestamp=row.timestamp,
+                    price=row.price,
+                    open=row.open,
+                    high=row.high,
+                    low=row.low,
+                    volume=row.volume,
                     is_warm_up=True,
                 )
                 if self._on_tick:
                     self._on_tick(ticker_data)
                 pushed_count += 1
             # 记录最后一根 bar 时间戳，防止轮询时重复推送同一根
-            self._last_data_timestamp[ticker] = data.index[-1]
+            self._last_data_timestamp[ticker] = data[-1].timestamp
             self.logger.info(f"已订阅并暖机 {ticker}（{pushed_count} 根）")
         except Exception as e:
             self.logger.warning(f"{ticker} 暖机失败: {e}")
@@ -180,23 +179,22 @@ class BaostockDataGateway(DataGateway):
             for ticker in self._tickers:
                 try:
                     data = self._fetch_recent_7_day_data(ticker, Interval.MINUTE_5)
-                    if data is None or data.empty:
+                    if not data:
                         continue
-                    data_timestamp = data.index[-1]
+                    data_timestamp = data[-1].timestamp
                     # 同一根 K 线不重复推送
                     if self._last_data_timestamp.get(ticker) == data_timestamp:
                         continue
                     self._last_data_timestamp[ticker] = data_timestamp
-                    row = data.iloc[-1]
-                    # 用收盘价和成交量合成 TickerData
+                    row = data[-1]
                     ticker_data = TickerData(
-                        ticker=ticker,
-                        timestamp=data_timestamp.to_pydatetime().replace(tzinfo=None),
-                        price=float(row["Close"]),
-                        open=float(row["Open"]),
-                        high=float(row["High"]),
-                        low=float(row["Low"]),
-                        volume=int(row["Volume"]),
+                        ticker=row.ticker,
+                        timestamp=row.timestamp,
+                        price=row.price,
+                        open=row.open,
+                        high=row.high,
+                        low=row.low,
+                        volume=row.volume,
                     )
                     if self._on_tick:
                         self._on_tick(ticker_data)
@@ -205,7 +203,7 @@ class BaostockDataGateway(DataGateway):
                     continue
             time.sleep(self.interval)
 
-    def _fetch_recent_7_day_data(self, ticker: str, interval: Interval) -> Optional[pd.DataFrame]:
+    def _fetch_recent_7_day_data(self, ticker: str, interval: Interval) -> List[TickerData]:
         """用已登录会话拉近 7 日 K 线。"""
         start = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
         end = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")

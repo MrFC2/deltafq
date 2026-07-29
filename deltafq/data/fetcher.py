@@ -16,6 +16,7 @@ from typing import List, Optional, Dict, Any
 from ..core.base import BaseComponent
 from .cleaner import DataCleaner
 from ..enums import Interval
+from ..core.models import TickerData
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -30,9 +31,26 @@ class DataFetcher(BaseComponent, ABC):
 
     @abstractmethod
     def fetch_data(self, ticker: str, start_date: str, end_date: Optional[str] = None,
-                   interval: Interval = Interval.DAY_1) -> pd.DataFrame:
-        """拉取单个标的行情数据并清洗。"""
+                   interval: Interval = Interval.DAY_1) -> List[TickerData]:
+        """拉取单个标的行情数据并清洗，返回按时间升序的 TickerData 列表。"""
         raise NotImplementedError
+
+    @staticmethod
+    def df_to_ticker_data(ticker: str, df: pd.DataFrame) -> List[TickerData]:
+        """将标准 OHLCV DataFrame 转为 TickerData 列表，供子类复用。"""
+        result = []
+        for ts, row in df.iterrows():
+            ts_dt = pd.Timestamp(ts).to_pydatetime().replace(tzinfo=None)
+            result.append(TickerData(
+                ticker=ticker,
+                timestamp=ts_dt,
+                price=float(row["Close"]),
+                open=float(row["Open"]) if "Open" in row else None,
+                high=float(row["High"]) if "High" in row else None,
+                low=float(row["Low"]) if "Low" in row else None,
+                volume=int(row["Volume"]) if "Volume" in row and pd.notna(row["Volume"]) else None,
+            ))
+        return result
 
     def fetch_data_from_fund(self, code: str, page: Optional[int] = None) -> pd.DataFrame:
         """从东方财富 API 拉取基金净值数据。"""

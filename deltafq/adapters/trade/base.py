@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from ...live.models import OrderRequest
+from ...core.models import OrderRequest
 
 
 class TradeGateway(ABC):

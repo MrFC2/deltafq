@@ -23,7 +23,7 @@ import yfinance as yf
 
 from deltafq.enums import Interval
 from .base import DataGateway
-from ...live.models import TickerData
+from ...core.models import TickerData
 
 
 class YFinanceDataGateway(DataGateway):

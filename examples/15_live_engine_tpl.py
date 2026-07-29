@@ -16,6 +16,8 @@ from deltafq.adapters.data.yfinance_gateway import YFinanceDataGateway
 from deltafq.adapters.trade.paper_gateway import PaperTradeGateway
 from deltafq.strategy.base import BaseStrategy
 from deltafq.enums import Interval
+from deltafq.core.models import TickerData
+from typing import List
 
 
 class Every2BarFlipStrategy(BaseStrategy):
@@ -26,10 +28,11 @@ class Every2BarFlipStrategy(BaseStrategy):
         self._run_count = 0
         self.order_amount = 100000 # 单次买入投入金额
 
-    def generate_signals(self, data: pd.DataFrame) -> pd.Series:
+    def generate_signals(self, data: List[TickerData]) -> pd.Series:
         self._run_count += 1
         sig = 1 if (self._run_count // 2) % 2 == 0 else -1
-        return pd.Series([sig] * len(data), index=data.index)
+        index = [t.timestamp for t in data]
+        return pd.Series([sig] * len(data), index=index)
 
 
 def main():

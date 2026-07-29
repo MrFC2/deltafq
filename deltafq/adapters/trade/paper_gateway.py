@@ -1,5 +1,5 @@
 from .base import TradeGateway
-from ...live.models import OrderRequest
+from ...core.models import OrderRequest
 from ...trader.engine import TraderEngine
 
 

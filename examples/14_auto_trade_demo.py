@@ -13,6 +13,8 @@ import pandas as pd
 from deltafq.data import BaostockDataFetcher, DataStorage
 from deltafq.strategy.base import BaseStrategy
 from deltafq.trader.engine import TraderEngine
+from deltafq.core.models import TickerData
+from typing import List
 
 
 class SimpleMAStrategy(BaseStrategy):
@@ -21,8 +23,8 @@ class SimpleMAStrategy(BaseStrategy):
         self.fast_period = fast_period
         self.slow_period = slow_period
 
-    def generate_signals(self, data: pd.DataFrame) -> pd.Series:
-        closes = data["Close"].astype(float)
+    def generate_signals(self, data: List[TickerData]) -> pd.Series:
+        closes = pd.Series([t.price for t in data], index=[t.timestamp for t in data])
         fast_ma = closes.rolling(window=self.fast_period, min_periods=1).mean()
         slow_ma = closes.rolling(window=self.slow_period, min_periods=1).mean()
         signals = pd.Series(0, index=closes.index, dtype=int)
@@ -32,12 +34,12 @@ class SimpleMAStrategy(BaseStrategy):
 
 def run_signal(fetcher, strategy, ticker, start, end, interval, storage=None):
     data = fetcher.fetch_data(ticker, start, end, interval=interval)
-    if storage is not None and not data.empty:
+    if storage is not None and data:
         storage.save_price_data(data, ticker, start, end)
-    if data.empty or len(data) < 2:
+    if not data or len(data) < 2:
         return 0, None
     signals = strategy.run(data)
-    return int(signals.iloc[-1]), float(data["Close"].iloc[-1])
+    return int(signals.iloc[-1]), float(data[-1].price)
 
 
 def try_trade(engine, ticker, signal, price, qty, now):

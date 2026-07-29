@@ -15,6 +15,8 @@ from deltafq.adapters.data.miniqmt_gateway import MiniQmtDataGateway
 from deltafq.adapters.trade.miniqmt_gateway import MiniQmtTradeGateway
 from deltafq.strategy.base import BaseStrategy
 from deltafq.enums import Interval
+from deltafq.core.models import TickerData
+from typing import List
 
 MIN_PATH = os.environ.get("QMT_USERDATA_MINI", r"D:\国金证券QMT交易端\userdata_mini")
 ACCOUNT_ID = os.environ.get("QMT_ACCOUNT_ID", "8886180407")
@@ -30,10 +32,11 @@ class DemoStrategy(BaseStrategy):
         self.order_quantity = 100
         self._i = 0
 
-    def generate_signals(self, data: pd.DataFrame) -> pd.Series:
+    def generate_signals(self, data: List[TickerData]) -> pd.Series:
         sig = self._SEQ[self._i % len(self._SEQ)]
         self._i += 1
-        return pd.Series([sig] * len(data), index=data.index)
+        index = [t.timestamp for t in data]
+        return pd.Series([sig] * len(data), index=index)
 
 
 def main() -> None:

@@ -11,7 +11,7 @@ if project_root not in sys.path:
 
 from deltafq.adapters.data import MiniQmtDataGateway
 from deltafq.adapters.trade import MiniQmtTradeGateway
-from deltafq.live.models import OrderRequest, TickerData
+from deltafq.core.models import OrderRequest, TickerData
 
 # 配置 miniQMT 环境变量
 MIN_PATH = os.environ.get("QMT_USERDATA_MINI", r"D:\国金证券QMT交易端\userdata_mini")

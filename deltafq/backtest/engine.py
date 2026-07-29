@@ -11,6 +11,7 @@ from ..trader.engine import TraderEngine
 from ..enums import OrderType
 from .performance import PerformanceReporter
 from ..charts.performance import PerformanceChart
+from ..core.models import TickerData
 from abc import ABC
 
 
@@ -51,36 +52,35 @@ class BacktestEngine(BaseComponent, ABC):
         # 运行策略，生成信号
         signals = self._run_strategy(data)
         # 逐 bar 回放
-        trades_df, values_df = self._run_backtest(signals, data['Close'])
+        trades_df, values_df = self._run_backtest(signals, data)
         # 计算绩效指标、打印报告、展示图表
-        self._report(trades_df, values_df, ohlcv_df=data)
+        self._report(trades_df, values_df, data)
         # 保存结果
         if save_results:
             self.save_backtest_results(trades_df, values_df)
 
-    def _load_data(self) -> pd.DataFrame:
+    def _load_data(self) -> List[TickerData]:
         """加载行情数据。"""
         if not self.ticker or not self.start_date:
             raise ValueError("ticker 和 start_date 不能为空。")
         return self.data_fetcher.fetch_data(self.ticker, self.start_date, self.end_date)
 
-    def _run_strategy(self, data: pd.DataFrame) -> pd.Series:
+    def _run_strategy(self, data: List[TickerData]) -> pd.Series:
         """运行策略，返回信号序列。"""
-        if data is None or data.empty:
+        if not data:
             raise ValueError("行情数据为空，请先调用 _load_data()。")
-        if 'Close' not in data.columns:
-            raise ValueError("行情数据缺少 Close 列。")
         return self.strategy.generate_signals(data)
 
-    def _run_backtest(self, signals: pd.Series, price_series: pd.Series) -> tuple:
+    def _run_backtest(self, signals: pd.Series, data: List[TickerData]) -> tuple:
         """逐 bar 回放，返回 trades_df 和 values_df。"""
         if signals is None or signals.empty:
             raise ValueError("信号序列为空，请检查策略。")
-        if price_series is None or price_series.empty:
+        if not data:
             raise ValueError("价格序列为空。")
 
         try:
             # 合并信号与价格
+            price_series = pd.Series([t.price for t in data], index=[t.timestamp for t in data])
             df_sig = pd.DataFrame({'Signal': signals, 'Close': price_series})
             values_records: List[Dict[str, Any]] = []
 
@@ -138,7 +138,7 @@ class BacktestEngine(BaseComponent, ABC):
             self.logger.error(f"_run_backtest 执行失败: {e}")
             raise RuntimeError(f"回测执行失败: {e}") from e
 
-    def _report(self, trades_df: pd.DataFrame, values_df: pd.DataFrame, ohlcv_df: pd.DataFrame = None) -> None:
+    def _report(self, trades_df: pd.DataFrame, values_df: pd.DataFrame, data: List[TickerData] = None) -> None:
         """计算绩效指标、打印报告、展示图表。"""
         if trades_df is None or values_df is None:
             raise ValueError("trades_df 或 values_df 为空，请先执行回测。")
@@ -147,14 +147,32 @@ class BacktestEngine(BaseComponent, ABC):
         # 展示图表（含指标表格）
         benchmark_close = None
         if self.benchmark is not None:
-            benchmark_close = \
-                self.data_fetcher.fetch_data(self.benchmark, self.start_date, self.end_date)['Close']
+            benchmark_bars = self.data_fetcher.fetch_data(self.benchmark, self.start_date, self.end_date)
+            benchmark_close = pd.Series(
+                [t.price for t in benchmark_bars],
+                index=[t.timestamp for t in benchmark_bars],
+            )
+        ohlcv_df = self.to_ohlcv_df(data) if data else None
         self.chart.plot_backtest_charts(
             values_df=values_df,
             ohlcv_df=ohlcv_df,
             trades_df=trades_df,
             benchmark_close=benchmark_close,
             metrics=metrics,
+        )
+
+    @staticmethod
+    def to_ohlcv_df(bars: List[TickerData]) -> pd.DataFrame:
+        """将 TickerData 列表转为标准 OHLCV DataFrame，供回测与图表使用。"""
+        return pd.DataFrame(
+            {
+                "Open": [t.open for t in bars],
+                "High": [t.high for t in bars],
+                "Low": [t.low for t in bars],
+                "Close": [t.price for t in bars],
+                "Volume": [t.volume for t in bars],
+            },
+            index=[t.timestamp for t in bars],
         )
 
     def save_backtest_results(self, trades_df: pd.DataFrame, values_df: pd.DataFrame) -> None:

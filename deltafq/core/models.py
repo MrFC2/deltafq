@@ -1,3 +1,8 @@
+"""
+全局共享数据模型。TickerData 和 OrderRequest 被 data/、live/、strategy/、adapters/ 各层共同使用，
+放在 core/ 层避免循环导入。
+"""
+
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
@@ -9,7 +14,7 @@ from ..enums import OrderType
 class TickerData:
     ticker: str
     timestamp: datetime
-    # 最新价（close）
+    # 最新价（实时场景为 tick 价，K 线场景为 close 价）
     price: float
     # K 线 OHLCV；纯 tick 场景 open/high/low 为 None
     open: Optional[float] = None

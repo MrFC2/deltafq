@@ -26,7 +26,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from deltafq.data.miniqmt_fetcher import fetch_data, import_xtdata as _import_xtdata
 from .base import DataGateway
-from ...live.models import TickerData
+from ...core.models import TickerData
 from ...enums import Interval
 
 

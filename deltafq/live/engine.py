@@ -59,7 +59,7 @@ from ..strategy.base import BaseStrategy
 from .event_engine import EventEngine
 from ..adapters.data.base import DataGateway
 from ..adapters.trade.base import TradeGateway
-from .models import OrderRequest, TickerData
+from ..core.models import OrderRequest, TickerData
 from ..enums import OrderType, EventType, Interval
 from ..adapters.data.yfinance_gateway import YFinanceDataGateway
 from ..adapters.data.miniqmt_gateway import MiniQmtDataGateway
@@ -144,11 +144,11 @@ class LiveEngine(BaseComponent):
         self._last_signal: int = 0
         # 当前未成交挂单的委托号
         self._last_pending_order_id: Optional[str] = None
-        # 最近一次拉取的 K 线
-        self._cached_strategy_input: Optional[pd.DataFrame] = None
+        # 缓存最近一次策略输入（List[TickerData]），供 get_chart_data 使用
+        self._cached_strategy_input: Optional[List[TickerData]] = None
         # 最近一次策略产生的信号序列
         self._cached_signals: Optional[pd.Series] = None
-        # REALTIME 模式下的 tick 滑动窗口
+        # K 线/REALTIME 模式下的 tick 滑动窗口
         self._tick_datas: deque = deque(maxlen=strategy_input_size)
 
         # --- 统计记录 ---
@@ -186,21 +186,24 @@ class LiveEngine(BaseComponent):
         返回:
             candles: [{date, open, high, low, close}, ...]；signals: [int, ...]
         """
-        if self._cached_strategy_input is None or self._cached_signals is None or self._cached_strategy_input.empty:
+        if not self._cached_strategy_input or self._cached_signals is None:
             return {"candles": [], "signals": []}
 
         date_fmt = "%Y-%m-%d" if self.strategy_interval == Interval.DAY_1 else "%Y-%m-%d %H:%M:%S"
 
         candles: List[Dict[str, Any]] = []
-        for idx, row in self._cached_strategy_input.iterrows():
-            c = float(row.get("Close", 0) or 0)
-            o = float(row.get("Open", c) or c)
-            h = float(row.get("High", c) or c)
-            l_ = float(row.get("Low", c) or c)
-            date_str = idx.strftime(date_fmt) if hasattr(idx, "strftime") else str(idx)[:16]
+        index = []
+        for t in self._cached_strategy_input:
+            c = t.price
+            o = t.open if t.open is not None else c
+            h = t.high if t.high is not None else c
+            l_ = t.low if t.low is not None else c
+            date_str = t.timestamp.strftime(date_fmt)
             candles.append({"date": date_str, "open": o, "high": h, "low": l_, "close": c})
+            index.append(t.timestamp)
 
-        sigs = self._cached_signals.reindex(self._cached_strategy_input.index, fill_value=0)
+        ts_index = pd.DatetimeIndex(index)
+        sigs = self._cached_signals.reindex(ts_index, fill_value=0)
         signals = [int(x) if pd.notna(x) else 0 for x in sigs]
 
         return {"candles": candles, "signals": signals}
@@ -246,7 +249,7 @@ class LiveEngine(BaseComponent):
             return MiniQmtDataFetcher()
         return BaostockDataFetcher()
 
-    def _fetch_data(self) -> Optional[pd.DataFrame]:
+    def _fetch_data(self) -> Optional[List[TickerData]]:
         """用 DataFetcher 拉当前 strategy_interval 下最近 strategy_input_size 根 K 线。"""
         # REALTIME 模式不拉 K 线，数据由 tick 实时积累
         if self._data_fetcher is None or self.strategy_interval == Interval.REALTIME:
@@ -267,12 +270,12 @@ class LiveEngine(BaseComponent):
         except Exception as e:
             self.logger.warning(f"DataFetcher 拉取失败: {e}")
             return None
-        if data.empty:
+        if not data:
             return None
 
-        # 只取策略需要的 n 条数据，避免把过多历史数据传给策略
+        # 只取策略需要的 n 条数据
         n = min(len(data), self.strategy_input_size)
-        return data.tail(n)
+        return data[-n:]
 
     # ---------- 内部：账户与挂单 ----------
 
@@ -379,21 +382,21 @@ class LiveEngine(BaseComponent):
             return
 
         # 未到重拉间隔或数据不足时返回 None，跳过本次信号计算
-        strategy_input_df = self._build_strategy_input(ticker_data)
-        if strategy_input_df is None:
+        strategy_input = self._build_strategy_input(ticker_data)
+        if strategy_input is None:
             return
 
         # 执行策略，生成信号
         try:
-            signals = self._strategy.generate_signals(strategy_input_df)
+            signals = self._strategy.generate_signals(strategy_input)
+            if signals.empty:
+                return
         except Exception as e:
             self.logger.warning(f"策略信号执行失败: {e}")
             return
-        if signals.empty:
-            return
 
         # 缓存供 get_chart_data 使用
-        self._cached_strategy_input = strategy_input_df
+        self._cached_strategy_input = strategy_input
         self._cached_signals = signals
 
         # 取最新一根 bar 的信号值
@@ -401,7 +404,7 @@ class LiveEngine(BaseComponent):
         price = float(ticker_data.price)
         cash, position, commission = self._account_snapshot()
 
-        # 追加权益曲线记录
+        # 追加净值记录
         self._append_values_record(ticker_data, signal, price, cash, position)
 
         order_quantity = getattr(self._strategy, "order_quantity", None)
@@ -413,21 +416,12 @@ class LiveEngine(BaseComponent):
         # 信号相对上次发生变化时撤旧单、发新单
         self._handle_signal_transition(signal, price, position, sizing, ticker_data)
 
-    def _build_strategy_input(self, ticker_data: TickerData) -> Optional[pd.DataFrame]:
-        """由当前 tick 构造策略输入 DataFrame；未到重拉间隔时返回 None。"""
+    def _build_strategy_input(self, ticker_data: TickerData) -> Optional[List[TickerData]]:
+        """由当前 tick 构造策略输入 List[TickerData]；未到重拉间隔时返回 None。"""
         if self.strategy_interval == Interval.REALTIME:
             # REALTIME 模式：把每个 tick 攒成滑动窗口，由策略自己判断数据是否足够
             self._tick_datas.append(ticker_data)
-            return pd.DataFrame(
-                {
-                    "Open": [t.open for t in self._tick_datas],
-                    "High": [t.high for t in self._tick_datas],
-                    "Low": [t.low for t in self._tick_datas],
-                    "Close": [t.price for t in self._tick_datas],
-                    "Volume": [t.volume for t in self._tick_datas],
-                },
-                index=[t.timestamp for t in self._tick_datas],
-            )
+            return list(self._tick_datas)
 
         # K 线模式：_tick_datas 最后一根的时间戳未超过重拉间隔时跳过
         refetch_interval = _REFETCH_INTERVAL.get(self.strategy_interval, 60)
@@ -436,33 +430,14 @@ class LiveEngine(BaseComponent):
             if interval < refetch_interval:
                 return None
 
-        # 用 fetch 结果覆盖 _tick_datas，每行 bar 转为 TickerData
-        df = self._fetch_data()
-        if df is None:
+        data = self._fetch_data()
+        if data is None:
             return None
 
         self._tick_datas.clear()
-        for ts, row in df.iterrows():
-            ts_dt = pd.Timestamp(ts).to_pydatetime().replace(tzinfo=None)
-            self._tick_datas.append(TickerData(
-                ticker=self.ticker,
-                timestamp=ts_dt,
-                price=float(row["Close"]),
-                open=float(row["Open"]) if "Open" in row else None,
-                high=float(row["High"]) if "High" in row else None,
-                low=float(row["Low"]) if "Low" in row else None,
-                volume=int(row["Volume"]) if "Volume" in row else None,
-            ))
-        return pd.DataFrame(
-            {
-                "Open": [t.open for t in self._tick_datas],
-                "High": [t.high for t in self._tick_datas],
-                "Low": [t.low for t in self._tick_datas],
-                "Close": [t.price for t in self._tick_datas],
-                "Volume": [t.volume for t in self._tick_datas],
-            },
-            index=[t.timestamp for t in self._tick_datas],
-        )
+        for ticker_data in data:
+            self._tick_datas.append(ticker_data)
+        return list(self._tick_datas)
 
     def _append_values_record(self, ticker_data: TickerData, signal: int, px: float, cash: float, position: int) -> None:
         """追加一条权益记录，供 get_values_df / calculate_metrics 使用。"""

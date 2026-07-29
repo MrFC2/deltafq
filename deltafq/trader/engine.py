@@ -11,7 +11,7 @@ from .position_manager import PositionManager
 from ..enums import OrderType
 
 if TYPE_CHECKING:
-    from ..live.models import TickerData
+    from ..core.models import TickerData
 
 
 class TraderEngine(BaseComponent):
