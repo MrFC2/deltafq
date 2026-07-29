@@ -7,7 +7,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
-from ..enums import OrderType
+from ..enums import OrderType, Signal
+
+
+@dataclass
+class SignalData:
+    timestamp: datetime
+    signal: Signal
 
 
 @dataclass

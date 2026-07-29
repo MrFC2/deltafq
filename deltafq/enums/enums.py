@@ -40,6 +40,13 @@ class EventType(Enum):
     POSITION = "position"
 
 
+class Signal(int, Enum):
+    """策略信号方向。"""
+    BUY = 1  # 买入
+    HOLD = 0  # 持仓不动
+    SELL = -1  # 卖出
+
+
 class Interval(Enum):
     """K 线周期。"""
     REALTIME = "realtime"

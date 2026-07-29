@@ -59,8 +59,8 @@ from ..strategy.base import BaseStrategy
 from .event_engine import EventEngine
 from ..adapters.data.base import DataGateway
 from ..adapters.trade.base import TradeGateway
-from ..core.models import OrderRequest, TickerData
-from ..enums import OrderType, EventType, Interval
+from ..core.models import OrderRequest, SignalData, TickerData
+from ..enums import OrderType, EventType, Interval, Signal
 from ..adapters.data.yfinance_gateway import YFinanceDataGateway
 from ..adapters.data.miniqmt_gateway import MiniQmtDataGateway
 
@@ -147,7 +147,7 @@ class LiveEngine(BaseComponent):
         # 缓存最近一次策略输入（List[TickerData]），供 get_chart_data 使用
         self._cached_strategy_input: Optional[List[TickerData]] = None
         # 最近一次策略产生的信号序列
-        self._cached_signals: Optional[pd.Series] = None
+        self._cached_signals: Optional[List[SignalData]] = None
         # K 线/REALTIME 模式下的 tick 滑动窗口
         self._tick_datas: deque = deque(maxlen=strategy_input_size)
 
@@ -186,25 +186,21 @@ class LiveEngine(BaseComponent):
         返回:
             candles: [{date, open, high, low, close}, ...]；signals: [int, ...]
         """
-        if not self._cached_strategy_input or self._cached_signals is None:
+        if not self._cached_strategy_input or not self._cached_signals:
             return {"candles": [], "signals": []}
 
         date_fmt = "%Y-%m-%d" if self.strategy_interval == Interval.DAY_1 else "%Y-%m-%d %H:%M:%S"
 
         candles: List[Dict[str, Any]] = []
-        index = []
         for t in self._cached_strategy_input:
             c = t.price
             o = t.open if t.open is not None else c
             h = t.high if t.high is not None else c
             l_ = t.low if t.low is not None else c
-            date_str = t.timestamp.strftime(date_fmt)
-            candles.append({"date": date_str, "open": o, "high": h, "low": l_, "close": c})
-            index.append(t.timestamp)
+            candles.append({"date": t.timestamp.strftime(date_fmt), "open": o, "high": h, "low": l_, "close": c})
 
-        ts_index = pd.DatetimeIndex(index)
-        sigs = self._cached_signals.reindex(ts_index, fill_value=0)
-        signals = [int(x) if pd.notna(x) else 0 for x in sigs]
+        sig_map = {s.timestamp: s.signal.value for s in self._cached_signals}
+        signals = [sig_map.get(t.timestamp, Signal.HOLD.value) for t in self._cached_strategy_input]
 
         return {"candles": candles, "signals": signals}
 
@@ -388,7 +384,7 @@ class LiveEngine(BaseComponent):
         # 执行策略，生成信号
         try:
             signals = self._strategy.generate_signals(list(self._tick_datas))
-            if signals.empty:
+            if not signals:
                 return
         except Exception as e:
             self.logger.warning(f"策略信号执行失败: {e}")
@@ -399,7 +395,7 @@ class LiveEngine(BaseComponent):
         self._cached_signals = signals
 
         # 取最新一根 bar 的信号值
-        signal = int(signals.iloc[-1])
+        signal = signals[-1].signal
         price = float(ticker_data.price)
         cash, position, commission = self._account_snapshot()
 
@@ -437,7 +433,7 @@ class LiveEngine(BaseComponent):
             self._tick_datas.append(ticker_data)
         return True
 
-    def _append_values_record(self, ticker_data: TickerData, signal: int, px: float, cash: float, position: int) -> None:
+    def _append_values_record(self, ticker_data: TickerData, signal: Signal, px: float, cash: float, position: int) -> None:
         """追加一条权益记录，供 get_values_df / calculate_metrics 使用。"""
         position_value = position * px
         total_value = cash + position_value
@@ -445,7 +441,7 @@ class LiveEngine(BaseComponent):
         daily_pnl = total_value - prev_total
         self._values_records.append({
             "date": ticker_data.timestamp,
-            "signal": signal,
+            "signal": signal.value,
             "price": px,
             "cash": cash,
             "position": position,

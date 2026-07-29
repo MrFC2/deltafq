@@ -8,10 +8,10 @@ from ..core.base import BaseComponent
 from ..data import DataFetcher, DataStorage, BaostockDataFetcher
 from ..strategy.base import BaseStrategy
 from ..trader.engine import TraderEngine
-from ..enums import OrderType
+from ..enums import OrderType, Signal
 from .performance import PerformanceReporter
 from ..charts.performance import PerformanceChart
-from ..core.models import TickerData
+from ..core.models import SignalData, TickerData
 from abc import ABC
 
 
@@ -65,30 +65,28 @@ class BacktestEngine(BaseComponent, ABC):
             raise ValueError("ticker 和 start_date 不能为空。")
         return self.data_fetcher.fetch_data(self.ticker, self.start_date, self.end_date)
 
-    def _run_strategy(self, data: List[TickerData]) -> pd.Series:
-        """运行策略，返回信号序列。"""
+    def _run_strategy(self, data: List[TickerData]) -> List[SignalData]:
+        """运行策略，返回信号列表。"""
         if not data:
             raise ValueError("行情数据为空，请先调用 _load_data()。")
         return self.strategy.generate_signals(data)
 
-    def _run_backtest(self, signals: pd.Series, data: List[TickerData]) -> tuple:
+    def _run_backtest(self, signals: List[SignalData], data: List[TickerData]) -> tuple:
         """逐 bar 回放，返回 trades_df 和 values_df。"""
-        if signals is None or signals.empty:
-            raise ValueError("信号序列为空，请检查策略。")
+        if not signals:
+            raise ValueError("信号列表为空，请检查策略。")
         if not data:
             raise ValueError("价格序列为空。")
 
         try:
-            # 合并信号与价格
-            price_series = pd.Series([t.price for t in data], index=[t.timestamp for t in data])
-            df_sig = pd.DataFrame({'Signal': signals, 'Close': price_series})
             values_records: List[Dict[str, Any]] = []
 
-            for i, (date, row) in enumerate(df_sig.iterrows()):
-                signal = row['Signal']
-                price = row['Close']
+            for i, (ticker_data, sig_data) in enumerate(zip(data, signals)):
+                signal = sig_data.signal
+                price = ticker_data.price
+                date = ticker_data.timestamp
 
-                if signal == 1:
+                if signal == Signal.BUY:
                     # 全仓买入：按手（100股）计算最大可买数量
                     max_qty = int(self.trader.cash / (price * (1 + self.trader.commission))) // 100 * 100
                     if max_qty > 0:
@@ -100,7 +98,7 @@ class BacktestEngine(BaseComponent, ABC):
                             timestamp=date
                         )
 
-                elif signal == -1:
+                elif signal == Signal.SELL:
                     # 清仓卖出：卖出全部持仓
                     current_qty = self.trader.position_manager.get_position(self.ticker)
                     if current_qty > 0:
@@ -120,7 +118,7 @@ class BacktestEngine(BaseComponent, ABC):
 
                 values_records.append({
                     'date': date,
-                    'signal': signal,
+                    'signal': signal.value,
                     'price': price,
                     'cash': self.trader.cash,
                     'position': position_qty,

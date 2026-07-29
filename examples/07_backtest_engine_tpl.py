@@ -13,7 +13,8 @@ if project_root not in sys.path:
 from deltafq.backtest import BacktestEngine
 from deltafq.strategy.base import BaseStrategy
 from deltafq.data import BaostockDataFetcher
-from deltafq.core.models import TickerData
+from deltafq.core.models import SignalData, TickerData
+from deltafq.enums import Signal
 
 
 class SimpleMAStrategy(BaseStrategy):
@@ -24,16 +25,22 @@ class SimpleMAStrategy(BaseStrategy):
         self.fast_period = fast_period
         self.slow_period = slow_period
 
-    def generate_signals(self, data: List[TickerData]) -> pd.Series:
+    def generate_signals(self, data: List[TickerData]) -> List[SignalData]:
         closes = pd.Series([t.price for t in data], index=[t.timestamp for t in data])
         fast_ma = closes.rolling(window=self.fast_period, min_periods=1).mean()
         slow_ma = closes.rolling(window=self.slow_period, min_periods=1).mean()
 
-        signals = pd.Series(0, index=closes.index, dtype=int)
-        signals = signals.mask(fast_ma > slow_ma, 1)
-        signals = signals.mask(fast_ma < slow_ma, -1)
-
-        return signals
+        result = []
+        for t in data:
+            ts = t.timestamp
+            if fast_ma[ts] > slow_ma[ts]:
+                sig = Signal.BUY
+            elif fast_ma[ts] < slow_ma[ts]:
+                sig = Signal.SELL
+            else:
+                sig = Signal.HOLD
+            result.append(SignalData(timestamp=ts, signal=sig))
+        return result
 
 
 def main() -> None:
