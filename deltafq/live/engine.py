@@ -260,7 +260,7 @@ class LiveEngine(BaseComponent):
 
     # ---------- 内部：账户与挂单 ----------
 
-    def _account_snapshot(self) -> Tuple[float, int, float]:
+    def _get_account_info(self) -> Tuple[float, int, float]:
         """返回 (现金, 持仓股数, 佣金率)，委托给网关实现。"""
         gw = self.trade_gateway
         return gw.get_cash(), gw.get_position(self.ticker), gw.get_commission()
@@ -316,7 +316,7 @@ class LiveEngine(BaseComponent):
         self._cached_signals = signals
 
         # 获取账户持仓信息
-        cash, position, commission = self._account_snapshot()
+        cash, position, commission = self._get_account_info()
 
         # 取最新一根 bar 的信号
         latest_signal = signals[-1]
