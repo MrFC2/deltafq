@@ -320,7 +320,7 @@ class LiveEngine(BaseComponent):
 
         # 取最新一根 bar 的信号
         latest_signal = signals[-1]
-        price = float(ticker_data.price)
+        price = ticker_data.price
 
         # 追加净值记录
         self._append_values_record(ticker_data, latest_signal.signal, price, cash, position)
