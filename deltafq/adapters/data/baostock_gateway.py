@@ -173,15 +173,16 @@ class BaostockDataGateway(DataGateway):
                     data = self._fetch_recent_7_day_data(ticker, Interval.MINUTE_5)
                     if not data:
                         continue
-                    last_data = data[-1]
-                    data_timestamp = last_data.timestamp
+                    # 取最新数据进行推送
+                    latest_data = data[-1]
+                    data_timestamp = latest_data.timestamp
                     # 同一根 K 线不重复推送
                     if self._last_data_timestamp.get(ticker) == data_timestamp:
                         continue
                     self._last_data_timestamp[ticker] = data_timestamp
-                    ticker_data = TickerData(ticker=last_data.ticker, timestamp=last_data.timestamp,
-                                             price=last_data.price, open=last_data.open, high=last_data.high,
-                                             low=last_data.low, volume=last_data.volume)
+                    ticker_data = TickerData(ticker=latest_data.ticker, timestamp=latest_data.timestamp,
+                                             price=latest_data.price, open=latest_data.open, high=latest_data.high,
+                                             low=latest_data.low, volume=latest_data.volume)
                     if self._on_tick:
                         self._on_tick(ticker_data)
                 except Exception as e:
