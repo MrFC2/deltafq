@@ -44,15 +44,7 @@ class DataFetcher(BaseComponent, ABC):
         result = []
         for ts, row in df.iterrows():
             ts_dt = pd.Timestamp(ts).to_pydatetime().replace(tzinfo=None)
-            result.append(TickerData(
-                ticker=ticker,
-                timestamp=ts_dt,
-                price=float(row["Close"]),
-                open=float(row["Open"]) if "Open" in row else None,
-                high=float(row["High"]) if "High" in row else None,
-                low=float(row["Low"]) if "Low" in row else None,
-                volume=int(row["Volume"]) if "Volume" in row and pd.notna(row["Volume"]) else None,
-            ))
+            result.append(TickerData(ticker=ticker, timestamp=ts_dt, price=float(row["Close"]), open=float(row["Open"]) if "Open" in row else None, high=float(row["High"]) if "High" in row else None, low=float(row["Low"]) if "Low" in row else None, volume=int(row["Volume"]) if "Volume" in row and pd.notna(row["Volume"]) else None))
         return result
 
     def fetch_data_from_fund(self, code: str, page: Optional[int] = None) -> pd.DataFrame:

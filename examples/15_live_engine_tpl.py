@@ -43,7 +43,7 @@ def main():
         strategy_input_size=50,
         strategy_interval=Interval.MINUTE_1,
     )
-    engine.run_live()
+    engine.run()
 
     try:
         while True:

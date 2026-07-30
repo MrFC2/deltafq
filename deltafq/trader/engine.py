@@ -60,9 +60,7 @@ class TraderEngine(BaseComponent):
                 raise ValueError("限价单必须提供价格")
 
             # 创建订单
-            order = self.order_manager.create_order(
-                ticker=ticker, quantity=quantity, order_type=order_type, price=price
-            )
+            order = self.order_manager.create_order(ticker, quantity, order_type, price)
             order_id = order['id']
 
             # 实盘：通过券商执行

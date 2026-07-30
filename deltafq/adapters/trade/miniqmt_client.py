@@ -167,16 +167,7 @@ class MiniQmtXtTraderClient:
             raise RuntimeError("未连接，请先调用 connect()")
         oc = self._xtconstant
         direction = oc.STOCK_BUY if is_buy else oc.STOCK_SELL
-        oid = self._xt.order_stock(
-            self._acc,
-            stock_code,
-            direction,
-            int(volume),
-            oc.FIX_PRICE,
-            float(price),
-            strategy_name,
-            order_remark or "",
-        )
+        oid = self._xt.order_stock(self._acc, stock_code, direction, int(volume), oc.FIX_PRICE, float(price), strategy_name, order_remark or "")
         return int(oid) if oid is not None else -1
 
     def cancel_order_stock(self, order_id: int) -> int:

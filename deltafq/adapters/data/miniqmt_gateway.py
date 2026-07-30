@@ -140,13 +140,7 @@ class MiniQmtDataGateway(DataGateway):
         try:
             end = datetime.now()
             start = end - timedelta(days=1)
-            data = fetch_data(
-                ticker,
-                start.strftime("%Y-%m-%d"),
-                None,
-                interval=Interval.MINUTE_1,
-                dividend_type=self.dividend_type,
-            )
+            data = fetch_data(ticker, start.strftime("%Y-%m-%d"), None, interval=Interval.MINUTE_1, dividend_type=self.dividend_type)
             if data.empty:
                 self.logger.warning(f"{ticker} 暖机数据为空")
                 return
@@ -157,16 +151,7 @@ class MiniQmtDataGateway(DataGateway):
                     ts = ts.replace(tzinfo=None)
                 price = float(row["Close"])
                 volume = int(row["Volume"])
-                ticker_data = TickerData(
-                    ticker=ticker,
-                    timestamp=ts,
-                    price=price,
-                    open=float(row["Open"]),
-                    high=float(row["High"]),
-                    low=float(row["Low"]),
-                    volume=volume,
-                    is_warm_up=True,
-                )
+                ticker_data = TickerData(ticker=ticker, timestamp=ts, price=price, open=float(row["Open"]), high=float(row["High"]), low=float(row["Low"]), volume=volume, is_warm_up=True)
                 if self._on_tick:
                     self._on_tick(ticker_data)
                 pushed += 1
@@ -207,18 +192,7 @@ class MiniQmtDataGateway(DataGateway):
                         continue
                     ts = self._ts_from_millis_or_now(tick.get("time"))
                     bid, ask = self._bid_ask_from_dict(tick)
-                    ticker_data = TickerData(
-                        ticker=ticker,
-                        timestamp=ts,
-                        price=float(last),
-                        open=float(tick["open"]) if tick.get("open") is not None else None,
-                        high=float(tick.get("high") or tick.get("highPrice") or 0) or None,
-                        low=float(tick.get("low") or tick.get("lowPrice") or 0) or None,
-                        volume=int(vol) if vol is not None else None,
-                        
-                        bid=bid,
-                        ask=ask,
-                    )
+                    ticker_data = TickerData(ticker=ticker, timestamp=ts, price=float(last), open=float(tick["open"]) if tick.get("open") is not None else None, high=float(tick.get("high") or tick.get("highPrice") or 0) or None, low=float(tick.get("low") or tick.get("lowPrice") or 0) or None, volume=int(vol) if vol is not None else None, bid=bid, ask=ask)
                     if self._on_tick:
                         self._on_tick(ticker_data)
                 except Exception as e:
@@ -237,14 +211,7 @@ class MiniQmtDataGateway(DataGateway):
         for ticker in list(self._tickers):
             if not self._running:
                 break
-            seq = xd.subscribe_quote(
-                ticker,
-                period="tick",
-                start_time="",
-                end_time="",
-                count=0,
-                callback=self._on_push_datas,
-            )
+            seq = xd.subscribe_quote(ticker, period="tick", start_time="", end_time="", count=0, callback=self._on_push_datas)
             if seq < 0:
                 self.logger.error(f"subscribe_quote 失败 {ticker}: {seq}")
                 continue
@@ -271,15 +238,7 @@ class MiniQmtDataGateway(DataGateway):
                 vol = row.get("volume") or row.get("lastVolume")
                 ts = self._ts_from_millis_or_now(row.get("time"))
                 bid, ask = self._bid_ask_from_dict(row)
-                ticker_data = TickerData(
-                    ticker=code,
-                    price=float(last),
-                    timestamp=ts,
-                    volume=int(vol) if vol is not None else None,
-                    
-                    bid=bid,
-                    ask=ask,
-                )
+                ticker_data = TickerData(ticker=code, price=float(last), timestamp=ts, volume=int(vol) if vol is not None else None, bid=bid, ask=ask)
                 if self._on_tick:
                     self._on_tick(ticker_data)
 

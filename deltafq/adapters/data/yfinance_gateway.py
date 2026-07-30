@@ -138,16 +138,7 @@ class YFinanceDataGateway(DataGateway):
                 local_ts = timestamp.to_pydatetime().replace(tzinfo=None)
                 price = float(row["Close"])
                 volume = int(row["Volume"])
-                ticker_data = TickerData(
-                    ticker=ticker,
-                    timestamp=local_ts,
-                    price=float(row["Close"]),
-                    open=float(row["Open"]),
-                    high=float(row["High"]),
-                    low=float(row["Low"]),
-                    volume=int(row["Volume"]),
-                    is_warm_up=True,
-                )
+                ticker_data = TickerData(ticker=ticker, timestamp=local_ts, price=float(row["Close"]), open=float(row["Open"]), high=float(row["High"]), low=float(row["Low"]), volume=int(row["Volume"]), is_warm_up=True)
                 if self._on_tick:
                     self._on_tick(ticker_data)
                 pushed_count += 1
@@ -166,13 +157,7 @@ class YFinanceDataGateway(DataGateway):
                     volume = info.last_volume
                     if price is None or volume is None:
                         continue
-                    ticker_data = TickerData(
-                        ticker=ticker,
-                        price=float(price),
-                        timestamp=datetime.utcnow(),
-                        volume=int(volume),
-                        
-                    )
+                    ticker_data = TickerData(ticker=ticker, price=float(price), timestamp=datetime.utcnow(), volume=int(volume))
                     if self._on_tick:
                         self._on_tick(ticker_data)
                 except Exception as e:

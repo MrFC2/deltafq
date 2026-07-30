@@ -41,11 +41,7 @@ class MiniQmtTradeGateway(TradeGateway):
         self._strategy_name = strategy_name
         self._order_remark = order_remark
         self._lot_size = max(1, int(lot_size))
-        self._client = MiniQmtXtTraderClient(
-            userdata_mini_path=userdata_mini_path,
-            account_id=account_id,
-            session_id=session_id,
-        )
+        self._client = MiniQmtXtTraderClient(userdata_mini_path, account_id, session_id)
 
     @property
     def client(self) -> MiniQmtXtTraderClient:
@@ -79,14 +75,7 @@ class MiniQmtTradeGateway(TradeGateway):
             logger.warning("adjusting quantity %s -> %s (lot_size=%s)", abs_vol, aligned, self._lot_size)
             abs_vol = aligned
         is_buy = qty > 0
-        oid = self._client.order_stock_limit(
-            ticker,
-            abs_vol,
-            float(price),
-            is_buy,
-            strategy_name=self._strategy_name,
-            order_remark=self._order_remark,
-        )
+        oid = self._client.order_stock_limit(ticker, abs_vol, float(price), is_buy, strategy_name=self._strategy_name, order_remark=self._order_remark)
         if oid is None or int(oid) <= 0:
             raise RuntimeError(f"下单失败: oid={oid!r}")
         return str(int(oid))

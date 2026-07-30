@@ -11,15 +11,17 @@ from deltafq.live import LiveEngine
 from deltafq.strategy.base import BaseStrategy
 import pandas as pd
 
+
 class MyStrategy(BaseStrategy):
     def generate_signals(self, data: pd.DataFrame) -> pd.Series:
         # 返回 -1 / 0 / 1
         return pd.Series([1] * len(data), index=data.index)
 
+
 engine = LiveEngine(symbol="BTC-USD", signal_interval="1m", lookback_bars=50)
 engine.set_trade_gateway("paper", initial_capital=100000)
 engine.add_strategy(MyStrategy())
-engine.run_live()
+engine.run()
 # Ctrl+C 退出时: engine.stop()
 ```
 

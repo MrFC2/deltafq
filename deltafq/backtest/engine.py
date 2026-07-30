@@ -96,13 +96,13 @@ class BacktestEngine(BaseComponent, ABC):
                     # 全仓买入：按手（100股）计算最大可买数量
                     max_qty = int(self.trader.cash / (price * (1 + self.trader.commission))) // 100 * 100
                     if max_qty > 0:
-                        self.trader.execute_order(ticker=self.ticker, quantity=max_qty, order_type=OrderType.LIMIT, price=price, timestamp=date)
+                        self.trader.execute_order(self.ticker, max_qty, OrderType.LIMIT, price, date)
 
                 elif signal == Signal.SELL:
                     # 清仓卖出：卖出全部持仓
                     current_qty = self.trader.position_manager.get_position(self.ticker)
                     if current_qty > 0:
-                        self.trader.execute_order(ticker=self.ticker, quantity=-current_qty, order_type=OrderType.LIMIT, price=price, timestamp=date)
+                        self.trader.execute_order(self.ticker, -current_qty, OrderType.LIMIT, price, date)
 
                 # 记录当日资产快照
                 position_qty = self.trader.position_manager.get_position(self.ticker)

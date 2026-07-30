@@ -37,8 +37,7 @@ LiveEngine — 内部：账户与挂单
     （已内联至调用处）
 
 LiveEngine — 内部：Tick
-    _on_tick_match              将 Tick 交给纸面撮合引擎（若有）
-    _on_tick_strategy           编排：建 df → 信号 → 快照 → 净值 → sizing 日志 → 翻转处理
+    _on_tick_strategy           编排：撮合挂单 → 建 df → 信号 → 快照 → 净值 → 翻转处理
     _build_strategy_input       由 tick 与缓存构造策略输入 DataFrame（K 线或 tick 滑动窗口）
     _append_values_record       追加一条净值记录（与回测 values 形状一致）
     # _calc_order_quantity      按信号与策略 order_* 计算买卖数量（已移至策略层）
@@ -133,12 +132,11 @@ class LiveEngine(BaseComponent):
 
     # ---------- 运行 ----------
 
-    def run_live(self) -> None:
+    def run(self) -> None:
         """连接网关、注册 Tick、订阅标的并启动推送。"""
         if not self.data_gateway.connect() or not self.trade_gateway.connect():
             raise RuntimeError("网关连接失败")
-        # 注册 tick 处理：撮合 + 策略信号
-        self._event_engine.register(EventType.TICK, self._on_tick_match)
+        # 注册 tick 处理
         self._event_engine.register(EventType.TICK, self._on_tick_strategy)
         # 将网关推送的 tick 接入事件总线
         self.data_gateway.set_on_tick(lambda ticker_data: self._event_engine.trigger(EventType.TICK, ticker_data))
@@ -250,13 +248,11 @@ class LiveEngine(BaseComponent):
 
     # ---------- 内部：Tick ----------
 
-    def _on_tick_match(self, ticker_data: TickerData) -> None:
-        """若网关带执行引擎则转发 on_tick 做限价撮合。"""
+    def _on_tick_strategy(self, ticker_data: TickerData) -> None:
+        """编排：撮合挂单 → 建 df → 信号 → 账户快照 → 权益 → 信号翻转时撤单/下单。"""
         if isinstance(self.trade_gateway, PaperTradeGateway):
             self.trade_gateway.on_tick(ticker_data)
 
-    def _on_tick_strategy(self, ticker_data: TickerData) -> None:
-        """编排：建 df → 信号 → 账户快照 → 权益 → sizing 与日志 → 信号翻转时撤单/下单。"""
         # 暖机 tick 只用于喂价格撮合，不触发策略
         if ticker_data.is_warm_up:
             return

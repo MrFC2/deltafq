@@ -154,16 +154,7 @@ class BaostockDataGateway(DataGateway):
             for row in data:
                 if row.timestamp.date() != last_day:
                     continue
-                ticker_data = TickerData(
-                    ticker=row.ticker,
-                    timestamp=row.timestamp,
-                    price=row.price,
-                    open=row.open,
-                    high=row.high,
-                    low=row.low,
-                    volume=row.volume,
-                    is_warm_up=True,
-                )
+                ticker_data = TickerData(ticker=row.ticker, timestamp=row.timestamp, price=row.price, open=row.open, high=row.high, low=row.low, volume=row.volume, is_warm_up=True)
                 if self._on_tick:
                     self._on_tick(ticker_data)
                 pushed_count += 1
@@ -187,15 +178,7 @@ class BaostockDataGateway(DataGateway):
                         continue
                     self._last_data_timestamp[ticker] = data_timestamp
                     row = data[-1]
-                    ticker_data = TickerData(
-                        ticker=row.ticker,
-                        timestamp=row.timestamp,
-                        price=row.price,
-                        open=row.open,
-                        high=row.high,
-                        low=row.low,
-                        volume=row.volume,
-                    )
+                    ticker_data = TickerData(ticker=row.ticker, timestamp=row.timestamp, price=row.price, open=row.open, high=row.high, low=row.low, volume=row.volume)
                     if self._on_tick:
                         self._on_tick(ticker_data)
                 except Exception as e:
