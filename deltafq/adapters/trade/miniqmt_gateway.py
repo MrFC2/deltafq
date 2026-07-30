@@ -16,7 +16,6 @@ import logging
 from typing import Optional
 
 from .base import TradeGateway
-from ...core.models import OrderRequest
 from ...enums import OrderType
 from .miniqmt_client import MiniQmtXtTraderClient
 
@@ -30,13 +29,13 @@ class MiniQmtTradeGateway(TradeGateway):
     """连接 miniQMT 并适配 LiveEngine 的下单撤单接口。"""
 
     def __init__(
-        self,
-        userdata_mini_path: Optional[str] = None,
-        account_id: Optional[str] = None,
-        session_id: Optional[int] = None,
-        strategy_name: str = "deltafq",
-        order_remark: str = "",
-        lot_size: int = 100,
+            self,
+            userdata_mini_path: Optional[str] = None,
+            account_id: Optional[str] = None,
+            session_id: Optional[int] = None,
+            strategy_name: str = "deltafq",
+            order_remark: str = "",
+            lot_size: int = 100,
     ) -> None:
         """初始化柜台参数；lot_size 用于数量对齐，默认按 A 股 100 股一手。"""
         self._strategy_name = strategy_name
@@ -61,11 +60,11 @@ class MiniQmtTradeGateway(TradeGateway):
         """断开交易端连接。"""
         self._client.disconnect()
 
-    def send_order(self, req: OrderRequest) -> str:
+    def send_order(self, ticker: str, quantity: int, price: float, order_type: OrderType = OrderType.LIMIT) -> str:
         """仅支持限价单；数量按 lot_size 向下对齐；返回字符串委托号。"""
-        if req.order_type != OrderType.LIMIT:
+        if order_type != OrderType.LIMIT:
             raise ValueError("MiniQmtTradeGateway 当前仅支持限价单")
-        qty = int(req.quantity)
+        qty = int(quantity)
         if qty == 0:
             raise ValueError("数量不能为零")
         abs_vol = abs(qty)
@@ -77,9 +76,9 @@ class MiniQmtTradeGateway(TradeGateway):
             abs_vol = aligned
         is_buy = qty > 0
         oid = self._client.order_stock_limit(
-            req.ticker,
+            ticker,
             abs_vol,
-            float(req.price),
+            float(price),
             is_buy,
             strategy_name=self._strategy_name,
             order_remark=self._order_remark,

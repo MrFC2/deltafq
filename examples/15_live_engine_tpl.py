@@ -28,7 +28,7 @@ class Every2BarFlipStrategy(BaseStrategy):
         super().__init__(**kwargs)
         self._run_count = 0
 
-    def generate_signals(self, data: List[TickerData]) -> List[SignalData]:
+    def generate_signals(self, data: List[TickerData], cash=None, position=None, commission=None) -> List[SignalData]:
         self._run_count += 1
         sig = Signal.BUY if (self._run_count // 2) % 2 == 0 else Signal.SELL
         return [SignalData(timestamp=t.timestamp, signal=sig) for t in data]

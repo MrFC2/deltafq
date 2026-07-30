@@ -1,5 +1,6 @@
 from .base import TradeGateway
-from ...core.models import OrderRequest, TickerData
+from ...core.models import TickerData
+from ...enums import OrderType
 from ...trader.engine import TraderEngine
 
 
@@ -14,13 +15,12 @@ class PaperTradeGateway(TradeGateway):
     def connect(self) -> bool:
         return True
 
-    def send_order(self, req: OrderRequest) -> str:
+    def send_order(self, ticker: str, quantity: int, price: float, order_type: OrderType = OrderType.LIMIT) -> str:
         return self._engine.execute_order(
-            ticker=req.ticker,
-            quantity=req.quantity,
-            order_type=req.order_type,
-            price=req.price,
-            timestamp=req.timestamp,
+            ticker=ticker,
+            quantity=quantity,
+            order_type=order_type,
+            price=price,
         )
 
     def cancel_order(self, order_id: str) -> bool:

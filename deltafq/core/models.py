@@ -1,5 +1,5 @@
 """
-全局共享数据模型。TickerData 和 OrderRequest 被 data/、live/、strategy/、adapters/ 各层共同使用，
+全局共享数据模型。TickerData 和 SignalData 被 data/、live/、strategy/、adapters/ 各层共同使用，
 放在 core/ 层避免循环导入。
 """
 
@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
-from ..enums import OrderType, Signal
+from ..enums import Signal
 
 
 @dataclass
@@ -34,12 +34,3 @@ class TickerData:
     # 买一/卖一；网关有 L2 时填入
     bid: Optional[float] = None
     ask: Optional[float] = None
-
-
-@dataclass
-class OrderRequest:
-    ticker: str
-    quantity: int
-    price: float
-    order_type: OrderType = OrderType.LIMIT
-    timestamp: Optional[datetime] = None

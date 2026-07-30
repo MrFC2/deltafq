@@ -34,15 +34,14 @@ LiveEngine — 内部：数据与网关
     _fetch_data           按 strategy_interval 拉取最近 strategy_input_size 根 K 线
 
 LiveEngine — 内部：账户与挂单
-    _account_snapshot     当前现金、持仓股数、佣金率（纸面引擎或 miniQMT 查询）
-    _pending_order_no_cancel_needed  判断挂单是否已终态，可跳过撤单
+    （已内联至调用处）
 
 LiveEngine — 内部：Tick
     _on_tick_match              将 Tick 交给纸面撮合引擎（若有）；打印非 warmup 的 Tick 日志
     _on_tick_strategy           编排：建 df → 信号 → 快照 → 净值 → sizing 日志 → 翻转处理
     _build_strategy_input       由 tick 与缓存构造策略输入 DataFrame（K 线或 tick 滑动窗口）
     _append_values_record       追加一条净值记录（与回测 values 形状一致）
-    _calc_order_quantity         按信号与策略 order_* 计算买卖数量
+    # _calc_order_quantity      按信号与策略 order_* 计算买卖数量（已移至策略层）
     _handle_signal_transition   信号相对上次变化时：撤挂单、下限价、更新 _last_signal
 """
 
@@ -60,8 +59,8 @@ from .event_engine import EventEngine
 from ..adapters.data.base import DataGateway
 from ..adapters.trade.base import TradeGateway
 from ..adapters.trade.paper_gateway import PaperTradeGateway
-from ..core.models import OrderRequest, SignalData, TickerData
-from ..enums import OrderType, EventType, Interval, Signal
+from ..core.models import SignalData, TickerData
+from ..enums import EventType, Interval, Signal
 from ..adapters.data.yfinance_gateway import YFinanceDataGateway
 from ..adapters.data.miniqmt_gateway import MiniQmtDataGateway
 
@@ -137,7 +136,7 @@ class LiveEngine(BaseComponent):
         # 最近一次策略产生的信号序列
         self._cached_signals: Optional[List[SignalData]] = None
         # K 线/REALTIME 模式下的 tick 滑动窗口
-        self._tick_datas: deque = deque(maxlen=strategy_input_size)
+        self._ticker_datas: deque = deque(maxlen=strategy_input_size)
 
         # --- 统计记录 ---
         # 净值记录列表
@@ -260,15 +259,6 @@ class LiveEngine(BaseComponent):
 
     # ---------- 内部：账户与挂单 ----------
 
-    def _get_account_info(self) -> Tuple[float, int, float]:
-        """返回 (现金, 持仓股数, 佣金率)，委托给网关实现。"""
-        gw = self.trade_gateway
-        return gw.get_cash(), gw.get_position(self.ticker), gw.get_commission()
-
-    def _pending_order_no_cancel_needed(self, order_id: str) -> bool:
-        """若上一笔委托已终结则返回 True，无需再撤单。"""
-        return self.trade_gateway.is_order_terminal(order_id)
-
     # ---------- 内部：Tick ----------
 
     def _on_tick_match(self, ticker_data: TickerData) -> None:
@@ -299,12 +289,17 @@ class LiveEngine(BaseComponent):
             return
 
         # 未到重拉间隔或数据不足时跳过本次信号计算
-        if not self._append_tick_datas(ticker_data):
+        if not self._append_ticker_datas(ticker_data):
             return
+
+        # 获取账户持仓信息（先于策略，以便策略计算 quantity）
+        cash = self.trade_gateway.get_cash()
+        position = self.trade_gateway.get_position(self.ticker)
+        commission = self.trade_gateway.get_commission()
 
         # 执行策略，生成信号
         try:
-            signals = self._strategy.generate_signals(list(self._tick_datas))
+            signals = self._strategy.generate_signals(list(self._ticker_datas), cash, position, commission)
             if not signals:
                 return
         except Exception as e:
@@ -312,35 +307,29 @@ class LiveEngine(BaseComponent):
             return
 
         # 缓存供 get_chart_data 使用
-        self._cached_strategy_input = list(self._tick_datas)
+        self._cached_strategy_input = list(self._ticker_datas)
         self._cached_signals = signals
-
-        # 获取账户持仓信息
-        cash, position, commission = self._get_account_info()
 
         # 取最新一根 bar 的信号
         latest_signal = signals[-1]
         price = ticker_data.price
 
+        # 根据信号生成买卖订单
+        self._handle_signal_to_order(latest_signal, price, position, ticker_data)
+
         # 追加净值记录
         self._append_values_record(ticker_data, latest_signal.signal, price, cash, position)
 
-        # 计算本次应买/卖数量
-        buy_quantity, sell_quantity = self._calc_order_quantity(latest_signal, price, cash, position, commission)
-
-        # 信号相对上次发生变化时撤旧单、发新单
-        self._handle_signal_transition(latest_signal.signal, price, position, buy_quantity, sell_quantity, ticker_data)
-
-    def _append_tick_datas(self, ticker_data: TickerData) -> bool:
+    def _append_ticker_datas(self, ticker_data: TickerData) -> bool:
         """由当前 tick 更新 _tick_datas；未到重拉间隔时返回 False。"""
         if self.strategy_interval == Interval.REALTIME:
-            self._tick_datas.append(ticker_data)
+            self._ticker_datas.append(ticker_data)
             return True
 
         # K 线模式：_tick_datas 最后一根的时间戳未超过重拉间隔时跳过
         refetch_interval = _REFETCH_INTERVAL.get(self.strategy_interval, 60)
-        if self._tick_datas:
-            interval = (datetime.now() - self._tick_datas[-1].timestamp).total_seconds()
+        if self._ticker_datas:
+            interval = (datetime.now() - self._ticker_datas[-1].timestamp).total_seconds()
             if interval < refetch_interval:
                 return False
 
@@ -348,9 +337,9 @@ class LiveEngine(BaseComponent):
         if data is None:
             return False
 
-        self._tick_datas.clear()
+        self._ticker_datas.clear()
         for ticker_data in data:
-            self._tick_datas.append(ticker_data)
+            self._ticker_datas.append(ticker_data)
         return True
 
     def _append_values_record(self, ticker_data: TickerData, signal: Signal, price: float, cash: float,
@@ -371,71 +360,61 @@ class LiveEngine(BaseComponent):
             "daily_pnl": daily_pnl,
         })
 
-    def _calc_order_quantity(self, signal_data: SignalData, price: float, cash: float, position: int,
-                             commission: float) -> Tuple[int, int]:
-        """按当前信号与上次信号计算本次应买卖的数量，返回 (buy_quantity, sell_quantity)。"""
-        signal = signal_data.signal
-        order_quantity = signal_data.quantity
-        # 信号由非买转买
-        if self._last_signal != Signal.BUY and signal == Signal.BUY:
-            # 现金可承受的最大股数
-            max_buy_quantity = max(0, int(cash / (price * (1 + commission))))
-            if order_quantity and order_quantity > 0:
-                # 股数上限优先
-                return min(order_quantity, max_buy_quantity), 0
-            # 无限制则全仓买入
-            return max_buy_quantity, 0
+    # def _calc_order_quantity(self, signal_data: SignalData, price: float, cash: float, position: int,
+    #                          commission: float) -> Tuple[int, int]:
+    #     """按当前信号与上次信号计算本次应买卖的数量，返回 (buy_quantity, sell_quantity)。"""
+    #     signal = signal_data.signal
+    #     order_quantity = signal_data.quantity
+    #     # 信号由非买转买
+    #     if self._last_signal != Signal.BUY and signal == Signal.BUY:
+    #         # 现金可承受的最大股数
+    #         max_buy_quantity = max(0, int(cash / (price * (1 + commission))))
+    #         if order_quantity and order_quantity > 0:
+    #             # 股数上限优先
+    #             return min(order_quantity, max_buy_quantity), 0
+    #         # 无限制则全仓买入
+    #         return max_buy_quantity, 0
+    #
+    #     # 信号由非卖转卖
+    #     if self._last_signal != Signal.SELL and signal == Signal.SELL and position > 0:
+    #         # 有股数上限则不超过持仓，否则清仓
+    #         if order_quantity and order_quantity > 0:
+    #             return 0, min(position, order_quantity)
+    #         return 0, position
+    #
+    #     return 0, 0
 
-        # 信号由非卖转卖
-        if self._last_signal != Signal.SELL and signal == Signal.SELL and position > 0:
-            # 有股数上限则不超过持仓，否则清仓
-            if order_quantity and order_quantity > 0:
-                return 0, min(position, order_quantity)
-            return 0, position
-
-        return 0, 0
-
-    def _handle_signal_transition(
-            self, signal: Signal, px: float, position: int, buy_quantity: int, sell_quantity: int,
-            ticker_data: TickerData
-    ) -> None:
+    def _handle_signal_to_order(self, signal_data: SignalData, price: float, position: int,
+                                ticker_data: TickerData) -> None:
         """相对 _last_signal 发生变化时：尝试撤上一笔挂单，再按规则下限价单。"""
-        last = self._last_signal
-        if signal == last:
+        if self.trade_gateway is None:
             return
 
-        assert self.trade_gateway is not None
+        # 信号未变，无需操作
+        signal = signal_data.signal
+        if signal == self._last_signal:
+            return
 
+        # 撤掉上一笔未成交的挂单，腾出仓位再挂新单
         if self._last_pending_order_id:
             oid = self._last_pending_order_id
-            if self._pending_order_no_cancel_needed(oid):
-                self.logger.info(f"挂单 {oid} 已完成，跳过撤单")
-                self._last_pending_order_id = None
-            else:
-                cancelled = self.trade_gateway.cancel_order(oid)
-                if cancelled:
-                    self.logger.info(f"已撤销挂单: {oid}")
-                else:
-                    self.logger.warning(f"撤销挂单 {oid} 返回失败")
-                self._last_pending_order_id = None
+            self._last_pending_order_id = None
+            if not self.trade_gateway.is_order_terminal(oid):
+                self.trade_gateway.cancel_order(oid)
 
-        if signal == Signal.BUY and last != Signal.BUY:
-            if buy_quantity > 0:
-                buy_px = float(ticker_data.ask) if ticker_data.ask is not None else px
-                req = OrderRequest(ticker=self.ticker, quantity=buy_quantity, price=buy_px,
-                                   order_type=OrderType.LIMIT)  # type: ignore[arg-type]
-                self._last_pending_order_id = self.trade_gateway.send_order(req)
-                self.logger.info(f"已发送买单: [{self.ticker}] qty={buy_quantity} @ {buy_px:.4f}")
-        elif signal == Signal.SELL and last != Signal.SELL and position > 0:
-            if sell_quantity <= 0:
+        if signal == Signal.BUY:
+            # 空仓/观望 → 买入：策略必须给出 quantity，否则不下单
+            if signal_data.quantity:
+                buy_px = float(ticker_data.ask) if ticker_data.ask is not None else price  # 优先用卖一价成交
+                self._last_pending_order_id = self.trade_gateway.send_order(self.ticker, signal_data.quantity, buy_px)
+
+        if signal == Signal.SELL and position > 0:
+            # 持仓 → 卖出：quantity 缺失则跳过下单但仍更新信号状态
+            if not signal_data.quantity:
                 self._last_signal = signal
                 return
-            sell_px = float(ticker_data.bid) if ticker_data.bid is not None else px
-            req = OrderRequest(
-                ticker=self.ticker, quantity=-sell_quantity, price=sell_px, order_type=OrderType.LIMIT
-                # type: ignore[arg-type]
-            )
-            self._last_pending_order_id = self.trade_gateway.send_order(req)
-            self.logger.info(f"已发送卖单: [{self.ticker}] qty={sell_quantity} @ {sell_px:.4f}")
+            sell_px = float(ticker_data.bid) if ticker_data.bid is not None else price  # 优先用买一价成交
+            self._last_pending_order_id = self.trade_gateway.send_order(self.ticker, -signal_data.quantity, sell_px)
+        # signal == HOLD：撤旧单后不下新单，等待下次信号
 
         self._last_signal = signal

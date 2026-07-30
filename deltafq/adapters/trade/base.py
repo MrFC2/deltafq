@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from ...core.models import OrderRequest
+from ...enums import OrderType
 
 
 class TradeGateway(ABC):
@@ -12,8 +12,8 @@ class TradeGateway(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def send_order(self, req: OrderRequest) -> str:
-        """发送委托，返回委托号。"""
+    def send_order(self, ticker: str, quantity: int, price: float, order_type: OrderType = OrderType.LIMIT) -> str:
+        """发送委托，返回委托号。quantity 为负表示卖出。"""
         raise NotImplementedError
 
     @abstractmethod
