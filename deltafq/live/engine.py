@@ -20,7 +20,7 @@
 
 LiveEngine — 运行
     __init__              构造：ticker、网关实例、策略实例、数据点数、信号周期、DataFetcher
-    run_live              连接网关、注册 Tick 处理、订阅标的并启动数据流
+    run                   连接网关、注册 Tick 回调、订阅标的并启动数据流
     stop                  停止数据网关与交易网关
 
 LiveEngine — 对外查询与绩效
@@ -54,12 +54,11 @@ from ..backtest.performance import PerformanceReporter
 from ..core.base import BaseComponent
 from ..data import DataFetcher, YahooDataFetcher, BaostockDataFetcher, MiniQmtDataFetcher
 from ..strategy.base import BaseStrategy
-from .event_engine import EventEngine
 from ..adapters.data.base import DataGateway
 from ..adapters.trade.base import TradeGateway
 from ..adapters.trade.paper_gateway import PaperTradeGateway
 from ..core.models import SignalData, TickerData
-from ..enums import EventType, Interval, Signal
+from ..enums import Interval, Signal
 from ..adapters.data.yfinance_gateway import YFinanceDataGateway
 from ..adapters.data.miniqmt_gateway import MiniQmtDataGateway
 
@@ -82,16 +81,14 @@ class LiveEngine(BaseComponent):
     有纸面引擎时资金/持仓来自引擎，否则 miniQMT 查询。
     """
 
-    def __init__(
-            self,
-            ticker: str,
-            data_gateway: DataGateway,
-            trade_gateway: TradeGateway,
-            strategy: BaseStrategy,
-            strategy_input_size: int = 100,
-            strategy_interval: Interval = Interval.MINUTE_5,
-            **kwargs,
-    ):
+    def __init__(self,
+                 ticker: str,
+                 data_gateway: DataGateway,
+                 trade_gateway: TradeGateway,
+                 strategy: BaseStrategy,
+                 strategy_input_size: int = 100,
+                 strategy_interval: Interval = Interval.MINUTE_5,
+                 **kwargs):
         super().__init__(**kwargs)
 
         # --- 配置参数 ---
@@ -109,8 +106,6 @@ class LiveEngine(BaseComponent):
         self.trade_gateway: TradeGateway = trade_gateway
         # 信号策略
         self._strategy: BaseStrategy = strategy
-        # 事件总线，驱动 tick 分发
-        self._event_engine: EventEngine = EventEngine()
         # K 线拉取器（tick 模式下为 None）
         self._data_fetcher: Optional[DataFetcher] = self._create_data_fetcher()
 
@@ -136,10 +131,8 @@ class LiveEngine(BaseComponent):
         """连接网关、注册 Tick、订阅标的并启动推送。"""
         if not self.data_gateway.connect() or not self.trade_gateway.connect():
             raise RuntimeError("网关连接失败")
-        # 注册 tick 处理
-        self._event_engine.register(EventType.TICK, self._on_tick_strategy)
-        # 将网关推送的 tick 接入事件总线
-        self.data_gateway.set_on_tick(lambda ticker_data: self._event_engine.trigger(EventType.TICK, ticker_data))
+        # 将网关推送的 tick 直接回调策略处理
+        self.data_gateway.set_on_tick(self._on_tick_strategy)
         # 订阅标的并启动行情流
         self.data_gateway.subscribe([self.ticker])
         self.data_gateway.start()
@@ -387,7 +380,8 @@ class LiveEngine(BaseComponent):
         if signal == Signal.BUY:
             if signal_data.quantity:
                 buy_price = float(ticker_data.ask) if ticker_data.ask is not None else price  # 优先用卖一价成交
-                self._last_pending_order_id = self.trade_gateway.send_order(self.ticker, signal_data.quantity, buy_price)
+                self._last_pending_order_id = self.trade_gateway.send_order(self.ticker, signal_data.quantity,
+                                                                            buy_price)
 
         # 持仓 → 卖出：quantity 缺失则跳过下单但仍更新信号状态
         if signal == Signal.SELL and position > 0:
