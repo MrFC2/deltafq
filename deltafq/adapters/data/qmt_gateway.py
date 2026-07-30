@@ -33,13 +33,11 @@ from ...enums import Interval
 class QmtDataGateway(DataGateway):
     """poll 定时拉全快照，push 订分笔推送；xt 标的代码，Tick 含最新价及可选买卖盘。"""
 
-    def __init__(
-        self,
-        interval: float = 3.0,
-        dividend_type: str = "none",
-        mode: str = "poll",
-        **kwargs: Any,
-    ) -> None:
+    def __init__(self,
+                 interval: float = 3.0,
+                 dividend_type: str = "none",
+                 mode: str = "poll",
+                 **kwargs: Any) -> None:
         """轮询间隔秒、K 线除权类型、模式 poll 或 push。"""
         super().__init__(**kwargs)
         self.interval = interval
@@ -140,7 +138,8 @@ class QmtDataGateway(DataGateway):
         try:
             end = datetime.now()
             start = end - timedelta(days=1)
-            data = fetch_data(ticker, start.strftime("%Y-%m-%d"), None, interval=Interval.MINUTE_1, dividend_type=self.dividend_type)
+            data = fetch_data(ticker, start.strftime("%Y-%m-%d"), None, interval=Interval.MINUTE_1,
+                              dividend_type=self.dividend_type)
             if data.empty:
                 self.logger.warning(f"{ticker} 暖机数据为空")
                 return
@@ -151,7 +150,8 @@ class QmtDataGateway(DataGateway):
                     ts = ts.replace(tzinfo=None)
                 price = float(row["Close"])
                 volume = int(row["Volume"])
-                ticker_data = TickerData(ticker=ticker, timestamp=ts, price=price, open=float(row["Open"]), high=float(row["High"]), low=float(row["Low"]), volume=volume, is_warm_up=True)
+                ticker_data = TickerData(ticker=ticker, timestamp=ts, price=price, open=float(row["Open"]),
+                                         high=float(row["High"]), low=float(row["Low"]), volume=volume, is_warm_up=True)
                 if self._on_tick:
                     self._on_tick(ticker_data)
                 pushed += 1
@@ -192,7 +192,11 @@ class QmtDataGateway(DataGateway):
                         continue
                     ts = self._ts_from_millis_or_now(tick.get("time"))
                     bid, ask = self._bid_ask_from_dict(tick)
-                    ticker_data = TickerData(ticker=ticker, timestamp=ts, price=float(last), open=float(tick["open"]) if tick.get("open") is not None else None, high=float(tick.get("high") or tick.get("highPrice") or 0) or None, low=float(tick.get("low") or tick.get("lowPrice") or 0) or None, volume=int(vol) if vol is not None else None, bid=bid, ask=ask)
+                    ticker_data = TickerData(ticker=ticker, timestamp=ts, price=float(last),
+                                             open=float(tick["open"]) if tick.get("open") is not None else None,
+                                             high=float(tick.get("high") or tick.get("highPrice") or 0) or None,
+                                             low=float(tick.get("low") or tick.get("lowPrice") or 0) or None,
+                                             volume=int(vol) if vol is not None else None, bid=bid, ask=ask)
                     if self._on_tick:
                         self._on_tick(ticker_data)
                 except Exception as e:
@@ -211,7 +215,8 @@ class QmtDataGateway(DataGateway):
         for ticker in list(self._tickers):
             if not self._running:
                 break
-            seq = xd.subscribe_quote(ticker, period="tick", start_time="", end_time="", count=0, callback=self._on_push_datas)
+            seq = xd.subscribe_quote(ticker, period="tick", start_time="", end_time="", count=0,
+                                     callback=self._on_push_datas)
             if seq < 0:
                 self.logger.error(f"subscribe_quote 失败 {ticker}: {seq}")
                 continue
@@ -238,7 +243,8 @@ class QmtDataGateway(DataGateway):
                 vol = row.get("volume") or row.get("lastVolume")
                 ts = self._ts_from_millis_or_now(row.get("time"))
                 bid, ask = self._bid_ask_from_dict(row)
-                ticker_data = TickerData(ticker=code, price=float(last), timestamp=ts, volume=int(vol) if vol is not None else None, bid=bid, ask=ask)
+                ticker_data = TickerData(ticker=code, price=float(last), timestamp=ts,
+                                         volume=int(vol) if vol is not None else None, bid=bid, ask=ask)
                 if self._on_tick:
                     self._on_tick(ticker_data)
 
@@ -256,6 +262,7 @@ class QmtDataGateway(DataGateway):
     @staticmethod
     def _bid_ask_from_dict(d: Dict[str, Any]) -> Tuple[Optional[float], Optional[float]]:
         """从行情 dict 取买一卖一；若买价大于卖价则对调一次。"""
+
         def _to_f(v: Any) -> Optional[float]:
             if v is None:
                 return None
@@ -319,7 +326,7 @@ class QmtDataGateway(DataGateway):
             return datetime.now().replace(tzinfo=None)
         try:
             n = int(raw)
-            if n > 10**12:
+            if n > 10 ** 12:
                 n = n // 1000
             return datetime.fromtimestamp(n)
         except (TypeError, ValueError, OSError):
