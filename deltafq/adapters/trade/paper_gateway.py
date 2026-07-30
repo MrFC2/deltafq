@@ -22,12 +22,7 @@ class PaperTradeGateway(TradeGateway):
                    quantity: int,
                    price: float,
                    order_type: OrderType = OrderType.LIMIT) -> str:
-        return self._engine.execute_order(
-            ticker=ticker,
-            quantity=quantity,
-            order_type=order_type,
-            price=price,
-        )
+        return self._engine.execute_order(ticker=ticker, quantity=quantity, order_type=order_type, price=price)
 
     def cancel_order(self, order_id: str) -> bool:
         return self._engine.order_manager.cancel_order(order_id)

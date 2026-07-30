@@ -50,7 +50,7 @@ class TraderEngine(BaseComponent):
     def execute_order(self,
                       ticker: str,
                       quantity: int,
-                      order_type: OrderType = None,
+                      order_type: OrderType,
                       price: Optional[float] = None,
                       timestamp: Optional[datetime] = None) -> str:
         """执行订单，默认为限价单。"""

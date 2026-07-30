@@ -96,25 +96,13 @@ class BacktestEngine(BaseComponent, ABC):
                     # 全仓买入：按手（100股）计算最大可买数量
                     max_qty = int(self.trader.cash / (price * (1 + self.trader.commission))) // 100 * 100
                     if max_qty > 0:
-                        self.trader.execute_order(
-                            ticker=self.ticker,
-                            quantity=max_qty,
-                            order_type=OrderType.LIMIT,
-                            price=price,
-                            timestamp=date
-                        )
+                        self.trader.execute_order(ticker=self.ticker, quantity=max_qty, order_type=OrderType.LIMIT, price=price, timestamp=date)
 
                 elif signal == Signal.SELL:
                     # 清仓卖出：卖出全部持仓
                     current_qty = self.trader.position_manager.get_position(self.ticker)
                     if current_qty > 0:
-                        self.trader.execute_order(
-                            ticker=self.ticker,
-                            quantity=-current_qty,
-                            order_type=OrderType.LIMIT,
-                            price=price,
-                            timestamp=date
-                        )
+                        self.trader.execute_order(ticker=self.ticker, quantity=-current_qty, order_type=OrderType.LIMIT, price=price, timestamp=date)
 
                 # 记录当日资产快照
                 position_qty = self.trader.position_manager.get_position(self.ticker)
@@ -160,13 +148,7 @@ class BacktestEngine(BaseComponent, ABC):
                 index=[t.timestamp for t in benchmark_bars],
             )
         ohlcv_df = self.to_ohlcv_df(data) if data else None
-        self.chart.plot_backtest_charts(
-            values_df=values_df,
-            ohlcv_df=ohlcv_df,
-            trades_df=trades_df,
-            benchmark_close=benchmark_close,
-            metrics=metrics,
-        )
+        self.chart.plot_backtest_charts(values_df=values_df, ohlcv_df=ohlcv_df, trades_df=trades_df, benchmark_close=benchmark_close, metrics=metrics)
 
     @staticmethod
     def to_ohlcv_df(bars: List[TickerData]) -> pd.DataFrame:
