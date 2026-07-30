@@ -132,7 +132,7 @@ class LiveEngine(BaseComponent):
         if not self.data_gateway.connect() or not self.trade_gateway.connect():
             raise RuntimeError("网关连接失败")
         # 将网关推送的 tick 直接回调策略处理
-        self.data_gateway.set_on_tick(self._on_tick_strategy)
+        self.data_gateway.set_on_tick(self._run_strategy)
         # 订阅标的并启动行情流
         self.data_gateway.subscribe([self.ticker])
         self.data_gateway.start()
@@ -241,7 +241,7 @@ class LiveEngine(BaseComponent):
 
     # ---------- 内部：Tick ----------
 
-    def _on_tick_strategy(self, ticker_data: TickerData) -> None:
+    def _run_strategy(self, ticker_data: TickerData) -> None:
         """编排：撮合挂单 → 建 df → 信号 → 账户快照 → 权益 → 信号翻转时撤单/下单。"""
         # 模拟交易撮合成交（实盘交易依赖第三方平台不需要）
         if isinstance(self.trade_gateway, PaperTradeGateway):
