@@ -2,7 +2,7 @@
 交易执行引擎。
 """
 
-from typing import Dict, List, Optional, Any, TYPE_CHECKING
+from typing import Dict, List, Optional, TYPE_CHECKING
 from datetime import datetime
 from ..core.base import BaseComponent
 from .order_manager import OrderManager
@@ -15,37 +15,27 @@ if TYPE_CHECKING:
 
 
 class TraderEngine(BaseComponent):
-    """实盘/模拟两用交易执行引擎。broker=None 为模拟交易，内部管理资金；传入 broker 为实盘，账户信息由 broker 提供。"""
+    """模拟交易执行引擎，内部管理资金、持仓、订单。"""
 
     def __init__(self,
                  cash: Optional[float] = None,
                  commission: Optional[float] = None,
-                 broker: Optional[Any] = None,
                  match_on_tick: bool = False,
                  **kwargs):
         """初始化执行引擎。"""
         super().__init__(**kwargs)
-        # 券商适配器（None 为模拟交易）
-        self.broker = broker
         # 是否在 tick 到达时撮合挂单（True=模拟撮合，False=立即成交）
         self.match_on_tick = match_on_tick
+        # 当前可用资金
+        self.cash = cash
+        # 手续费率
+        self.commission = commission
         # 成交记录列表
         self.trades = []
         # 订单管理器
         self.order_manager = OrderManager()
         # 持仓管理器
         self.position_manager = PositionManager()
-
-        # 模拟交易：内部管理资金
-        if broker is None:
-            # 当前可用资金
-            self.cash = cash
-            # 手续费率
-            self.commission = commission
-        else:
-            # 实盘：账户信息由 broker 提供
-            self.cash = None
-            self.commission = None
 
     def execute_order(self,
                       ticker: str,
@@ -63,13 +53,6 @@ class TraderEngine(BaseComponent):
             order = self.order_manager.create_order(ticker, quantity, order_type, price)
             order_id = order['id']
 
-            # 实盘：通过券商执行
-            if self.broker:
-                order['broker_order_id'] = self.broker.place_order(
-                    ticker=ticker, quantity=quantity, order_type=order_type, price=price
-                )
-                return order_id
-
             # 模拟：立即成交或挂单等待撮合
             if not self.match_on_tick:
                 self._on_trade(order_id, price, timestamp)
@@ -79,9 +62,7 @@ class TraderEngine(BaseComponent):
             raise RuntimeError(f"订单执行失败: {str(e)}") from e
 
     def on_tick(self, ticker_data: TickerData) -> None:
-        """对挂单进行 tick 撮合（EventEngine 驱动的模拟交易）。"""
-        if self.broker is not None:
-            return
+        """对挂单进行 tick 撮合。"""
         for order in self.order_manager.get_pending_orders():
             if order["ticker"] != ticker_data.ticker:
                 continue

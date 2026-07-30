@@ -53,7 +53,7 @@ def market_by_stock_code(stock_code: str, xtconstant: Any) -> Optional[int]:
     return {".SH": xtconstant.SH_MARKET, ".SZ": xtconstant.SZ_MARKET}.get(suffix)
 
 
-class MiniQmtXtTraderClient:
+class QmtXtTraderClient:
     """封装 XtQuantTrader：连柜台下限价撤单，查资金持仓委托成交；不做本地仿真。"""
 
     def __init__(

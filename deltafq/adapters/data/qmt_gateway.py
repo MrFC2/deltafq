@@ -24,13 +24,13 @@ import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-from deltafq.data.miniqmt_fetcher import fetch_data, import_xtdata as _import_xtdata
+from deltafq.data.qmt_fetcher import fetch_data, import_xtdata as _import_xtdata
 from .base import DataGateway
 from ...core.models import TickerData
 from ...enums import Interval
 
 
-class MiniQmtDataGateway(DataGateway):
+class QmtDataGateway(DataGateway):
     """poll 定时拉全快照，push 订分笔推送；xt 标的代码，Tick 含最新价及可选买卖盘。"""
 
     def __init__(

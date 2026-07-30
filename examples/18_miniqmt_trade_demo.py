@@ -9,8 +9,8 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from deltafq.adapters.data import MiniQmtDataGateway
-from deltafq.adapters.trade import MiniQmtTradeGateway
+from deltafq.adapters.data import QmtDataGateway
+from deltafq.adapters.trade import QmtTradeGateway
 from deltafq.core.models import OrderRequest, TickerData
 
 # 配置 miniQMT 环境变量
@@ -18,14 +18,14 @@ MIN_PATH = os.environ.get("QMT_USERDATA_MINI", r"D:\国金证券QMT交易端\use
 ACCOUNT_ID = os.environ.get("QMT_ACCOUNT_ID", "8886180407")
 
 
-def connect_broker() -> MiniQmtTradeGateway:
-    gw = MiniQmtTradeGateway(userdata_mini_path=MIN_PATH, account_id=ACCOUNT_ID)
+def connect_broker() -> QmtTradeGateway:
+    gw = QmtTradeGateway(userdata_mini_path=MIN_PATH, account_id=ACCOUNT_ID)
     if not gw.connect():
         sys.exit("connect failed")
     return gw
 
 
-def run_queries(gw: MiniQmtTradeGateway) -> None:
+def run_queries(gw: QmtTradeGateway) -> None:
     c = gw.client
     for x in c.query_account_infos() or []:
         print("account_info", x)
@@ -53,10 +53,10 @@ def run_queries(gw: MiniQmtTradeGateway) -> None:
         print(f"  {t.stock_code} px={t.traded_price} vol={t.traded_volume}")
 
 
-def run_orders(gw: MiniQmtTradeGateway) -> None:
+def run_orders(gw: QmtTradeGateway) -> None:
     code = "000001.SZ"
     # 通过 tick 回调获取最新价
-    data_gw = MiniQmtDataGateway(interval=1.0, mode="poll")
+    data_gw = QmtDataGateway(interval=1.0, mode="poll")
     if not data_gw.connect():
         raise ValueError("行情网关连接失败")
     done = threading.Event()

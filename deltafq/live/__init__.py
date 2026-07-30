@@ -7,7 +7,7 @@ from ..core.models import TickerData
 from ..adapters.data.base import DataGateway
 from ..adapters.trade.base import TradeGateway
 from ..adapters.data import YFinanceDataGateway
-from ..adapters.trade import MiniQmtTradeGateway, MiniQmtXtTraderClient, PaperTradeGateway
+from ..adapters.trade import QmtTradeGateway, QmtXtTraderClient, PaperTradeGateway
 from .engine import LiveEngine
 
 __all__ = [
@@ -17,7 +17,7 @@ __all__ = [
     "DataGateway",
     "TradeGateway",
     "YFinanceDataGateway",
-    "MiniQmtTradeGateway",
-    "MiniQmtXtTraderClient",
+    "QmtTradeGateway",
+    "QmtXtTraderClient",
     "PaperTradeGateway",
 ]

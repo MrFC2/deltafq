@@ -30,7 +30,7 @@ _OHLCV_FIELDS = ("open", "high", "low", "close", "volume")
 _OHLCV_COLUMNS = ("Open", "High", "Low", "Close", "Volume")
 
 
-class MiniQmtDataFetcher(DataFetcher):
+class QmtDataFetcher(DataFetcher):
     """基于 xtquant 的行情拉取器（需本机运行 miniQMT 终端）。"""
 
     def fetch_data(self,

@@ -52,7 +52,7 @@ import pandas as pd
 
 from ..backtest.performance import PerformanceReporter
 from ..core.base import BaseComponent
-from ..data import DataFetcher, YahooDataFetcher, BaostockDataFetcher, MiniQmtDataFetcher
+from ..data import DataFetcher, YahooDataFetcher, BaostockDataFetcher, QmtDataFetcher
 from ..strategy.base import BaseStrategy
 from ..adapters.data.base import DataGateway
 from ..adapters.trade.base import TradeGateway
@@ -60,7 +60,7 @@ from ..adapters.trade.paper_gateway import PaperTradeGateway
 from ..core.models import SignalData, TickerData
 from ..enums import Interval, Signal
 from ..adapters.data.yfinance_gateway import YFinanceDataGateway
-from ..adapters.data.miniqmt_gateway import MiniQmtDataGateway
+from ..adapters.data.qmt_gateway import QmtDataGateway
 
 # 各周期下「多久重拉一次 K 线」（秒）
 _REFETCH_INTERVAL = {
@@ -205,8 +205,8 @@ class LiveEngine(BaseComponent):
             return None
         if isinstance(self.data_gateway, YFinanceDataGateway):
             return YahooDataFetcher()
-        if isinstance(self.data_gateway, MiniQmtDataGateway):
-            return MiniQmtDataFetcher()
+        if isinstance(self.data_gateway, QmtDataGateway):
+            return QmtDataFetcher()
         return BaostockDataFetcher()
 
     def _fetch_data(self) -> Optional[List[TickerData]]:

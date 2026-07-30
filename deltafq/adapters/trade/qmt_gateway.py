@@ -17,7 +17,7 @@ from typing import Optional
 
 from .base import TradeGateway
 from ...enums import OrderType
-from .miniqmt_client import MiniQmtXtTraderClient
+from .qmt_client import QmtXtTraderClient
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 _MINIQMT_ORDER_STATUS_TERMINAL = frozenset({53, 54, 56, 57})
 
 
-class MiniQmtTradeGateway(TradeGateway):
+class QmtTradeGateway(TradeGateway):
     """连接 miniQMT 并适配 LiveEngine 的下单撤单接口。"""
 
     def __init__(
@@ -41,10 +41,10 @@ class MiniQmtTradeGateway(TradeGateway):
         self._strategy_name = strategy_name
         self._order_remark = order_remark
         self._lot_size = max(1, int(lot_size))
-        self._client = MiniQmtXtTraderClient(userdata_mini_path, account_id, session_id)
+        self._client = QmtXtTraderClient(userdata_mini_path, account_id, session_id)
 
     @property
-    def client(self) -> MiniQmtXtTraderClient:
+    def client(self) -> QmtXtTraderClient:
         """底层交易客户端；可直接查资金、持仓、委托、成交。"""
         return self._client
 
@@ -75,7 +75,8 @@ class MiniQmtTradeGateway(TradeGateway):
             logger.warning("adjusting quantity %s -> %s (lot_size=%s)", abs_vol, aligned, self._lot_size)
             abs_vol = aligned
         is_buy = qty > 0
-        oid = self._client.order_stock_limit(ticker, abs_vol, float(price), is_buy, strategy_name=self._strategy_name, order_remark=self._order_remark)
+        oid = self._client.order_stock_limit(ticker, abs_vol, float(price), is_buy, strategy_name=self._strategy_name,
+                                             order_remark=self._order_remark)
         if oid is None or int(oid) <= 0:
             raise RuntimeError(f"下单失败: oid={oid!r}")
         return str(int(oid))

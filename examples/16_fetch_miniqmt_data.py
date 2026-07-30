@@ -7,7 +7,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from deltafq.data import MiniQmtDataFetcher, DataStorage
+from deltafq.data import QmtDataFetcher, DataStorage
 from deltafq.enums import Interval
 
 # 需本机启动 miniQMT、已安装 xtquant；标的为 xt 代码，如 000001.SZ、600000.SH
@@ -17,7 +17,7 @@ def main() -> None:
     start_date = "2026-04-01"
     end_date = "2026-04-16"
 
-    fetcher = MiniQmtDataFetcher()
+    fetcher = QmtDataFetcher()
     data = fetcher.fetch_data(
         ticker=ticker,
         start_date=start_date,

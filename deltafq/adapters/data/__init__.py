@@ -1,6 +1,6 @@
 from .base import DataGateway
 from .baostock_gateway import BaostockDataGateway
-from .miniqmt_gateway import MiniQmtDataGateway
+from .qmt_gateway import QmtDataGateway
 from .yfinance_gateway import YFinanceDataGateway
 
-__all__ = ["DataGateway", "BaostockDataGateway", "YFinanceDataGateway", "MiniQmtDataGateway"]
+__all__ = ["DataGateway", "BaostockDataGateway", "YFinanceDataGateway", "QmtDataGateway"]

@@ -11,8 +11,8 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from deltafq.live import LiveEngine
-from deltafq.adapters.data.miniqmt_gateway import MiniQmtDataGateway
-from deltafq.adapters.trade.miniqmt_gateway import MiniQmtTradeGateway
+from deltafq.adapters.data.qmt_gateway import QmtDataGateway
+from deltafq.adapters.trade.qmt_gateway import QmtTradeGateway
 from deltafq.strategy.base import BaseStrategy
 from deltafq.enums import Interval
 from deltafq.core.models import SignalData, TickerData
@@ -42,8 +42,8 @@ class DemoStrategy(BaseStrategy):
 def main() -> None:
     engine = LiveEngine(
         ticker="159118.SZ",
-        data_gateway=MiniQmtDataGateway(interval=5.0, mode="poll"),
-        trade_gateway=MiniQmtTradeGateway(
+        data_gateway=QmtDataGateway(interval=5.0, mode="poll"),
+        trade_gateway=QmtTradeGateway(
             userdata_mini_path=MIN_PATH,
             account_id=ACCOUNT_ID,
             strategy_name="deltafq_order_amount_demo",

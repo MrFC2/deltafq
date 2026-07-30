@@ -4,7 +4,7 @@
 子类实现：
 - YahooDataFetcher    — yahoo_fetcher.py
 - BaostockDataFetcher — baostock_fetcher.py
-- MiniQmtDataFetcher  — miniqmt_fetcher.py
+- MiniQmtDataFetcher  — qmt_fetcher.py
 """
 
 import re
