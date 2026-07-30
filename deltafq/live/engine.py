@@ -274,7 +274,7 @@ class LiveEngine(BaseComponent):
         price = ticker_data.price
 
         # 根据信号生成买卖订单
-        self._handle_signal_to_order(latest_signal, price, position, ticker_data)
+        self._make_signal_to_order(latest_signal, price, position, ticker_data)
 
         # 追加净值记录
         self._append_values_record(ticker_data, latest_signal.signal, price, cash, position)
@@ -346,11 +346,11 @@ class LiveEngine(BaseComponent):
     #
     #     return 0, 0
 
-    def _handle_signal_to_order(self,
-                                signal_data: SignalData,
-                                price: float,
-                                position: int,
-                                ticker_data: TickerData) -> None:
+    def _make_signal_to_order(self,
+                              signal_data: SignalData,
+                              price: float,
+                              position: int,
+                              ticker_data: TickerData) -> None:
         """相对 _last_signal 发生变化时：尝试撤上一笔挂单，再按规则下限价单。"""
         if self.trade_gateway is None:
             return
