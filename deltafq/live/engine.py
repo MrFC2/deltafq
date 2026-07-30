@@ -16,7 +16,7 @@
 函数与方法索引（按模块）
 ------------------------
 模块级
-    _vol_str              将成交量格式化为 B/M/K 或整数字符串
+    （无）
 
 LiveEngine — 运行
     __init__              构造：ticker、网关实例、策略实例、数据点数、信号周期、DataFetcher
@@ -37,7 +37,7 @@ LiveEngine — 内部：账户与挂单
     （已内联至调用处）
 
 LiveEngine — 内部：Tick
-    _on_tick_match              将 Tick 交给纸面撮合引擎（若有）；打印非 warmup 的 Tick 日志
+    _on_tick_match              将 Tick 交给纸面撮合引擎（若有）
     _on_tick_strategy           编排：建 df → 信号 → 快照 → 净值 → sizing 日志 → 翻转处理
     _build_strategy_input       由 tick 与缓存构造策略输入 DataFrame（K 线或 tick 滑动窗口）
     _append_values_record       追加一条净值记录（与回测 values 形状一致）
@@ -73,17 +73,6 @@ _REFETCH_INTERVAL = {
 _FETCH_DAYS_PER_BAR = {Interval.DAY_1: 365 / 252, Interval.WEEK_1: 365 / 52, Interval.MONTH_1: 365 / 12}
 _SIG_ICON = {1: "↑", -1: "↓", 0: "-"}
 _ACTION_ICON = {"buy": "↑", "sell": "↓", "skip": "x", "no_change": "-"}
-
-
-def _vol_str(v: float) -> str:
-    """成交量友好显示：≥1e9 为 B，≥1e6 为 M，≥1e3 为 K，否则整数。"""
-    if v >= 1e9:
-        return f"{v / 1e9:.1f}B"
-    if v >= 1e6:
-        return f"{v / 1e6:.1f}M"
-    if v >= 1e3:
-        return f"{v / 1e3:.1f}K"
-    return str(int(v))
 
 
 class LiveEngine(BaseComponent):
@@ -262,20 +251,7 @@ class LiveEngine(BaseComponent):
     # ---------- 内部：Tick ----------
 
     def _on_tick_match(self, ticker_data: TickerData) -> None:
-        """非 warmup：打 Tick 日志；若网关带执行引擎则转发 on_tick 做限价撮合。"""
-        if not ticker_data.is_warm_up:
-            ts = ticker_data.timestamp.strftime("%H:%M:%S")
-            v = ticker_data.volume
-            ba = ""
-            if ticker_data.bid is not None and ticker_data.ask is not None:
-                ba = f" bid={ticker_data.bid:.4f} ask={ticker_data.ask:.4f}"
-            elif ticker_data.bid is not None:
-                ba = f" bid={ticker_data.bid:.4f}"
-            elif ticker_data.ask is not None:
-                ba = f" ask={ticker_data.ask:.4f}"
-            self.logger.info(
-                f"Tick: [{ticker_data.ticker}] {ticker_data.price:.4f}{ba} vol={v}({_vol_str(v)}) @ {ts}"
-            )
+        """若网关带执行引擎则转发 on_tick 做限价撮合。"""
         if isinstance(self.trade_gateway, PaperTradeGateway):
             self.trade_gateway.on_tick(ticker_data)
 
