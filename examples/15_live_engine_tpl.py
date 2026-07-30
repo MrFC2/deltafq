@@ -27,7 +27,6 @@ class Every2BarFlipStrategy(BaseStrategy):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._run_count = 0
-        self.order_amount = 100000 # 单次买入投入金额
 
     def generate_signals(self, data: List[TickerData]) -> List[SignalData]:
         self._run_count += 1

@@ -14,6 +14,8 @@ from ..enums import OrderType, Signal
 class SignalData:
     timestamp: datetime
     signal: Signal
+    # 本次信号建议的买卖股数上限（买卖双侧），None 表示不限
+    quantity: Optional[int] = None
 
 
 @dataclass

@@ -91,9 +91,8 @@ class LiveEngine(BaseComponent):
     """
     在实盘数据上跑策略并通过网关下单。
 
-    策略可选属性：``order_quantity``（股）买卖均封顶；未设时 ``order_amount`` 仅限制买入，
-    卖出用满仓。二者皆无时买入用可承受现金。有纸面引擎时资金/持仓来自引擎，否则 miniQMT 查询。
-    同时设置时买入侧 ``order_quantity`` 优先于 ``order_amount``。
+    策略可在 SignalData 中设置 ``order_quantity``（股）控制买卖双侧股数上限；未设置时买入用可承受现金全仓。
+    有纸面引擎时资金/持仓来自引擎，否则 miniQMT 查询。
     """
 
     def __init__(
@@ -319,21 +318,18 @@ class LiveEngine(BaseComponent):
         # 获取账户持仓信息
         cash, position, commission = self._account_snapshot()
 
-        # 取最新一根 bar 的信号值
-        signal = signals[-1].signal
+        # 取最新一根 bar 的信号
+        latest_signal = signals[-1]
         price = float(ticker_data.price)
 
         # 追加净值记录
-        self._append_values_record(ticker_data, signal, price, cash, position)
+        self._append_values_record(ticker_data, latest_signal.signal, price, cash, position)
 
-        order_quantity = getattr(self._strategy, "order_quantity", None)
-        order_amount = getattr(self._strategy, "order_amount", None)
         # 计算本次应买/卖数量
-        buy_quantity, sell_quantity = self._calc_order_quantity(signal, price, cash, position, commission,
-                                                                order_quantity, order_amount)
+        buy_quantity, sell_quantity = self._calc_order_quantity(latest_signal, price, cash, position, commission)
 
         # 信号相对上次发生变化时撤旧单、发新单
-        self._handle_signal_transition(signal, price, position, buy_quantity, sell_quantity, ticker_data)
+        self._handle_signal_transition(latest_signal.signal, price, position, buy_quantity, sell_quantity, ticker_data)
 
     def _append_tick_datas(self, ticker_data: TickerData) -> bool:
         """由当前 tick 更新 _tick_datas；未到重拉间隔时返回 False。"""
@@ -375,17 +371,11 @@ class LiveEngine(BaseComponent):
             "daily_pnl": daily_pnl,
         })
 
-    def _calc_order_quantity(
-            self,
-            signal: Signal,
-            price: float,
-            cash: float,
-            position: int,
-            commission: float,
-            order_quantity: Optional[int],
-            order_amount: Optional[float],
-    ) -> Tuple[int, int]:
+    def _calc_order_quantity(self, signal_data: SignalData, price: float, cash: float, position: int,
+                             commission: float) -> Tuple[int, int]:
         """按当前信号与上次信号计算本次应买卖的数量，返回 (buy_quantity, sell_quantity)。"""
+        signal = signal_data.signal
+        order_quantity = signal_data.quantity
         # 信号由非买转买
         if self._last_signal != Signal.BUY and signal == Signal.BUY:
             # 现金可承受的最大股数
@@ -393,9 +383,6 @@ class LiveEngine(BaseComponent):
             if order_quantity and order_quantity > 0:
                 # 股数上限优先
                 return min(order_quantity, max_buy_quantity), 0
-            if order_amount is not None and order_amount > 0:
-                # 金额上限次之
-                return min(max(0, int(order_amount / (price * (1 + commission)))), max_buy_quantity), 0
             # 无限制则全仓买入
             return max_buy_quantity, 0
 
