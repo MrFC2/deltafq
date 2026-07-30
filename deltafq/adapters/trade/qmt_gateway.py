@@ -16,7 +16,8 @@ import logging
 from typing import Optional
 
 from .base import TradeGateway
-from ...enums import OrderType
+from ...enums import OrderType, Signal
+from ...core.models import SignalData
 from .qmt_client import QmtXtTraderClient
 
 logger = logging.getLogger(__name__)
@@ -58,24 +59,23 @@ class QmtTradeGateway(TradeGateway):
 
     def send_order(self,
                    ticker: str,
-                   quantity: int,
+                   signal_data: SignalData,
                    price: float,
                    order_type: OrderType = OrderType.LIMIT) -> str:
         """仅支持限价单；数量按 lot_size 向下对齐；返回字符串委托号。"""
         if order_type != OrderType.LIMIT:
             raise ValueError("MiniQmtTradeGateway 当前仅支持限价单")
-        qty = int(quantity)
-        if qty == 0:
-            raise ValueError("数量不能为零")
-        abs_vol = abs(qty)
-        if abs_vol % self._lot_size != 0:
-            aligned = (abs_vol // self._lot_size) * self._lot_size
+        qty = signal_data.quantity
+        if not qty or qty <= 0:
+            raise ValueError("数量必须为正整数")
+        if qty % self._lot_size != 0:
+            aligned = (qty // self._lot_size) * self._lot_size
             if aligned <= 0:
                 raise ValueError(f"数量 {qty} 小于最小手数（{self._lot_size}）")
-            logger.warning("adjusting quantity %s -> %s (lot_size=%s)", abs_vol, aligned, self._lot_size)
-            abs_vol = aligned
-        is_buy = qty > 0
-        oid = self._client.order_stock_limit(ticker, abs_vol, float(price), is_buy, strategy_name=self._strategy_name,
+            logger.warning("adjusting quantity %s -> %s (lot_size=%s)", qty, aligned, self._lot_size)
+            qty = aligned
+        is_buy = signal_data.signal == Signal.BUY
+        oid = self._client.order_stock_limit(ticker, qty, float(price), is_buy, strategy_name=self._strategy_name,
                                              order_remark=self._order_remark)
         if oid is None or int(oid) <= 0:
             raise RuntimeError(f"下单失败: oid={oid!r}")

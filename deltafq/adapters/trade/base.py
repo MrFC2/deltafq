@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 
 from ...enums import OrderType
+from ...core.models import SignalData
 
 
 class TradeGateway(ABC):
@@ -14,10 +15,10 @@ class TradeGateway(ABC):
     @abstractmethod
     def send_order(self,
                    ticker: str,
-                   quantity: int,
+                   signal_data: SignalData,
                    price: float,
                    order_type: OrderType = OrderType.LIMIT) -> str:
-        """发送委托，返回委托号。quantity 为负表示卖出。"""
+        """发送委托，返回委托号。方向和数量由 signal_data 决定。"""
         raise NotImplementedError
 
     @abstractmethod

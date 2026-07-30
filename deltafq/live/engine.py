@@ -371,8 +371,7 @@ class LiveEngine(BaseComponent):
         if signal == Signal.BUY:
             if signal_data.quantity:
                 buy_price = float(ticker_data.ask) if ticker_data.ask is not None else price  # 优先用卖一价成交
-                self._last_pending_order_id = self.trade_gateway.send_order(self.ticker, signal_data.quantity,
-                                                                            buy_price)
+                self._last_pending_order_id = self.trade_gateway.send_order(self.ticker, signal_data, buy_price)
 
         # 持仓 → 卖出：quantity 缺失则跳过下单但仍更新信号状态
         if signal == Signal.SELL and position > 0:
@@ -380,7 +379,7 @@ class LiveEngine(BaseComponent):
                 self._last_signal = signal
                 return
             sell_price = float(ticker_data.bid) if ticker_data.bid is not None else price  # 优先用买一价成交
-            self._last_pending_order_id = self.trade_gateway.send_order(self.ticker, -signal_data.quantity, sell_price)
+            self._last_pending_order_id = self.trade_gateway.send_order(self.ticker, signal_data, sell_price)
 
         # signal == HOLD：撤旧单后不下新单，等待下次信号
         self._last_signal = signal
