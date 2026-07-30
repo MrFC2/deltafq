@@ -250,12 +250,14 @@ class LiveEngine(BaseComponent):
 
     def _on_tick_strategy(self, ticker_data: TickerData) -> None:
         """编排：撮合挂单 → 建 df → 信号 → 账户快照 → 权益 → 信号翻转时撤单/下单。"""
+        # 模拟交易撮合成交（实盘交易依赖第三方平台不需要）
         if isinstance(self.trade_gateway, PaperTradeGateway):
             self.trade_gateway.on_tick(ticker_data)
 
         # 暖机 tick 只用于喂价格撮合，不触发策略
         if ticker_data.is_warm_up:
             return
+
         # 非本标的或策略未挂载时跳过
         if ticker_data.ticker != self.ticker or self._strategy is None:
             return
