@@ -59,6 +59,7 @@ from ..strategy.base import BaseStrategy
 from .event_engine import EventEngine
 from ..adapters.data.base import DataGateway
 from ..adapters.trade.base import TradeGateway
+from ..adapters.trade.paper_gateway import PaperTradeGateway
 from ..core.models import OrderRequest, SignalData, TickerData
 from ..enums import OrderType, EventType, Interval, Signal
 from ..adapters.data.yfinance_gateway import YFinanceDataGateway
@@ -73,9 +74,6 @@ _REFETCH_INTERVAL = {
 _FETCH_DAYS_PER_BAR = {Interval.DAY_1: 365 / 252, Interval.WEEK_1: 365 / 52, Interval.MONTH_1: 365 / 12}
 _SIG_ICON = {1: "↑", -1: "↓", 0: "-"}
 _ACTION_ICON = {"buy": "↑", "sell": "↓", "skip": "x", "no_change": "-"}
-
-# miniQMT order_status：终态、无需再撤（见 documents/MiniQmtTrade.md）
-_MINIQMT_ORDER_STATUS_TERMINAL = frozenset({53, 54, 56, 57})
 
 
 class _SizingLogResult(NamedTuple):
@@ -205,13 +203,10 @@ class LiveEngine(BaseComponent):
         return {"candles": candles, "signals": signals}
 
     def get_trades_df(self) -> pd.DataFrame:
-        """从交易网关内嵌执行引擎取成交列表（结构与回测一致）。"""
-        if self.trade_gateway is None or not hasattr(self.trade_gateway, "_engine"):
+        """从纸面交易网关取成交列表（结构与回测一致）；实盘网关返回空 DataFrame。"""
+        if not isinstance(self.trade_gateway, PaperTradeGateway):
             return pd.DataFrame()
-        eng = getattr(self.trade_gateway, "_engine", None)
-        if eng is None or not hasattr(eng, "trades"):
-            return pd.DataFrame()
-        return pd.DataFrame(eng.trades)
+        return pd.DataFrame(self.trade_gateway.get_trades())
 
     def get_values_df(self) -> pd.DataFrame:
         """权益曲线 DataFrame；按 date 去重保留最后一条。"""
@@ -276,76 +271,13 @@ class LiveEngine(BaseComponent):
     # ---------- 内部：账户与挂单 ----------
 
     def _account_snapshot(self) -> Tuple[float, int, float]:
-        """返回 (现金, 持仓股数, 佣金率)，用于仓位与日志；纸面用引擎，否则 miniQMT 查询。"""
+        """返回 (现金, 持仓股数, 佣金率)，委托给网关实现。"""
         gw = self.trade_gateway
-        eng = getattr(gw, "_engine", None)
-        if eng is not None:
-            position = int(eng.position_manager.get_position(self.ticker))
-            cash = float(eng.cash or 0.0)
-            commission = float(getattr(eng, "commission", 0.0) or 0.0)
-            return cash, position, commission
-        client = getattr(gw, "client", None)
-        if client is None or not getattr(client, "is_connected", lambda: False)():
-            return 0.0, 0, 0.001
-        try:
-            asset = client.query_stock_asset()
-            cash = float(getattr(asset, "cash", 0.0) or 0.0) if asset is not None else 0.0
-        except Exception as e:
-            self.logger.warning(f"query_stock_asset 失败: {e}")
-            cash = 0.0
-        position = 0
-        try:
-            for p in client.query_stock_positions() or []:
-                if (getattr(p, "stock_code", "") or "") == self.ticker:
-                    position = int(
-                        getattr(p, "can_use_volume", None)
-                        or getattr(p, "volume", 0)
-                        or 0
-                    )
-                    break
-        except Exception as e:
-            self.logger.warning(f"query_stock_positions 失败: {e}")
-            position = 0
-        return cash, position, 0.001
+        return gw.get_cash(), gw.get_position(self.ticker), gw.get_commission()
 
     def _pending_order_no_cancel_needed(self, order_id: str) -> bool:
-        """
-        若上一笔委托已结束则返回 True：不必再向柜台撤单，并应清空本地 pending id。
-        纸面：OrderManager 状态；miniQMT：order_status 属终态或委托列表中已无该单。
-        """
-        gw = self.trade_gateway
-        eng = getattr(gw, "_engine", None)
-        if eng is not None:
-            o = eng.order_manager.get_order(order_id)
-            if o is None:
-                return True
-            st = (o.get("status") or "").lower()
-            return st in ("executed", "cancelled")
-
-        client = getattr(gw, "client", None)
-        if client is None or not getattr(client, "is_connected", lambda: False)():
-            return False
-        try:
-            target = int(str(order_id).strip())
-        except ValueError:
-            return True
-        try:
-            for row in client.query_stock_orders(cancelable_only=False) or []:
-                brid = getattr(row, "order_id", None)
-                if brid is None:
-                    continue
-                try:
-                    if int(brid) != target:
-                        continue
-                except (TypeError, ValueError):
-                    if str(brid).strip() != str(order_id).strip():
-                        continue
-                st = int(getattr(row, "order_status", -1))
-                return st in _MINIQMT_ORDER_STATUS_TERMINAL
-            return True
-        except Exception as e:
-            self.logger.warning(f"查询挂单 {order_id} 失败: {e}")
-            return False
+        """若上一笔委托已终结则返回 True，无需再撤单。"""
+        return self.trade_gateway.is_order_terminal(order_id)
 
     # ---------- 内部：Tick ----------
 
@@ -364,9 +296,8 @@ class LiveEngine(BaseComponent):
             self.logger.info(
                 f"Tick: [{ticker_data.ticker}] {ticker_data.price:.4f}{ba} vol={v}({_vol_str(v)}) @ {ts}"
             )
-        eng = getattr(self.trade_gateway, "_engine", None) if self.trade_gateway else None
-        if eng is not None:
-            eng.on_tick(ticker_data)
+        if isinstance(self.trade_gateway, PaperTradeGateway):
+            self.trade_gateway.on_tick(ticker_data)
 
     def _on_tick_strategy(self, ticker_data: TickerData) -> None:
         """编排：建 df → 信号 → 账户快照 → 权益 → sizing 与日志 → 信号翻转时撤单/下单。"""
@@ -394,10 +325,12 @@ class LiveEngine(BaseComponent):
         self._cached_strategy_input = list(self._tick_datas)
         self._cached_signals = signals
 
+        # 获取账户持仓信息
+        cash, position, commission = self._account_snapshot()
+
         # 取最新一根 bar 的信号值
         signal = signals[-1].signal
         price = float(ticker_data.price)
-        cash, position, commission = self._account_snapshot()
 
         # 追加净值记录
         self._append_values_record(ticker_data, signal, price, cash, position)

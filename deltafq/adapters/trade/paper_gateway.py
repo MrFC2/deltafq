@@ -1,5 +1,5 @@
 from .base import TradeGateway
-from ...core.models import OrderRequest
+from ...core.models import OrderRequest, TickerData
 from ...trader.engine import TraderEngine
 
 
@@ -28,3 +28,24 @@ class PaperTradeGateway(TradeGateway):
 
     def stop(self) -> None:
         pass
+
+    def get_cash(self) -> float:
+        return float(self._engine.cash or 0.0)
+
+    def get_position(self, ticker: str) -> int:
+        return int(self._engine.position_manager.get_position(ticker))
+
+    def get_commission(self) -> float:
+        return float(self._engine.commission or 0.0)
+
+    def is_order_terminal(self, order_id: str) -> bool:
+        o = self._engine.order_manager.get_order(order_id)
+        if o is None:
+            return True
+        return (o.get("status") or "").lower() in ("executed", "cancelled")
+
+    def on_tick(self, ticker_data: TickerData) -> None:
+        self._engine.on_tick(ticker_data)
+
+    def get_trades(self) -> list:
+        return list(self._engine.trades)

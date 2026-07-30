@@ -72,7 +72,7 @@ class TraderEngine(BaseComponent):
         except Exception as e:
             raise RuntimeError(f"订单执行失败: {str(e)}") from e
 
-    def on_tick(self, ticker_data: "TickerData") -> None:
+    def on_tick(self, ticker_data: TickerData) -> None:
         """对挂单进行 tick 撮合（EventEngine 驱动的模拟交易）。"""
         if self.broker is not None:
             return

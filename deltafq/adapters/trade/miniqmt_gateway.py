@@ -22,6 +22,9 @@ from .miniqmt_client import MiniQmtXtTraderClient
 
 logger = logging.getLogger(__name__)
 
+# miniQMT order_status 终态：已成交、已撤单、部分撤单、废单等（见 documents/MiniQmtTrade.md）
+_MINIQMT_ORDER_STATUS_TERMINAL = frozenset({53, 54, 56, 57})
+
 
 class MiniQmtTradeGateway(TradeGateway):
     """连接 miniQMT 并适配 LiveEngine 的下单撤单接口。"""
@@ -84,6 +87,54 @@ class MiniQmtTradeGateway(TradeGateway):
         if oid is None or int(oid) <= 0:
             raise RuntimeError(f"下单失败: oid={oid!r}")
         return str(int(oid))
+
+    def get_cash(self) -> float:
+        if not self._client.is_connected():
+            return 0.0
+        try:
+            asset = self._client.query_stock_asset()
+            return float(getattr(asset, "cash", 0.0) or 0.0) if asset is not None else 0.0
+        except Exception as e:
+            logger.warning("query_stock_asset 失败: %s", e)
+            return 0.0
+
+    def get_position(self, ticker: str) -> int:
+        if not self._client.is_connected():
+            return 0
+        try:
+            for p in self._client.query_stock_positions() or []:
+                if (getattr(p, "stock_code", "") or "") == ticker:
+                    return int(getattr(p, "can_use_volume", None) or getattr(p, "volume", 0) or 0)
+        except Exception as e:
+            logger.warning("query_stock_positions 失败: %s", e)
+        return 0
+
+    def get_commission(self) -> float:
+        return 0.001
+
+    def is_order_terminal(self, order_id: str) -> bool:
+        if not self._client.is_connected():
+            return False
+        try:
+            target = int(str(order_id).strip())
+        except ValueError:
+            return True
+        try:
+            for row in self._client.query_stock_orders(cancelable_only=False) or []:
+                brid = getattr(row, "order_id", None)
+                if brid is None:
+                    continue
+                try:
+                    matched = int(brid) == target
+                except (TypeError, ValueError):
+                    matched = str(brid).strip() == str(order_id).strip()
+                if matched:
+                    st = int(getattr(row, "order_status", -1))
+                    return st in _MINIQMT_ORDER_STATUS_TERMINAL
+            return True
+        except Exception as e:
+            logger.warning("查询挂单 %s 失败: %s", order_id, e)
+            return False
 
     def cancel_order(self, order_id: str) -> bool:
         """先按委托号撤；失败则在可撤委托里查合同号并兜底撤单。"""
