@@ -62,13 +62,6 @@ from ..enums import Interval, Signal
 from ..adapters.data.yfinance_gateway import YFinanceDataGateway
 from ..adapters.data.qmt_gateway import QmtDataGateway
 
-# 各周期下「多久重拉一次 K 线」（秒）
-_REFETCH_INTERVAL = {
-    Interval.MINUTE_1: 60, Interval.MINUTE_5: 300, Interval.MINUTE_15: 900,
-    Interval.HOUR_1: 3600, Interval.DAY_1: 86400,
-}
-# 按信号周期估算「每根 K 线对应多少日历日」，用于拉足 lookback（1d≈252 交易日/365 日）
-_FETCH_DAYS_PER_BAR = {Interval.DAY_1: 365 / 252, Interval.WEEK_1: 365 / 52, Interval.MONTH_1: 365 / 12}
 _SIG_ICON = {1: "↑", -1: "↓", 0: "-"}
 _ACTION_ICON = {"buy": "↑", "sell": "↓", "skip": "x", "no_change": "-"}
 
@@ -212,13 +205,12 @@ class LiveEngine(BaseComponent):
     def _fetch_data(self) -> Optional[List[TickerData]]:
         """用 DataFetcher 拉当前 strategy_interval 下最近 strategy_input_size 根 K 线。"""
         # REALTIME 模式不拉 K 线，数据由 tick 实时积累
-        if self._data_fetcher is None or self.strategy_interval == Interval.REALTIME:
+        if self._data_fetcher is None:
             return None
         now = datetime.now(timezone.utc)
-        days_per_bar = _FETCH_DAYS_PER_BAR.get(self.strategy_interval)
-        if days_per_bar is not None:
+        if self.strategy_interval.days_per_bar > 0:
             # 日/周/月线：按每根 bar 对应日历天数估算拉取范围，多留 60 天缓冲
-            cal_days = int(self.strategy_input_size * days_per_bar) + 60
+            cal_days = int(self.strategy_input_size * self.strategy_interval.days_per_bar) + 60
             start = (now - timedelta(days=max(cal_days, 60))).strftime("%Y-%m-%d")
         else:
             # 分钟/小时线：按 strategy_input_size 估算天数，最少 7 天、最多 60 天
@@ -294,10 +286,9 @@ class LiveEngine(BaseComponent):
             return True
 
         # K 线模式：_tick_datas 最后一根的时间戳未超过重拉间隔时跳过
-        refetch_interval = _REFETCH_INTERVAL.get(self.strategy_interval, 60)
         if self._ticker_datas:
             interval = (datetime.now() - self._ticker_datas[-1].timestamp).total_seconds()
-            if interval < refetch_interval:
+            if interval < self.strategy_interval.refetch_seconds:
                 return False
 
         data = self._fetch_data()

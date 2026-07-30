@@ -48,13 +48,18 @@ class Signal(int, Enum):
 
 
 class Interval(Enum):
-    """K 线周期。"""
-    REALTIME = "realtime"
-    MINUTE_1 = "1m"
-    MINUTE_5 = "5m"
-    MINUTE_15 = "15m"
-    MINUTE_30 = "30m"
-    HOUR_1 = "1h"
-    DAY_1 = "1d"
-    WEEK_1 = "1wk"
-    MONTH_1 = "1mo"
+    """K 线周期。refetch_seconds: 实盘重拉间隔；days_per_bar: 估算日历天数用于拉足 lookback。"""
+
+    def __init__(self, _: str, refetch_seconds: int = 0, days_per_bar: float = 0.0):
+        self.refetch_seconds = refetch_seconds
+        self.days_per_bar = days_per_bar
+
+    REALTIME = ("realtime", 0, 0.0)
+    MINUTE_1 = ("1m", 60, 0.0)
+    MINUTE_5 = ("5m", 300, 0.0)
+    MINUTE_15 = ("15m", 900, 0.0)
+    MINUTE_30 = ("30m", 1800, 0.0)
+    HOUR_1 = ("1h", 3600, 0.0)
+    DAY_1 = ("1d", 86400, 365 / 252)
+    WEEK_1 = ("1wk", 60, 365 / 52)
+    MONTH_1 = ("1mo", 60, 365 / 12)
