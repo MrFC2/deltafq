@@ -39,7 +39,10 @@ class BaostockDataFetcher(DataFetcher):
         # 外部已登录的 baostock session；None 时每次 fetch 自动 login/logout
         self.bs = bs
 
-    def fetch_data(self, ticker: str, start_date: str, end_date: Optional[str] = None,
+    def fetch_data(self,
+                   ticker: str,
+                   start_date: str,
+                   end_date: Optional[str] = None,
                    interval: Interval = Interval.DAY_1) -> List[TickerData]:
         """拉取历史 K 线，返回 TickerData 列表。end_date 排他（与 yahoo 一致）。"""
         if self.bs is not None:

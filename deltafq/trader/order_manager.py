@@ -17,8 +17,12 @@ class OrderManager(BaseComponent):
         super().__init__(**kwargs)
         self.orders = {}
 
-    def create_order(self, ticker: str, quantity: int, order_type: OrderType = None,
-                     price: Optional[float] = None, stop_price: Optional[float] = None) -> Dict[str, Any]:
+    def create_order(self,
+                     ticker: str,
+                     quantity: int,
+                     order_type: OrderType = None,
+                     price: Optional[float] = None,
+                     stop_price: Optional[float] = None) -> Dict[str, Any]:
         """创建新订单，返回订单字典。"""
         order_id = f"ORD_{len(self.orders) + 1:06d}"
 

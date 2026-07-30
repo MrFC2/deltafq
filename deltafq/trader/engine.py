@@ -17,8 +17,12 @@ if TYPE_CHECKING:
 class TraderEngine(BaseComponent):
     """实盘/模拟两用交易执行引擎。broker=None 为模拟交易，内部管理资金；传入 broker 为实盘，账户信息由 broker 提供。"""
 
-    def __init__(self, cash: Optional[float] = None, commission: Optional[float] = None,
-                 broker: Optional[Any] = None, match_on_tick: bool = False, **kwargs):
+    def __init__(self,
+                 cash: Optional[float] = None,
+                 commission: Optional[float] = None,
+                 broker: Optional[Any] = None,
+                 match_on_tick: bool = False,
+                 **kwargs):
         """初始化执行引擎。"""
         super().__init__(**kwargs)
         # 券商适配器（None 为模拟交易）
@@ -43,8 +47,12 @@ class TraderEngine(BaseComponent):
             self.cash = None
             self.commission = None
 
-    def execute_order(self, ticker: str, quantity: int, order_type: OrderType = None,
-                      price: Optional[float] = None, timestamp: Optional[datetime] = None) -> str:
+    def execute_order(self,
+                      ticker: str,
+                      quantity: int,
+                      order_type: OrderType = None,
+                      price: Optional[float] = None,
+                      timestamp: Optional[datetime] = None) -> str:
         """执行订单，默认为限价单。"""
         try:
             # 限价单校验价格
@@ -85,7 +93,10 @@ class TraderEngine(BaseComponent):
                 self._on_trade(order["id"], ticker_data.price, ticker_data.timestamp)
                 break  # 每个 tick 每标的只撮合一笔
 
-    def _on_trade(self, order_id: str, execution_price: float, timestamp: Optional[datetime] = None):
+    def _on_trade(self,
+                  order_id: str,
+                  execution_price: float,
+                  timestamp: Optional[datetime] = None):
         """成交后统一结算：更新资金、持仓、订单状态和成交记录。"""
         order = self.order_manager.get_order(order_id)
         if not order:

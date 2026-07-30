@@ -30,7 +30,8 @@ def calculate_total_return(equity: pd.Series) -> float:
     return float(equity.iloc[-1] / equity.iloc[0] - 1)
 
 
-def calculate_annualized_return(returns: pd.Series, periods: int = 252) -> float:
+def calculate_annualized_return(returns: pd.Series,
+                                periods: int = 252) -> float:
     """计算年化收益率（几何复利：(1+R_total)^(periods/n) - 1）。"""
     n = len(returns)
     if n == 0:
@@ -39,12 +40,15 @@ def calculate_annualized_return(returns: pd.Series, periods: int = 252) -> float
     return float((1 + total_return) ** (periods / n) - 1)
 
 
-def calculate_volatility(returns: pd.Series, periods: int = 252) -> float:
+def calculate_volatility(returns: pd.Series,
+                         periods: int = 252) -> float:
     """计算年化波动率。"""
     return float(returns.std() * np.sqrt(periods))
 
 
-def calculate_sharpe_ratio(returns: pd.Series, risk_free: float = 0.0, periods: int = 252) -> float:
+def calculate_sharpe_ratio(returns: pd.Series,
+                           risk_free: float = 0.0,
+                           periods: int = 252) -> float:
     """计算年化夏普比率。"""
     excess = returns - risk_free / periods
     return float(excess.mean() / excess.std() * np.sqrt(periods)) if excess.std() else 0.0

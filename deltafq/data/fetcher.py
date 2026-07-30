@@ -30,7 +30,10 @@ class DataFetcher(BaseComponent, ABC):
         self._cleaner = DataCleaner()
 
     @abstractmethod
-    def fetch_data(self, ticker: str, start_date: str, end_date: Optional[str] = None,
+    def fetch_data(self,
+                   ticker: str,
+                   start_date: str,
+                   end_date: Optional[str] = None,
                    interval: Interval = Interval.DAY_1) -> List[TickerData]:
         """拉取单个标的行情数据并清洗，返回按时间升序的 TickerData 列表。"""
         raise NotImplementedError

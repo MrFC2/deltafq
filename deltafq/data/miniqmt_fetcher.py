@@ -33,7 +33,10 @@ _OHLCV_COLUMNS = ("Open", "High", "Low", "Close", "Volume")
 class MiniQmtDataFetcher(DataFetcher):
     """基于 xtquant 的行情拉取器（需本机运行 miniQMT 终端）。"""
 
-    def fetch_data(self, ticker: str, start_date: str, end_date: Optional[str] = None,
+    def fetch_data(self,
+                   ticker: str,
+                   start_date: str,
+                   end_date: Optional[str] = None,
                    interval: Interval = Interval.DAY_1) -> List[TickerData]:
         try:
             data = fetch_data(ticker, start_date, end_date, interval=interval)

@@ -18,10 +18,16 @@ from abc import ABC
 class BacktestEngine(BaseComponent, ABC):
     """回测引擎。"""
 
-    def __init__(self, ticker: str, strategy: BaseStrategy, start_date: str,
-                 end_date: Optional[str] = None, benchmark: Optional[str] = None,
-                 initial_capital: float = 1000000, commission: float = 0.001,
-                 data_fetcher: Optional[DataFetcher] = None, **kwargs):
+    def __init__(self,
+                 ticker: str,
+                 strategy: BaseStrategy,
+                 start_date: str,
+                 end_date: Optional[str] = None,
+                 benchmark: Optional[str] = None,
+                 initial_capital: float = 1000000,
+                 commission: float = 0.001,
+                 data_fetcher: Optional[DataFetcher] = None,
+                 **kwargs):
         """初始化回测引擎。"""
         super().__init__(**kwargs)
         # 回测标的代码
@@ -136,7 +142,10 @@ class BacktestEngine(BaseComponent, ABC):
             self.logger.error(f"_run_backtest 执行失败: {e}")
             raise RuntimeError(f"回测执行失败: {e}") from e
 
-    def _report(self, trades_df: pd.DataFrame, values_df: pd.DataFrame, data: List[TickerData] = None) -> None:
+    def _report(self,
+                trades_df: pd.DataFrame,
+                values_df: pd.DataFrame,
+                data: List[TickerData] = None) -> None:
         """计算绩效指标、打印报告、展示图表。"""
         if trades_df is None or values_df is None:
             raise ValueError("trades_df 或 values_df 为空，请先执行回测。")

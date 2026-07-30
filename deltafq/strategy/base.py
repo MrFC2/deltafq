@@ -14,7 +14,8 @@ class BaseStrategy(BaseComponent, ABC):
         super().__init__(name=name, **kwargs)
 
     @abstractmethod
-    def generate_signals(self, data: List[TickerData],
+    def generate_signals(self,
+                         data: List[TickerData],
                          cash: Optional[float] = None,
                          position: Optional[int] = None,
                          commission: Optional[float] = None) -> List[SignalData]:

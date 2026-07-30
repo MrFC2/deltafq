@@ -51,7 +51,9 @@ class DataStorage(BaseComponent):
     # 行情数据存储
     # ============================================================================
 
-    def save_price_data(self, data: pd.DataFrame, ticker: str,
+    def save_price_data(self,
+                        data: pd.DataFrame,
+                        ticker: str,
                         start_date: Optional[str] = None,
                         end_date: Optional[str] = None) -> Path:
         """保存行情数据。"""
@@ -69,7 +71,9 @@ class DataStorage(BaseComponent):
         self.logger.info(f"已保存价格数据至：{filepath}")
         return filepath
 
-    def load_price_data(self, ticker: str, start_date: Optional[str] = None,
+    def load_price_data(self,
+                        ticker: str,
+                        start_date: Optional[str] = None,
                         end_date: Optional[str] = None) -> Optional[pd.DataFrame]:
         """加载行情数据。"""
         symbol_dir = self.price_dir / ticker.replace('.', '_')
@@ -95,7 +99,10 @@ class DataStorage(BaseComponent):
     # 回测结果存储
     # ============================================================================
 
-    def save_backtest_results(self, trades_df: pd.DataFrame, values_df: pd.DataFrame, ticker: str,
+    def save_backtest_results(self,
+                              trades_df: pd.DataFrame,
+                              values_df: pd.DataFrame,
+                              ticker: str,
                               strategy_name: Optional[str] = None) -> None:
         """保存回测结果。"""
         symbol_dir = self.backtest_dir / ticker.replace('.', '_')
@@ -112,7 +119,9 @@ class DataStorage(BaseComponent):
 
         self.logger.info(f"已保存回测结果至：{symbol_dir}")
 
-    def load_backtest_results(self, ticker: str, strategy_name: Optional[str] = None,
+    def load_backtest_results(self,
+                              ticker: str,
+                              strategy_name: Optional[str] = None,
                               latest: bool = True) -> Optional[Dict[str, pd.DataFrame]]:
         """加载回测结果。"""
         symbol_dir = self.backtest_dir / ticker.replace('.', '_')
@@ -151,8 +160,11 @@ class DataStorage(BaseComponent):
     # 通用存储方法
     # ============================================================================
 
-    def save_data(self, data: pd.DataFrame, filename: str,
-                  category: str = "indicators", subdir: Optional[str] = None) -> Path:
+    def save_data(self,
+                  data: pd.DataFrame,
+                  filename: str,
+                  category: str = "indicators",
+                  subdir: Optional[str] = None) -> Path:
         """按分类保存数据。"""
         if category == "price":
             target_dir = self.price_dir
@@ -194,7 +206,8 @@ class DataStorage(BaseComponent):
     # 工具方法
     # ============================================================================
 
-    def list_files(self, category: Optional[str] = None,
+    def list_files(self,
+                   category: Optional[str] = None,
                    subdir: Optional[str] = None) -> List[str]:
         """列出存储中的所有文件。"""
         if category == "price":

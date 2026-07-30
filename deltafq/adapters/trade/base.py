@@ -12,7 +12,11 @@ class TradeGateway(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def send_order(self, ticker: str, quantity: int, price: float, order_type: OrderType = OrderType.LIMIT) -> str:
+    def send_order(self,
+                   ticker: str,
+                   quantity: int,
+                   price: float,
+                   order_type: OrderType = OrderType.LIMIT) -> str:
         """发送委托，返回委托号。quantity 为负表示卖出。"""
         raise NotImplementedError
 

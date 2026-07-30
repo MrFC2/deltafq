@@ -5,7 +5,9 @@ from ...trader.engine import TraderEngine
 
 
 class PaperTradeGateway(TradeGateway):
-    def __init__(self, initial_capital: float = 1_000_000.0, commission: float = 0.001) -> None:
+    def __init__(self,
+                 initial_capital: float = 1_000_000.0,
+                 commission: float = 0.001) -> None:
         self._engine = TraderEngine(
             cash=initial_capital,
             commission=commission,
@@ -15,7 +17,11 @@ class PaperTradeGateway(TradeGateway):
     def connect(self) -> bool:
         return True
 
-    def send_order(self, ticker: str, quantity: int, price: float, order_type: OrderType = OrderType.LIMIT) -> str:
+    def send_order(self,
+                   ticker: str,
+                   quantity: int,
+                   price: float,
+                   order_type: OrderType = OrderType.LIMIT) -> str:
         return self._engine.execute_order(
             ticker=ticker,
             quantity=quantity,

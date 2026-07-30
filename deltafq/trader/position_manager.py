@@ -15,7 +15,10 @@ class PositionManager(BaseComponent):
         super().__init__(**kwargs)
         self.positions = {}
 
-    def add_position(self, ticker: str, quantity: int, price: Optional[float] = None) -> bool:
+    def add_position(self,
+                     ticker: str,
+                     quantity: int,
+                     price: Optional[float] = None) -> bool:
         """增加或新建持仓。"""
         if ticker in self.positions:
             # 更新已有持仓

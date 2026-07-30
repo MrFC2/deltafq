@@ -60,7 +60,11 @@ class MiniQmtTradeGateway(TradeGateway):
         """断开交易端连接。"""
         self._client.disconnect()
 
-    def send_order(self, ticker: str, quantity: int, price: float, order_type: OrderType = OrderType.LIMIT) -> str:
+    def send_order(self,
+                   ticker: str,
+                   quantity: int,
+                   price: float,
+                   order_type: OrderType = OrderType.LIMIT) -> str:
         """仅支持限价单；数量按 lot_size 向下对齐；返回字符串委托号。"""
         if order_type != OrderType.LIMIT:
             raise ValueError("MiniQmtTradeGateway 当前仅支持限价单")

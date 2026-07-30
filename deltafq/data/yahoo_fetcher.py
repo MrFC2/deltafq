@@ -14,7 +14,10 @@ from ..core.models import TickerData
 class YahooDataFetcher(DataFetcher):
     """基于 yfinance 的行情拉取器。"""
 
-    def fetch_data(self, ticker: str, start_date: str, end_date: Optional[str] = None,
+    def fetch_data(self,
+                   ticker: str,
+                   start_date: str,
+                   end_date: Optional[str] = None,
                    interval: Interval = Interval.DAY_1) -> List[TickerData]:
         try:
             import yfinance as yf

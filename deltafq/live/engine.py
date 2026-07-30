@@ -342,7 +342,11 @@ class LiveEngine(BaseComponent):
             self._ticker_datas.append(ticker_data)
         return True
 
-    def _append_values_record(self, ticker_data: TickerData, signal: Signal, price: float, cash: float,
+    def _append_values_record(self,
+                              ticker_data: TickerData,
+                              signal: Signal,
+                              price: float,
+                              cash: float,
                               position: int) -> None:
         """追加一条权益记录，供 get_values_df / calculate_metrics 使用。"""
         position_value = position * price
@@ -384,7 +388,10 @@ class LiveEngine(BaseComponent):
     #
     #     return 0, 0
 
-    def _handle_signal_to_order(self, signal_data: SignalData, price: float, position: int,
+    def _handle_signal_to_order(self,
+                                signal_data: SignalData,
+                                price: float,
+                                position: int,
                                 ticker_data: TickerData) -> None:
         """相对 _last_signal 发生变化时：尝试撤上一笔挂单，再按规则下限价单。"""
         if self.trade_gateway is None:
@@ -402,19 +409,19 @@ class LiveEngine(BaseComponent):
             if not self.trade_gateway.is_order_terminal(oid):
                 self.trade_gateway.cancel_order(oid)
 
+        # 空仓/观望 → 买入：策略必须给出 quantity，否则不下单
         if signal == Signal.BUY:
-            # 空仓/观望 → 买入：策略必须给出 quantity，否则不下单
             if signal_data.quantity:
-                buy_px = float(ticker_data.ask) if ticker_data.ask is not None else price  # 优先用卖一价成交
-                self._last_pending_order_id = self.trade_gateway.send_order(self.ticker, signal_data.quantity, buy_px)
+                buy_price = float(ticker_data.ask) if ticker_data.ask is not None else price  # 优先用卖一价成交
+                self._last_pending_order_id = self.trade_gateway.send_order(self.ticker, signal_data.quantity, buy_price)
 
+        # 持仓 → 卖出：quantity 缺失则跳过下单但仍更新信号状态
         if signal == Signal.SELL and position > 0:
-            # 持仓 → 卖出：quantity 缺失则跳过下单但仍更新信号状态
             if not signal_data.quantity:
                 self._last_signal = signal
                 return
-            sell_px = float(ticker_data.bid) if ticker_data.bid is not None else price  # 优先用买一价成交
-            self._last_pending_order_id = self.trade_gateway.send_order(self.ticker, -signal_data.quantity, sell_px)
-        # signal == HOLD：撤旧单后不下新单，等待下次信号
+            sell_price = float(ticker_data.bid) if ticker_data.bid is not None else price  # 优先用买一价成交
+            self._last_pending_order_id = self.trade_gateway.send_order(self.ticker, -signal_data.quantity, sell_price)
 
+        # signal == HOLD：撤旧单后不下新单，等待下次信号
         self._last_signal = signal

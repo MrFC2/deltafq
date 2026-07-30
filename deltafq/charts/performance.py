@@ -173,7 +173,9 @@ class PerformanceChart(BaseComponent):
         return strategy_nv, drawdown, returns_pct, price_norm
 
     @staticmethod
-    def _calc_benchmark(benchmark_close, df: pd.DataFrame, has_price: bool):
+    def _calc_benchmark(benchmark_close,
+                        df: pd.DataFrame,
+                        has_price: bool):
         """对齐基准序列，返回 (bench_norm_price, bench_norm_nv)。"""
         if benchmark_close is None:
             return None, None
@@ -196,8 +198,11 @@ class PerformanceChart(BaseComponent):
         return bench_norm_price, bench_norm_nv
 
     @staticmethod
-    def _add_candle_traces(fig, go, ohlcv_df: pd.DataFrame,
-                           trades_df: Optional[pd.DataFrame], row: int) -> None:
+    def _add_candle_traces(fig,
+                           go,
+                           ohlcv_df: pd.DataFrame,
+                           trades_df: Optional[pd.DataFrame],
+                           row: int) -> None:
         """K 线图 + 买入/卖出标注。"""
         ohlc = _to_ohlc(ohlcv_df)
 
@@ -277,7 +282,10 @@ class PerformanceChart(BaseComponent):
             )
 
     @staticmethod
-    def _add_volume_trace(fig, go, ohlcv_df: pd.DataFrame, row: int) -> None:
+    def _add_volume_trace(fig,
+                          go,
+                          ohlcv_df: pd.DataFrame,
+                          row: int) -> None:
         """成交量柱状图，涨红跌绿。"""
         ohlc = _to_ohlc(ohlcv_df)
 
@@ -440,9 +448,17 @@ class PerformanceChart(BaseComponent):
 
     @staticmethod
     def _add_chart_traces(
-            fig, df, strategy_nv, drawdown, returns_pct,
-            price_norm, bench_norm_price, bench_norm_nv,
-            has_price, offset, go,
+            fig,
+            df,
+            strategy_nv,
+            drawdown,
+            returns_pct,
+            price_norm,
+            bench_norm_price,
+            bench_norm_nv,
+            has_price,
+            offset,
+            go,
     ) -> None:
         """依次向五个图表面板添加 trace，label 显示在曲线末端。"""
 
