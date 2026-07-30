@@ -330,8 +330,7 @@ class LiveEngine(BaseComponent):
         order_amount = getattr(self._strategy, "order_amount", None)
         # 计算本次应买/卖数量
         buy_quantity, sell_quantity = self._calc_order_quantity(signal, price, cash, position, commission,
-                                                                order_quantity,
-                                                                order_amount)
+                                                                order_quantity, order_amount)
 
         # 信号相对上次发生变化时撤旧单、发新单
         self._handle_signal_transition(signal, price, position, buy_quantity, sell_quantity, ticker_data)
@@ -387,16 +386,13 @@ class LiveEngine(BaseComponent):
             order_amount: Optional[float],
     ) -> Tuple[int, int]:
         """按当前信号与上次信号计算本次应买卖的数量，返回 (buy_quantity, sell_quantity)。"""
-        # order_quantity 有效时作为买卖双侧的股数上限
-        quantity_cap = int(order_quantity) if order_quantity and int(order_quantity) > 0 else None
-
         # 信号由非买转买
         if self._last_signal != Signal.BUY and signal == Signal.BUY:
             # 现金可承受的最大股数
             max_buy_quantity = max(0, int(cash / (price * (1 + commission))))
-            if quantity_cap is not None:
+            if order_quantity and order_quantity > 0:
                 # 股数上限优先
-                return min(quantity_cap, max_buy_quantity), 0
+                return min(order_quantity, max_buy_quantity), 0
             if order_amount is not None and order_amount > 0:
                 # 金额上限次之
                 return min(max(0, int(order_amount / (price * (1 + commission)))), max_buy_quantity), 0
@@ -406,7 +402,9 @@ class LiveEngine(BaseComponent):
         # 信号由非卖转卖
         if self._last_signal != Signal.SELL and signal == Signal.SELL and position > 0:
             # 有股数上限则不超过持仓，否则清仓
-            return 0, min(position, quantity_cap) if quantity_cap is not None else position
+            if order_quantity and order_quantity > 0:
+                return 0, min(position, order_quantity)
+            return 0, position
 
         return 0, 0
 
