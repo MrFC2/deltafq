@@ -35,11 +35,11 @@ class QmtDataFetcher(DataFetcher):
 
     def fetch_data(self,
                    ticker: str,
+                   interval: Interval,
                    start_date: str,
-                   end_date: Optional[str] = None,
-                   interval: Interval = Interval.DAY_1) -> List[TickerData]:
+                   end_date: Optional[str] = None) -> List[TickerData]:
         try:
-            data = fetch_data(ticker, start_date, end_date, interval=interval)
+            data = fetch_data(ticker, start_date, end_date, interval)
             data = self._cleaner.dropna(data)
             return self.df_to_ticker_data(ticker, data)
         except Exception as e:

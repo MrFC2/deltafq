@@ -47,7 +47,7 @@ class BaostockDataGateway(DataGateway):
         # 已订阅标的列表
         self._tickers: List[str] = []
         # 各标的最后一根 K 线时间戳，用于去重推送
-        self._last_data_timestamp: Dict[str, Any] = {}
+        self._last_data_timestamp: Dict[str, datetime] = {}
 
         # --- 运行时状态 ---
         # 轮询线程运行标志
@@ -164,4 +164,4 @@ class BaostockDataGateway(DataGateway):
         """用已登录会话拉近 7 日 K 线。"""
         start = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
         end = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-        return self.data_fetcher.fetch_data(ticker, start, end, interval=interval)
+        return self.data_fetcher.fetch_data(ticker, interval, start, end)

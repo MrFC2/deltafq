@@ -41,9 +41,9 @@ class BaostockDataFetcher(DataFetcher):
 
     def fetch_data(self,
                    ticker: str,
+                   interval: Interval,
                    start_date: str,
-                   end_date: Optional[str] = None,
-                   interval: Interval = Interval.DAY_1) -> List[TickerData]:
+                   end_date: Optional[str] = None) -> List[TickerData]:
         """拉取历史 K 线，返回 TickerData 列表。end_date 排他（与 yahoo 一致）。"""
         if self.bs is not None:
             bs = self.bs

@@ -215,7 +215,7 @@ class LiveEngine(BaseComponent):
         end = (now + timedelta(days=1)).strftime("%Y-%m-%d")
 
         try:
-            data = self._data_fetcher.fetch_data(self.ticker, start, end, self.strategy_interval)
+            data = self._data_fetcher.fetch_data(self.ticker, self.strategy_interval, start, end)
         except Exception as e:
             self.logger.warning(f"DataFetcher 拉取失败: {e}")
             return None
