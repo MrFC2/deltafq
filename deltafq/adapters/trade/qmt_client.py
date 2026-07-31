@@ -56,12 +56,10 @@ def market_by_stock_code(stock_code: str, xtconstant: Any) -> Optional[int]:
 class QmtXtTraderClient:
     """封装 XtQuantTrader：连柜台下限价撤单，查资金持仓委托成交；不做本地仿真。"""
 
-    def __init__(
-        self,
-        userdata_mini_path: Optional[str] = None,
-        account_id: Optional[str] = None,
-        session_id: Optional[int] = None,
-    ) -> None:
+    def __init__(self,
+                 userdata_mini_path: Optional[str] = None,
+                 account_id: Optional[str] = None,
+                 session_id: Optional[int] = None) -> None:
         """路径与账号可传参或用 QMT_USERDATA_MINI、QMT_ACCOUNT_ID；会话号不传则随机。"""
         self.userdata_mini_path = (userdata_mini_path or os.environ.get("QMT_USERDATA_MINI") or "").strip()
         self.account_id = (account_id or os.environ.get("QMT_ACCOUNT_ID") or "").strip()
@@ -153,21 +151,20 @@ class QmtXtTraderClient:
             self._xt = None
             self._acc = None
 
-    def order_stock_limit(
-        self,
-        stock_code: str,
-        volume: int,
-        price: float,
-        is_buy: bool,
-        strategy_name: str = "deltafq",
-        order_remark: str = "",
-    ) -> int:
+    def order_stock_limit(self,
+                          stock_code: str,
+                          volume: int,
+                          price: float,
+                          is_buy: bool,
+                          strategy_name: str = "deltafq",
+                          order_remark: str = "") -> int:
         """限价委托；返回柜台委托号，失败多为 -1 或 0，以柜台为准。"""
         if self._xt is None or self._acc is None:
             raise RuntimeError("未连接，请先调用 connect()")
         oc = self._xtconstant
         direction = oc.STOCK_BUY if is_buy else oc.STOCK_SELL
-        oid = self._xt.order_stock(self._acc, stock_code, direction, int(volume), oc.FIX_PRICE, float(price), strategy_name, order_remark or "")
+        oid = self._xt.order_stock(self._acc, stock_code, direction, int(volume), oc.FIX_PRICE, float(price),
+                                   strategy_name, order_remark or "")
         return int(oid) if oid is not None else -1
 
     def cancel_order_stock(self, order_id: int) -> int:
