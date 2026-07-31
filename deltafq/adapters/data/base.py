@@ -10,11 +10,11 @@ class DataGateway(BaseComponent, ABC):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self._on_tick: Optional[Callable[[TickerData], None]] = None
+        self._push: Optional[Callable[[TickerData], None]] = None
 
-    def set_on_tick(self, callback: Callable[[TickerData], None]) -> None:
-        """注册 Tick 回调。"""
-        self._on_tick = callback
+    def set_push(self, callback: Callable[[TickerData], None]) -> None:
+        """注册 Tick 推送回调。"""
+        self._push = callback
 
     @abstractmethod
     def connect(self) -> bool:

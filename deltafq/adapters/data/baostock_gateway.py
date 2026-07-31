@@ -143,23 +143,19 @@ class BaostockDataGateway(DataGateway):
     def _warm_up(self, ticker: str) -> None:
         """最近交易日 5m K 线，逐根合成暖机 tick。"""
         try:
-            data = self._fetch_recent_7_day_data(ticker, Interval.MINUTE_5)
-            if not data:
+            datas = self._fetch_recent_7_day_data(ticker, Interval.MINUTE_5)
+            if not datas:
                 self.logger.warning(f"{ticker} 暖机数据为空")
                 return
             # 只取最近一个交易日的 bar，避免把历史数据当成实时 tick 推出去
-            last_day = data[-1].timestamp.date()
-            pushed_count = 0
-            for row in data:
-                if row.timestamp.date() != last_day:
-                    continue
-                ticker_data = TickerData(ticker=row.ticker, timestamp=row.timestamp, price=row.price, open=row.open,
-                                         high=row.high, low=row.low, volume=row.volume, is_warm_up=True)
-                if self._on_tick:
-                    self._on_tick(ticker_data)
-                pushed_count += 1
+            latest_day = datas[-1].timestamp.date()
+            latest_day_data = [row for row in datas if row.timestamp.date() == latest_day]
+            for data in latest_day_data:
+                data.is_warm_up = True
+                if self._push:
+                    self._push(data)
             # 记录最后一根 bar 时间戳，防止轮询时重复推送同一根
-            self._last_data_timestamp[ticker] = data[-1].timestamp
+            self._last_data_timestamp[ticker] = datas[-1].timestamp
         except Exception as e:
             self.logger.warning(f"{ticker} 暖机失败: {e}")
 
@@ -178,11 +174,8 @@ class BaostockDataGateway(DataGateway):
                     if self._last_data_timestamp.get(ticker) == data_timestamp:
                         continue
                     self._last_data_timestamp[ticker] = data_timestamp
-                    ticker_data = TickerData(ticker=latest_data.ticker, timestamp=latest_data.timestamp,
-                                             price=latest_data.price, open=latest_data.open, high=latest_data.high,
-                                             low=latest_data.low, volume=latest_data.volume)
-                    if self._on_tick:
-                        self._on_tick(ticker_data)
+                    if self._push:
+                        self._push(latest_data)
                 except Exception as e:
                     self.logger.error(f"拉取 {ticker} 数据出错: {str(e)}")
                     continue

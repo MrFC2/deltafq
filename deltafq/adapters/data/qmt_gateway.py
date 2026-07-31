@@ -152,8 +152,8 @@ class QmtDataGateway(DataGateway):
                 volume = int(row["Volume"])
                 ticker_data = TickerData(ticker=ticker, timestamp=ts, price=price, open=float(row["Open"]),
                                          high=float(row["High"]), low=float(row["Low"]), volume=volume, is_warm_up=True)
-                if self._on_tick:
-                    self._on_tick(ticker_data)
+                if self._push:
+                    self._push(ticker_data)
                 pushed += 1
             self.logger.info(f"已订阅并暖机 {ticker}（{pushed} 根）")
         except Exception as e:
@@ -197,8 +197,8 @@ class QmtDataGateway(DataGateway):
                                              high=float(tick.get("high") or tick.get("highPrice") or 0) or None,
                                              low=float(tick.get("low") or tick.get("lowPrice") or 0) or None,
                                              volume=int(vol) if vol is not None else None, bid=bid, ask=ask)
-                    if self._on_tick:
-                        self._on_tick(ticker_data)
+                    if self._push:
+                        self._push(ticker_data)
                 except Exception as e:
                     self.logger.error(f"轮询 {ticker} 出错: {e}")
             time.sleep(self.interval)
@@ -245,8 +245,8 @@ class QmtDataGateway(DataGateway):
                 bid, ask = self._bid_ask_from_dict(row)
                 ticker_data = TickerData(ticker=code, price=float(last), timestamp=ts,
                                          volume=int(vol) if vol is not None else None, bid=bid, ask=ask)
-                if self._on_tick:
-                    self._on_tick(ticker_data)
+                if self._push:
+                    self._push(ticker_data)
 
     def _get_full_tick(self, ticker: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
         """调 get_full_tick；成功返回快照和 None，失败返回 None 和错误说明。"""

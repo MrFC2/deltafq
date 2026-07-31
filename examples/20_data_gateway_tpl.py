@@ -77,7 +77,7 @@ if __name__ == "__main__":
                 done.set()
 
     # 注册 Tick 回调
-    gw.set_on_tick(on_tick)
+    gw.set_push(on_tick)
 
     sec("live")
     # 启动网关循环（轮询/推送）

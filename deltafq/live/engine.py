@@ -124,7 +124,7 @@ class LiveEngine(BaseComponent):
         if not self.data_gateway.connect() or not self.trade_gateway.connect():
             raise RuntimeError("网关连接失败")
         # 将网关推送的 tick 直接回调策略处理
-        self.data_gateway.set_on_tick(self._run_strategy)
+        self.data_gateway.set_push(self._run_strategy)
         # 订阅标的并启动行情流
         self.data_gateway.subscribe([self.ticker])
         self.data_gateway.start()
