@@ -287,13 +287,13 @@ class LiveEngine(BaseComponent):
             if interval < self.strategy_interval.refetch_seconds:
                 return False
 
-        data = self._fetch_data()
-        if data is None:
+        datas = self._fetch_data()
+        if datas is None:
             return False
 
         self._ticker_datas.clear()
-        for ticker_data in data:
-            self._ticker_datas.append(ticker_data)
+        for data in datas:
+            self._ticker_datas.append(data)
         return True
 
     def _append_values_record(self,

@@ -14,7 +14,7 @@ miniQMT 行情（xtdata），类 MiniQmtDataGateway。
     _unsubscribe_push    push 停时退订
     _run_poll            按间隔拉全快照轮询
     _run_push            订分笔并阻塞 run
-    _on_push_datas       分笔回调里组 TickerData
+    _on_push_tick        分笔回调里组 TickerData
     _get_full_tick       封装 get_full_tick
     _bid_ask_from_dict   快照 dict 取买一卖一
     _ts_from_millis_or_now  行情时间转 datetime
@@ -24,10 +24,12 @@ import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-from source.data.qmt_fetcher import fetch_data, import_xtdata as _import_xtdata
+from xtquant import xtdata  # type: ignore
+
+from source.data.qmt_fetcher import fetch_data
 from .base import DataGateway
 from ...core.models import TickerData
-from ...enums import Interval
+from ...enums import GatewayMode, Interval
 
 
 class QmtDataGateway(DataGateway):
@@ -36,26 +38,35 @@ class QmtDataGateway(DataGateway):
     def __init__(self,
                  interval: float = 3.0,
                  dividend_type: str = "none",
-                 mode: str = "poll",
+                 mode: GatewayMode = GatewayMode.POLL,
                  **kwargs: Any) -> None:
         """轮询间隔秒、K 线除权类型、模式 poll 或 push。"""
         super().__init__(**kwargs)
+
+        # --- 配置参数 ---
+        # 轮询间隔（秒），仅 poll 模式使用
         self.interval = interval
+        # K 线除权类型（none / 前复权等）
         self.dividend_type = dividend_type
-        self.mode = (mode or "poll").strip().lower()
-        if self.mode not in ("poll", "push"):
-            raise ValueError("mode 必须为 poll 或 push")
+        # 行情模式：poll 定时拉全快照，push 订分笔
+        self.mode: GatewayMode = mode
+
+        # --- 订阅状态 ---
+        # 已订阅标的列表
         self._tickers: List[str] = []
+
+        # --- 运行时状态 ---
+        # 轮询/推送线程运行标志
         self._running = False
+        # 后台 daemon 线程
         self._thread: Optional[threading.Thread] = None
-        self._quote_seqs: List[int] = []
-        self.logger.info(f"Initialized MiniQmtDataGateway mode={self.mode} interval={self.interval}s")
+        # push 模式下各标的订阅序号，退订时使用
+        self._ticker_sub_seqs: List[int] = []
 
     def connect(self) -> bool:
         """加载 xtdata，本机需已启动 miniQMT。"""
         try:
-            _import_xtdata()
-            self.logger.info("xtquant xtdata 已加载（请确保 miniQMT 正在运行）")
+            # xtdata 已在顶层导入，此处仅保留 try-catch 用于统一错误处理
             return True
         except Exception as e:
             self.logger.error(f"miniQMT 连接失败: {e}")
@@ -73,24 +84,21 @@ class QmtDataGateway(DataGateway):
         """起后台线程：poll 轮询快照，push 订分笔并跑 xtdata.run。"""
         if self._running:
             return
-        self._running = True
-        if self.mode == "poll":
-            self.logger.info("启动 miniQMT 轮询循环")
+        if self.mode == GatewayMode.POLL:
             self._thread = threading.Thread(target=self._run_poll, daemon=True)
         else:
-            self.logger.info("启动 miniQMT subscribe_quote + xtdata.run()")
             self._thread = threading.Thread(target=self._run_push, daemon=True)
         self._thread.start()
+        self._running = True
 
     def stop(self) -> None:
         """停线程；push 会退订并调 stop（若有）；join 等线程结束。"""
         self._running = False
-        if self.mode == "push":
+        if self.mode == GatewayMode.PUSH:
             self._unsubscribe_push()
         if self._thread:
             self._thread.join(timeout=5.0)
         self._thread = None
-        self.logger.info(f"已停止 MiniQmtDataGateway（{self.mode}）")
 
     def get_today_ohlc(self, ticker: str) -> Optional[Dict[str, float]]:
         """从快照取当日开、高、低三个 float；缺或错返回 None。"""
@@ -133,45 +141,41 @@ class QmtDataGateway(DataGateway):
     # ---------- 私有 ----------
 
     def _warm_up(self, ticker: str) -> None:
-        """近一日 1m 收盘合成暖机 tick。"""
-        self.logger.debug(f"正在用 miniQMT 1m 数据暖机 {ticker}...")
+        """近一日 1m 收盘合成暖机 tick。 TODO 这个warmup现在没意义，看下后面怎么改"""
         try:
             end = datetime.now()
             start = end - timedelta(days=1)
-            data = fetch_data(ticker, start.strftime("%Y-%m-%d"), None, interval=Interval.MINUTE_1,
-                              dividend_type=self.dividend_type)
-            if data.empty:
+            datas = fetch_data(ticker, start.strftime("%Y-%m-%d"), None, interval=Interval.MINUTE_1,
+                               dividend_type=self.dividend_type)
+            if datas.empty:
                 self.logger.warning(f"{ticker} 暖机数据为空")
                 return
-            pushed = 0
-            for timestamp, row in data.iterrows():
+            for timestamp, data in datas.iterrows():
                 ts = timestamp.to_pydatetime() if hasattr(timestamp, "to_pydatetime") else timestamp
                 if getattr(ts, "tzinfo", None) is not None:
                     ts = ts.replace(tzinfo=None)
-                price = float(row["Close"])
-                volume = int(row["Volume"])
-                ticker_data = TickerData(ticker=ticker, timestamp=ts, price=price, open=float(row["Open"]),
-                                         high=float(row["High"]), low=float(row["Low"]), volume=volume, is_warm_up=True)
+                price = float(data["Close"])
+                volume = int(data["Volume"])
+                ticker_data = TickerData(ticker=ticker, timestamp=ts, price=price, open=float(data["Open"]),
+                                         high=float(data["High"]), low=float(data["Low"]), volume=volume,
+                                         is_warm_up=True)
                 if self._push:
                     self._push(ticker_data)
-                pushed += 1
-            self.logger.info(f"已订阅并暖机 {ticker}（{pushed} 根）")
         except Exception as e:
             self.logger.warning(f"{ticker} 暖机失败: {e}")
 
     def _unsubscribe_push(self) -> None:
         """push 停时逐个退订 quote，再调 xtdata.stop（有则调）。"""
-        if not self._quote_seqs:
+        if not self._ticker_sub_seqs:
             return
         try:
-            xd = _import_xtdata()
-            for seq in self._quote_seqs:
+            for seq in self._ticker_sub_seqs:
                 try:
-                    xd.unsubscribe_quote(seq)
+                    xtdata.unsubscribe_quote(seq)
                 except Exception as e:
-                    self.logger.debug(f"unsubscribe_quote {seq} 失败: {e}")
-            self._quote_seqs.clear()
-            stop_fn = getattr(xd, "stop", None)
+                    self.logger.warning(f"unsubscribe_quote {seq} 失败: {e}")
+            self._ticker_sub_seqs.clear()
+            stop_fn = getattr(xtdata, "stop", None)
             if callable(stop_fn):
                 stop_fn()
         except Exception as e:
@@ -204,27 +208,28 @@ class QmtDataGateway(DataGateway):
             time.sleep(self.interval)
 
     def _run_push(self) -> None:
-        """等标的有列表后逐只 subscribe_quote，最后阻塞 xd.run。"""
-        # 启动可能早于订阅，先空转等到标的非空。
-        while self._running and not self._tickers:
-            time.sleep(0.1)
+        """逐只 subscribe_quote，最后阻塞 xd.run。"""
+        # 防御性检查：线程启动时已被 stop
         if not self._running:
             return
-        xd = _import_xtdata()
-        self._quote_seqs = []
+
+        # 逐个标的订阅分笔行情
+        self._ticker_sub_seqs = []
         for ticker in list(self._tickers):
-            if not self._running:
-                break
-            seq = xd.subscribe_quote(ticker, period="tick", start_time="", end_time="", count=0,
-                                     callback=self._on_push_datas)
+            seq = xtdata.subscribe_quote(ticker, period="tick", start_time="", end_time="", count=0,
+                                         callback=self._on_push_datas)
             if seq < 0:
                 self.logger.error(f"subscribe_quote 失败 {ticker}: {seq}")
                 continue
-            self._quote_seqs.append(seq)
-        if not self._running or not self._quote_seqs:
+            self._ticker_sub_seqs.append(seq)
+
+        # 无成功订阅则退出
+        if not self._ticker_sub_seqs:
             return
+
+        # 阻塞运行 xtdata 事件循环，直到 stop() 调用 unsubscribe
         try:
-            xd.run()
+            xtdata.run()
         except Exception as e:
             if self._running:
                 self.logger.error(f"xtdata.run 异常: {e}")
@@ -233,17 +238,20 @@ class QmtDataGateway(DataGateway):
         """分笔推送回调：行转 TickerData 再交 tick 回调。"""
         if not self._running:
             return
+        # datas 结构：{标的代码: [分笔行, ...]}
         for code, rows in (datas or {}).items():
             for row in rows or []:
+                # 跳过格式异常的推送数据
                 if not isinstance(row, dict):
                     continue
-                last = row.get("lastPrice") or row.get("last_price") or row.get("price")
-                if last is None:
+                # 兼容多种字段名
+                price = row.get("lastPrice") or row.get("last_price") or row.get("price")
+                if price is None:
                     continue
                 vol = row.get("volume") or row.get("lastVolume")
                 ts = self._ts_from_millis_or_now(row.get("time"))
                 bid, ask = self._bid_ask_from_dict(row)
-                ticker_data = TickerData(ticker=code, price=float(last), timestamp=ts,
+                ticker_data = TickerData(ticker=code, price=float(price), timestamp=ts,
                                          volume=int(vol) if vol is not None else None, bid=bid, ask=ask)
                 if self._push:
                     self._push(ticker_data)
@@ -251,7 +259,6 @@ class QmtDataGateway(DataGateway):
     def _get_full_tick(self, ticker: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
         """调 get_full_tick；成功返回快照和 None，失败返回 None 和错误说明。"""
         try:
-            xtdata = _import_xtdata()
             data = xtdata.get_full_tick([ticker])
             if not data or ticker not in data:
                 return None, f"{ticker} 无快照"

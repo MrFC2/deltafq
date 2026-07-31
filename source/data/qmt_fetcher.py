@@ -5,9 +5,10 @@ miniQMT 历史 K 线适配（xtdata）。
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import List, Optional
 
 import pandas as pd
+from xtquant import xtdata  # type: ignore
 
 from source.data.fetcher import DataFetcher
 from source.enums import Interval
@@ -46,17 +47,6 @@ class QmtDataFetcher(DataFetcher):
             raise RuntimeError(f"拉取 {ticker} 数据失败: {str(e)}") from e
 
 
-def import_xtdata() -> Any:
-    """导入 xtdata；未安装 xtquant 时给出明确错误提示。"""
-    try:
-        from xtquant import xtdata  # type: ignore
-    except ImportError as e:
-        raise ImportError(
-            "miniQMT requires xtquant (pip install xtquant). Ensure miniQMT is running when using xtdata."
-        ) from e
-    return xtdata
-
-
 def interval_to_xt_period(interval: Interval) -> str:
     """把 Interval 枚举转为 xt 周期并校验合法性。"""
     p = _PERIOD_MAP.get(interval)
@@ -80,28 +70,25 @@ def _end_exclusive_to_xt(end_date: Optional[str]) -> str:
         return ymd
 
 
-def fetch_data(
-        ticker: str,
-        start_date: str,
-        end_date: Optional[str] = None,
-        interval: Interval = Interval.DAY_1,
-        dividend_type: str = "none",
-) -> pd.DataFrame:
+def fetch_data(ticker: str,
+               start_date: str,
+               end_date: Optional[str] = None,
+               interval: Interval = Interval.DAY_1,
+               dividend_type: str = "none") -> pd.DataFrame:
     """拉取历史 K 线并返回 Open/High/Low/Close/Volume 列。"""
-    xtdata = import_xtdata()
     period = interval_to_xt_period(interval)
-    t0 = _compact_date(start_date)
-    t1 = _end_exclusive_to_xt(end_date) if end_date else ""
+    start_time = _compact_date(start_date)
+    end_time = _end_exclusive_to_xt(end_date) if end_date else ""
 
-    xtdata.download_history_data(ticker, period, t0, t1)
+    xtdata.download_history_data(ticker, period, start_time, end_time)
 
     fields = ["time", *_OHLCV_FIELDS]
     bars = xtdata.get_market_data(
         field_list=fields,
         stock_list=[ticker],
         period=period,
-        start_time=t0,
-        end_time=t1,
+        start_time=start_time,
+        end_time=end_time,
         count=-1,
         dividend_type=dividend_type,
         fill_data=True,

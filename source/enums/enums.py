@@ -30,6 +30,12 @@ class DataSource(Enum):
     MINIQMT = "miniqmt"
 
 
+class GatewayMode(Enum):
+    """数据网关模式。"""
+    POLL = "poll"  # 轮询拉全快照
+    PUSH = "push"  # 订阅分笔推送
+
+
 class EventType(Enum):
     """事件总线事件类型。"""
     TICK = "tick"
