@@ -10,10 +10,10 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from deltafq.data import BaostockDataFetcher
-from deltafq.strategy.base import BaseStrategy
-from deltafq.core.models import SignalData, TickerData
-from deltafq.enums import Signal
+from source.data import BaostockDataFetcher
+from source.strategy.base import BaseStrategy
+from source.core.models import SignalData, TickerData
+from source.enums import Signal
 
 
 class DemoStrategy(BaseStrategy):

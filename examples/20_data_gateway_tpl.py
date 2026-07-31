@@ -8,9 +8,9 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from deltafq.live import create_data_gateway
-from deltafq.adapters.data.base import DataGateway
-from deltafq.core.models import TickerData
+from source.live import create_data_gateway
+from source.adapters.data.base import DataGateway
+from source.core.models import TickerData
 
 NAME = "baostock"  # "miniqmt" | "baostock"
 SYMBOL = "600000.SH" # "600000.SH" | "sh.600000"

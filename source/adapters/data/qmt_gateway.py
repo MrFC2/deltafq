@@ -24,7 +24,7 @@ import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-from deltafq.data.qmt_fetcher import fetch_data, import_xtdata as _import_xtdata
+from source.data.qmt_fetcher import fetch_data, import_xtdata as _import_xtdata
 from .base import DataGateway
 from ...core.models import TickerData
 from ...enums import Interval

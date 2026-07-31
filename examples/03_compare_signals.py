@@ -11,9 +11,9 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from deltafq.data import BaostockDataFetcher
-from deltafq.indicators import TechnicalIndicators
-from deltafq.strategy import SignalGenerator
+from source.data import BaostockDataFetcher
+from source.indicators import TechnicalIndicators
+from source.strategy import SignalGenerator
 
 
 def main() -> None:

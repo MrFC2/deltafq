@@ -10,11 +10,11 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 import pandas as pd
-from deltafq.data import BaostockDataFetcher, DataStorage
-from deltafq.strategy.base import BaseStrategy
-from deltafq.trader.engine import TraderEngine
-from deltafq.core.models import SignalData, TickerData
-from deltafq.enums import Signal
+from source.data import BaostockDataFetcher, DataStorage
+from source.strategy.base import BaseStrategy
+from source.trader.engine import TraderEngine
+from source.core.models import SignalData, TickerData
+from source.enums import Signal
 from typing import List
 
 

@@ -47,7 +47,7 @@ pip install deltafq
 ## ⚡ 快速上手
 
 ```python
-import deltafq as dfq
+import source as dfq
 
 
 # 1. 定义策略逻辑
@@ -91,7 +91,7 @@ DeltaFStation 基于 deltafq 的开源量化交易云平台，集成数据服务
 ### miniQMT 实盘接口最小接入
 
 ```python
-from deltafq.live import LiveEngine
+from source.live import LiveEngine
 
 engine = LiveEngine(symbol="000001.SZ", signal_interval="1m")
 engine.set_data_gateway("miniqmt", interval=3.0, mode="poll")

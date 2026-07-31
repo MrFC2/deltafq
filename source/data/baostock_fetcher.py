@@ -9,9 +9,9 @@ from typing import List, Optional
 
 import pandas as pd
 
-from deltafq.data.fetcher import DataFetcher
-from deltafq.enums import Interval
-from deltafq.core.models import TickerData
+from source.data.fetcher import DataFetcher
+from source.enums import Interval
+from source.core.models import TickerData
 
 # Interval 枚举 → baostock frequency
 _FREQ = {

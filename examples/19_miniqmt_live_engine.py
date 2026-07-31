@@ -10,13 +10,13 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from deltafq.live import LiveEngine
-from deltafq.adapters.data.qmt_gateway import QmtDataGateway
-from deltafq.adapters.trade.qmt_gateway import QmtTradeGateway
-from deltafq.strategy.base import BaseStrategy
-from deltafq.enums import Interval
-from deltafq.core.models import SignalData, TickerData
-from deltafq.enums import Signal
+from source.live import LiveEngine
+from source.adapters.data.qmt_gateway import QmtDataGateway
+from source.adapters.trade.qmt_gateway import QmtTradeGateway
+from source.strategy.base import BaseStrategy
+from source.enums import Interval
+from source.core.models import SignalData, TickerData
+from source.enums import Signal
 from typing import List
 
 MIN_PATH = os.environ.get("QMT_USERDATA_MINI", r"D:\国金证券QMT交易端\userdata_mini")

@@ -3,16 +3,15 @@ baostock 行情，类 BaostockDataGateway。
 
 对外
     connect              bs.login
-    subscribe            追加标的并 5m 暖机回放
+    subscribe            追加订阅标的
     start                开 daemon 线程轮询最新 5m
     stop                 停线程并 logout
     get_today_ohlc       当日开高低（日线）
     get_depths           合成盘口（价由最新 close 铺档）
 
 私有
-    _warm_up             最近交易日 5m 逐根暖机 tick
     _run                 主循环：bar 时间戳变化才推送
-    _fetch_bars          已登录会话上拉 K 线
+    _fetch_recent_7_day_data  已登录会话拉近 7 日 K 线
 """
 import random
 import threading
@@ -22,7 +21,7 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from deltafq.data.baostock_fetcher import BaostockDataFetcher
+from source.data.baostock_fetcher import BaostockDataFetcher
 from ...enums import Interval
 from .base import DataGateway
 from ...core.models import TickerData
@@ -70,11 +69,10 @@ class BaostockDataGateway(DataGateway):
             return False
 
     def subscribe(self, tickers: List[str]) -> bool:
-        """追加订阅；新标的拉最近交易日 5m 暖机并逐根回调。"""
+        """追加订阅标的。"""
         new_ticker = [s for s in tickers if s not in self._tickers]
         for ticker in new_ticker:
             self._tickers.append(ticker)
-            self._warm_up(ticker)
         return True
 
     def start(self) -> None:
@@ -139,25 +137,6 @@ class BaostockDataGateway(DataGateway):
         return {"bids": bids, "asks": asks}
 
     # ---------- 私有 ----------
-
-    def _warm_up(self, ticker: str) -> None:
-        """最近交易日 5m K 线，逐根合成暖机 tick。"""
-        try:
-            datas = self._fetch_recent_7_day_data(ticker, Interval.MINUTE_5)
-            if not datas:
-                self.logger.warning(f"{ticker} 暖机数据为空")
-                return
-            # 只取最近一个交易日的 bar，避免把历史数据当成实时 tick 推出去
-            latest_day = datas[-1].timestamp.date()
-            latest_day_data = [row for row in datas if row.timestamp.date() == latest_day]
-            for data in latest_day_data:
-                data.is_warm_up = True
-                if self._push:
-                    self._push(data)
-            # 记录最后一根 bar 时间戳，防止轮询时重复推送同一根
-            self._last_data_timestamp[ticker] = datas[-1].timestamp
-        except Exception as e:
-            self.logger.warning(f"{ticker} 暖机失败: {e}")
 
     def _run(self) -> None:
         """轮询各标的最新 5m；仅 bar 时间变化时组 TickerData 回调。"""

@@ -9,7 +9,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from deltafq.data import BaostockDataFetcher
+from source.data import BaostockDataFetcher
 
 
 def fetch_watchlist_funds(output_dir: str = "fund_data") -> None:

@@ -2,7 +2,7 @@
 数据拉取示例：使用 baostock 拉取沪深300日线数据。
 """
 
-from deltafq.data import BaostockDataFetcher
+from source.data import BaostockDataFetcher
 
 
 def main() -> None:

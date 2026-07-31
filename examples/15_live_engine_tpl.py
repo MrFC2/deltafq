@@ -4,19 +4,19 @@ import sys
 import os
 import time
 
-from deltafq.adapters.data import BaostockDataGateway
+from source.adapters.data import BaostockDataGateway
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 import pandas as pd
-from deltafq.live import LiveEngine
-from deltafq.adapters.trade.paper_gateway import PaperTradeGateway
-from deltafq.strategy.base import BaseStrategy
-from deltafq.enums import Interval
-from deltafq.core.models import SignalData, TickerData
-from deltafq.enums import Signal
+from source.live import LiveEngine
+from source.adapters.trade.paper_gateway import PaperTradeGateway
+from source.strategy.base import BaseStrategy
+from source.enums import Interval
+from source.core.models import SignalData, TickerData
+from source.enums import Signal
 from typing import List
 
 
