@@ -275,7 +275,7 @@ class LiveEngine(BaseComponent):
         # 根据信号生成买卖订单
         self._make_signal_to_order(latest_signal, position, ticker_data)
 
-        # 追加净值记录
+        # 追加净值记录 TODO 放在这里不太合理，而且用的价格也不太对，后续看下怎么调整
         self._append_values_record(ticker_data, latest_signal.signal, cash, position)
 
     def _append_ticker_datas(self, ticker_data: TickerData) -> bool:
