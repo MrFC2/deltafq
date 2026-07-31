@@ -3,11 +3,11 @@
 
 典型用法::
     engine = LiveEngine(
-        ticker="BTC-USD",
-        data_gateway=YFinanceDataGateway(),
+        ticker="600519.SH",
+        data_gateway=BaostockDataGateway(),
         trade_gateway=PaperTradeGateway(initial_capital=100000),
         strategy=MyStrategy(),
-        strategy_interval=Interval.MINUTE_1,
+        strategy_interval=Interval.MINUTE_5,
         strategy_input_size=50,
     )
     engine.run_live()
@@ -52,14 +52,13 @@ import pandas as pd
 
 from ..backtest.performance import PerformanceReporter
 from ..core.base import BaseComponent
-from ..data import DataFetcher, YahooDataFetcher, BaostockDataFetcher, QmtDataFetcher
+from ..data import DataFetcher, BaostockDataFetcher, QmtDataFetcher
 from ..strategy.base import BaseStrategy
 from ..adapters.data.base import DataGateway
 from ..adapters.trade.base import TradeGateway
 from ..adapters.trade.paper_gateway import PaperTradeGateway
 from ..core.models import SignalData, TickerData
 from ..enums import Interval, Signal
-from ..adapters.data.yfinance_gateway import YFinanceDataGateway
 from ..adapters.data.qmt_gateway import QmtDataGateway
 
 _SIG_ICON = {1: "↑", -1: "↓", 0: "-"}
@@ -196,8 +195,6 @@ class LiveEngine(BaseComponent):
         """非 tick 模式时按网关类型创建对应 DataFetcher，tick 模式返回 None。"""
         if self.strategy_interval == Interval.REALTIME:
             return None
-        if isinstance(self.data_gateway, YFinanceDataGateway):
-            return YahooDataFetcher()
         if isinstance(self.data_gateway, QmtDataGateway):
             return QmtDataFetcher()
         return BaostockDataFetcher()

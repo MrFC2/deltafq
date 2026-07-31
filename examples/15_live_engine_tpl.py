@@ -12,7 +12,6 @@ if project_root not in sys.path:
 
 import pandas as pd
 from deltafq.live import LiveEngine
-from deltafq.adapters.data.yfinance_gateway import YFinanceDataGateway
 from deltafq.adapters.trade.paper_gateway import PaperTradeGateway
 from deltafq.strategy.base import BaseStrategy
 from deltafq.enums import Interval

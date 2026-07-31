@@ -142,7 +142,6 @@ class BaostockDataGateway(DataGateway):
 
     def _warm_up(self, ticker: str) -> None:
         """最近交易日 5m K 线，逐根合成暖机 tick。"""
-        self.logger.debug(f"正在用 baostock 5m 数据暖机 {ticker}...")
         try:
             data = self._fetch_recent_7_day_data(ticker, Interval.MINUTE_5)
             if not data:
@@ -161,7 +160,6 @@ class BaostockDataGateway(DataGateway):
                 pushed_count += 1
             # 记录最后一根 bar 时间戳，防止轮询时重复推送同一根
             self._last_data_timestamp[ticker] = data[-1].timestamp
-            self.logger.info(f"已订阅并暖机 {ticker}（{pushed_count} 根）")
         except Exception as e:
             self.logger.warning(f"{ticker} 暖机失败: {e}")
 

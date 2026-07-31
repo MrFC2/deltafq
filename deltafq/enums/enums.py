@@ -26,7 +26,6 @@ class CombineMethod(Enum):
 
 class DataSource(Enum):
     """行情数据源。"""
-    YAHOO = "yahoo"
     BAOSTOCK = "baostock"
     MINIQMT = "miniqmt"
 

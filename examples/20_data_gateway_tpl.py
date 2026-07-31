@@ -12,10 +12,10 @@ from deltafq.live import create_data_gateway
 from deltafq.adapters.data.base import DataGateway
 from deltafq.core.models import TickerData
 
-NAME = "miniqmt"  # "yfinance" | "miniqmt" | "baostock"
-SYMBOL = "600000.SH" # "AAPL" | "600000.SH" | "sh.600000"
+NAME = "baostock"  # "miniqmt" | "baostock"
+SYMBOL = "600000.SH" # "600000.SH" | "sh.600000"
 
-_LIVE = {"yfinance": ("yfinance",), "miniqmt": ("miniqmt", "miniqmt_push"), "baostock": ("baostock",)}
+_LIVE = {"miniqmt": ("miniqmt", "miniqmt_push"), "baostock": ("baostock",)}
 
 
 def sec(t: str) -> None:
@@ -38,7 +38,7 @@ def print_depths(depths: dict) -> None:
 
 
 if __name__ == "__main__":
-    # 创建数据网关（可切换 yfinance / miniqmt）
+    # 创建数据网关（可切换 baostock / miniqmt）
     gw: DataGateway = create_data_gateway(NAME, interval=5.0)
 
     sec("inst")

@@ -21,7 +21,7 @@ class Config:
         return {
             "data": {
                 "cache_dir": "data_cache",
-                "default_source": "yahoo"
+                "default_source": "baostock"
             },
             "trading": {
                 "initial_capital": 1000000,
