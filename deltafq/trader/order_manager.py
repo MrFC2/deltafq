@@ -5,7 +5,7 @@
 import pandas as pd
 from typing import Dict, List, Optional, Any
 from datetime import datetime
-from ..enums import OrderType, OrderStatus
+from ..enums import OrderType, OrderStatus, Signal
 from ..core.base import BaseComponent
 
 
@@ -19,16 +19,18 @@ class OrderManager(BaseComponent):
 
     def create_order(self,
                      ticker: str,
+                     signal: Signal,
                      quantity: int,
                      order_type: OrderType = None,
                      price: Optional[float] = None,
                      stop_price: Optional[float] = None) -> Dict[str, Any]:
-        """创建新订单，返回订单字典。"""
+        """创建新订单，返回订单字典。quantity 为正整数，方向由 signal 决定。"""
         order_id = f"ORD_{len(self.orders) + 1:06d}"
 
         order = {
             'id': order_id,
             'ticker': ticker,
+            'signal': signal,
             'quantity': quantity,
             'order_type': order_type,
             'price': price,

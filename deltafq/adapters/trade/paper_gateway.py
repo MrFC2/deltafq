@@ -1,6 +1,6 @@
 from .base import TradeGateway
 from ...core.models import SignalData, TickerData
-from ...enums import OrderType, Signal
+from ...enums import OrderType
 from ...trader.engine import TraderEngine
 
 
@@ -18,8 +18,7 @@ class PaperTradeGateway(TradeGateway):
                    signal_data: SignalData,
                    price: float,
                    order_type: OrderType = OrderType.LIMIT) -> str:
-        qty = signal_data.quantity if signal_data.signal == Signal.BUY else -signal_data.quantity
-        return self._engine.execute_order(ticker, qty, order_type, price)
+        return self._engine.execute_order(ticker, signal_data.signal, signal_data.quantity, order_type, price)
 
     def cancel_order(self, order_id: str) -> bool:
         return self._engine.order_manager.cancel_order(order_id)

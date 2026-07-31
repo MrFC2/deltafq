@@ -8,7 +8,7 @@ from ..core.base import BaseComponent
 from .order_manager import OrderManager
 from .position_manager import PositionManager
 
-from ..enums import OrderType
+from ..enums import OrderType, Signal
 
 if TYPE_CHECKING:
     from ..core.models import TickerData
@@ -39,18 +39,19 @@ class TraderEngine(BaseComponent):
 
     def execute_order(self,
                       ticker: str,
+                      signal: Signal,
                       quantity: int,
                       order_type: OrderType,
                       price: Optional[float] = None,
                       timestamp: Optional[datetime] = None) -> str:
-        """执行订单，默认为限价单。"""
+        """执行订单。signal 决定买卖方向，quantity 为正整数。"""
         try:
             # 限价单校验价格
             if order_type == OrderType.LIMIT and price is None:
                 raise ValueError("限价单必须提供价格")
 
             # 创建订单
-            order = self.order_manager.create_order(ticker, quantity, order_type, price)
+            order = self.order_manager.create_order(ticker, signal, quantity, order_type, price)
             order_id = order['id']
 
             # 模拟：立即成交或挂单等待撮合
@@ -66,8 +67,8 @@ class TraderEngine(BaseComponent):
         for order in self.order_manager.get_pending_orders():
             if order["ticker"] != ticker_data.ticker:
                 continue
-            q, ot, p = order["quantity"], order["order_type"], order["price"]
-            match = ot == OrderType.MARKET or (q > 0 and ticker_data.price <= p) or (q < 0 and ticker_data.price >= p)
+            sig, ot, p = order["signal"], order["order_type"], order["price"]
+            match = ot == OrderType.MARKET or (sig == Signal.BUY and ticker_data.price <= p) or (sig == Signal.SELL and ticker_data.price >= p)
             if match:
                 self._on_trade(order["id"], ticker_data.price, ticker_data.timestamp)
                 break  # 每个 tick 每标的只撮合一笔
@@ -82,10 +83,11 @@ class TraderEngine(BaseComponent):
             return
 
         ticker = order['ticker']
+        signal = order['signal']
         quantity = order['quantity']
         timestamp = timestamp or datetime.now()
 
-        if quantity > 0:  # 买入
+        if signal == Signal.BUY:  # 买入
             gross_cost = quantity * execution_price
             commission_amount = gross_cost * self.commission
             total_cost = gross_cost + commission_amount
@@ -109,8 +111,7 @@ class TraderEngine(BaseComponent):
             else:
                 self.logger.warning(f"买入资金不足: 需要 {total_cost:.2f}，当前 {self.cash:.2f}")
                 self.order_manager.cancel_order(order_id)
-        else:  # 卖出
-            quantity = abs(quantity)
+        else:  # 卖出（signal == Signal.SELL）
             if self.position_manager.can_sell(ticker, quantity):
                 gross_revenue = quantity * execution_price
                 commission_amount = gross_revenue * self.commission
