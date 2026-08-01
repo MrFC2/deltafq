@@ -251,8 +251,8 @@ class QmtDataGateway(DataGateway):
                 vol = row.get("volume") or row.get("lastVolume")
                 ts = self._ts_from_millis_or_now(row.get("time"))
                 bid, ask = self._bid_ask_from_dict(row)
-                ticker_data = TickerData(ticker=code, price=float(price), timestamp=ts,
-                                         volume=int(vol) if vol is not None else None, bid=bid, ask=ask)
+                ticker_data = TickerData(ticker=code, price=float(price), timestamp=ts, volume=int(vol),
+                                         bid=bid, ask=ask)
                 if self._push:
                     self._push(ticker_data)
 
