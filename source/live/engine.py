@@ -7,7 +7,6 @@
         data_gateway=BaostockDataGateway(),
         trade_gateway=PaperTradeGateway(initial_capital=100000),
         strategy=MyStrategy(),
-        strategy_interval=Interval.MINUTE_5,
         strategy_input_size=50,
     )
     engine.run_live()
@@ -79,7 +78,6 @@ class LiveEngine(BaseComponent):
                  trade_gateway: TradeGateway,
                  strategy: BaseStrategy,
                  strategy_input_size: int = 100,
-                 strategy_interval: Interval = Interval.MINUTE_5,
                  **kwargs):
         super().__init__(**kwargs)
 
@@ -88,8 +86,6 @@ class LiveEngine(BaseComponent):
         self.ticker: str = ticker
         # 策略所需数据点数（K 线根数或 tick 数）
         self.strategy_input_size: int = strategy_input_size
-        # K 线周期（Interval.REALTIME 时不拉 K 线）
-        self.strategy_interval: Interval = strategy_interval
 
         # --- 核心组件 ---
         # 行情网关
@@ -148,7 +144,7 @@ class LiveEngine(BaseComponent):
         if not self._cached_strategy_input or not self._cached_signals:
             return {"candles": [], "signals": []}
 
-        date_fmt = "%Y-%m-%d" if self.strategy_interval == Interval.DAY_1 else "%Y-%m-%d %H:%M:%S"
+        date_fmt = "%Y-%m-%d" if self._strategy.interval == Interval.DAY_1 else "%Y-%m-%d %H:%M:%S"
 
         candles: List[Dict[str, Any]] = []
         for t in self._cached_strategy_input:
@@ -193,7 +189,7 @@ class LiveEngine(BaseComponent):
 
     def _create_data_fetcher(self) -> Optional[DataFetcher]:
         """非 tick 模式时按网关类型创建对应 DataFetcher，tick 模式返回 None。"""
-        if self.strategy_interval == Interval.REALTIME:
+        if self._strategy.interval == Interval.REALTIME:
             return None
         if isinstance(self.data_gateway, QmtDataGateway):
             return QmtDataFetcher()
@@ -205,9 +201,9 @@ class LiveEngine(BaseComponent):
         if self._data_fetcher is None:
             return None
         now = datetime.now(timezone.utc)
-        if self.strategy_interval.days_per_bar > 0:
+        if self._strategy.interval.days_per_bar > 0:
             # 日/周/月线：按每根 bar 对应日历天数估算拉取范围，多留 60 天缓冲
-            cal_days = int(self.strategy_input_size * self.strategy_interval.days_per_bar) + 60
+            cal_days = int(self.strategy_input_size * self._strategy.interval.days_per_bar) + 60
             start = (now - timedelta(days=max(cal_days, 60))).strftime("%Y-%m-%d")
         else:
             # 分钟/小时线：按 strategy_input_size 估算天数，最少 7 天、最多 60 天
@@ -215,7 +211,7 @@ class LiveEngine(BaseComponent):
         end = (now + timedelta(days=1)).strftime("%Y-%m-%d")
 
         try:
-            data = self._data_fetcher.fetch_data(self.ticker, self.strategy_interval, start, end)
+            data = self._data_fetcher.fetch_data(self.ticker, self._strategy.interval, start, end)
         except Exception as e:
             self.logger.warning(f"DataFetcher 拉取失败: {e}")
             return None
@@ -277,14 +273,14 @@ class LiveEngine(BaseComponent):
 
     def _append_ticker_datas(self, ticker_data: TickerData) -> bool:
         """由当前 tick 更新 _tick_datas；未到重拉间隔时返回 False。"""
-        if self.strategy_interval == Interval.REALTIME:
+        if self._strategy.interval == Interval.REALTIME:
             self._ticker_datas.append(ticker_data)
             return True
 
         # K 线模式：_tick_datas 最后一根的时间戳未超过重拉间隔时跳过
         if self._ticker_datas:
             interval = (datetime.now() - self._ticker_datas[-1].timestamp).total_seconds()
-            if interval < self.strategy_interval.refetch_seconds:
+            if interval < self._strategy.interval.refetch_seconds:
                 return False
 
         datas = self._fetch_data()

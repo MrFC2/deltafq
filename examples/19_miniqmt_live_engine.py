@@ -29,7 +29,7 @@ class DemoStrategy(BaseStrategy):
     _SEQ = (0, 1, -1)
 
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+        super().__init__(interval=Interval.MINUTE_1, **kwargs)
         self.order_quantity = 100
         self._i = 0
 
@@ -51,7 +51,6 @@ def main() -> None:
         ),
         strategy=DemoStrategy(name="SeqNeg010"),
         strategy_input_size=10,
-        strategy_interval=Interval.MINUTE_1,
     )
     engine.run()
     try:

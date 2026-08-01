@@ -14,14 +14,14 @@ from source.backtest import BacktestEngine
 from source.strategy.base import BaseStrategy
 from source.data import BaostockDataFetcher
 from source.core.models import SignalData, TickerData
-from source.enums import Signal
+from source.enums import Signal, Interval
 
 
 class SimpleMAStrategy(BaseStrategy):
     """Simple moving-average crossover strategy."""
 
     def __init__(self, fast_period: int = 5, slow_period: int = 20, **kwargs: Any) -> None:
-        super().__init__(name="SimpleMA", **kwargs)
+        super().__init__(name="SimpleMA", interval=Interval.DAY_1, **kwargs)
         self.fast_period = fast_period
         self.slow_period = slow_period
 
