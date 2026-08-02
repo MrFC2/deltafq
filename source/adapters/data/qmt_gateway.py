@@ -227,7 +227,6 @@ class QmtDataGateway(DataGateway):
             return
 
         # 逐个标的订阅分笔行情
-        self._ticker_sub_seqs = []
         for ticker in list(self._tickers):
             seq = xtdata.subscribe_quote(ticker, period=period.value, start_time="", end_time="", count=0,
                                          callback=self._on_push_datas)
