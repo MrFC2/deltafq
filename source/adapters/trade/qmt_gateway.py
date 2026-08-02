@@ -29,15 +29,13 @@ _MINIQMT_ORDER_STATUS_TERMINAL = frozenset({53, 54, 56, 57})
 class QmtTradeGateway(TradeGateway):
     """连接 miniQMT 并适配 LiveEngine 的下单撤单接口。"""
 
-    def __init__(
-            self,
-            userdata_mini_path: Optional[str] = None,
-            account_id: Optional[str] = None,
-            session_id: Optional[int] = None,
-            strategy_name: str = "deltafq",
-            order_remark: str = "",
-            lot_size: int = 100,
-    ) -> None:
+    def __init__(self,
+                 userdata_mini_path: Optional[str] = None,
+                 account_id: Optional[str] = None,
+                 session_id: Optional[int] = None,
+                 strategy_name: str = "deltafq",
+                 order_remark: str = "",
+                 lot_size: int = 100) -> None:
         """初始化柜台参数；lot_size 用于数量对齐，默认按 A 股 100 股一手。"""
         self._strategy_name = strategy_name
         self._order_remark = order_remark
