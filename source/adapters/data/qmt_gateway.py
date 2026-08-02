@@ -58,6 +58,8 @@ class QmtDataGateway(DataGateway):
         self._thread: Optional[threading.Thread] = None
         # push 模式下各标的订阅序号，退订时使用
         self._ticker_sub_seqs: List[int] = []
+        # K 线模式下各标的上次推送的 K 线时间戳，用于去重
+        self._last_kline_ts: Dict[str, Optional[datetime]] = {}
 
     def connect(self) -> bool:
         """加载 xtdata，本机需已启动 miniQMT。"""
@@ -170,7 +172,7 @@ class QmtDataGateway(DataGateway):
             self.logger.exception(f"push 清理失败: {e}")
 
     def _run_poll(self, period: Period) -> None:
-        """按 period 轮询行情，TICK 模式拉实时快照，K 线模式拉历史最新一根 K 线。"""
+        """按 period 轮询行情，TICK 模式拉实时快照，K 线模式等到新 K 线才推送。"""
         while self._running:
             for ticker in self._tickers:
                 try:
@@ -178,17 +180,14 @@ class QmtDataGateway(DataGateway):
                         # 拉取实时信息
                         ticker_data = self._poll_tick(ticker)
                     else:
-                        # 拉取历史k线
+                        # K 线模式：等到时间戳比上次大才推送
                         ticker_data = self._poll_kline(ticker, period)
-
-                    # 数据推送
                     if ticker_data and self._push:
                         self._push(ticker_data)
                 except Exception as e:
                     self.logger.error(f"轮询 {ticker} 出错: {e}")
 
-            # 循环拉取
-            time.sleep(period.fetch_seconds)
+            time.sleep(period.fetch_seconds + 3)
 
     def _poll_tick(self, ticker: str) -> Optional[TickerData]:
         """拉实时快照，返回 TickerData；失败返回 None。"""
@@ -206,10 +205,20 @@ class QmtDataGateway(DataGateway):
                           volume=int(vol), bid=bid, ask=ask)
 
     def _poll_kline(self, ticker: str, period: Period) -> Optional[TickerData]:
-        """拉最新一根 K 线，返回 TickerData；失败返回 None。"""
-        today = datetime.now().strftime("%Y-%m-%d")
-        datas = fetch_data(ticker, today, None, period=period, dividend_type=self.dividend_type)
-        return datas[-1] if datas else None
+        """拉最新一根 K 线，等到时间戳比上次新才返回；旧数据则睡 1 秒重试。"""
+        while self._running:
+            today = datetime.now().strftime("%Y-%m-%d")
+            datas = fetch_data(ticker, today, None, period=period, dividend_type=self.dividend_type)
+            if datas:
+                data = datas[-1]
+                last_ts = self._last_kline_ts.get(ticker)
+                if last_ts is None or data.timestamp > last_ts:
+                    # 是新 K 线，记录时间戳并返回
+                    self._last_kline_ts[ticker] = data.timestamp
+                    return data
+            # 还是旧数据，等 1 秒再试
+            time.sleep(1)
+        return None
 
     def _run_push(self, period: Period) -> None:
         """逐只 subscribe_quote，最后阻塞 xd.run。"""

@@ -59,7 +59,7 @@ class Period(Enum):
         self.fetch_seconds = fetch_seconds
         self.days_per_bar = days_per_bar
 
-    TICK = ("tick", 3, 0.0)
+    TICK = ("tick", 0, 0.0)
     MINUTE_1 = ("1m", 60, 0.0)
     MINUTE_5 = ("5m", 300, 0.0)
     MINUTE_15 = ("15m", 900, 0.0)

@@ -47,7 +47,7 @@ class BaostockDataGateway(DataGateway):
         # 已订阅标的列表
         self._tickers: List[str] = []
         # 各标的最后一根 K 线时间戳，用于去重推送
-        self._last_data_timestamp: Dict[str, datetime] = {}
+        self._last_kline_ts: Dict[str, datetime] = {}
 
         # --- 运行时状态 ---
         # 轮询线程运行标志
@@ -148,9 +148,9 @@ class BaostockDataGateway(DataGateway):
                     latest_data = data[-1]
                     data_timestamp = latest_data.timestamp
                     # 同一根 K 线不重复推送
-                    if self._last_data_timestamp.get(ticker) == data_timestamp:
+                    if self._last_kline_ts.get(ticker) == data_timestamp:
                         continue
-                    self._last_data_timestamp[ticker] = data_timestamp
+                    self._last_kline_ts[ticker] = data_timestamp
                     if self._push:
                         self._push(latest_data)
                 except Exception as e:
