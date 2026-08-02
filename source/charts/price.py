@@ -11,7 +11,6 @@ class PriceChart(BaseComponent):
     def __init__(self, **kwargs):
         """初始化价格图表。"""
         super().__init__(**kwargs)
-        self.logger.info("初始化价格图表")
 
     def plot_prices(
         self,

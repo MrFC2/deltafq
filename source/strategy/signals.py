@@ -13,14 +13,12 @@ class SignalGenerator(BaseComponent):
     def __init__(self, **kwargs):
         """初始化信号生成器。"""
         super().__init__(**kwargs)
-        self.logger.info("初始化信号生成器")
 
     def _log_signal_counts(self, label: str, series: pd.Series) -> None:
         """记录买入、卖出、持平信号数量。"""
         buy = int((series == 1).sum())
         sell = int((series == -1).sum())
         flat = int((series == 0).sum())
-        self.logger.info(f"{label} signals -> buy={buy}, sell={sell}, flat={flat}")
 
     # --- SMA -----------------------------------------------------------------
     def sma_signals(self, fast_ma: pd.Series, slow_ma: pd.Series) -> pd.Series:

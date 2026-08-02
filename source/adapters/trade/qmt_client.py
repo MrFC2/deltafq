@@ -107,7 +107,7 @@ class QmtXtTraderClient:
             self._account = acc
             return True
         except Exception as e:
-            logger.error("miniQMT 连接异常: %s", e)
+            logger.exception("miniQMT 连接异常: %s", e)
             self._xt = None
             self._account = None
             return False
@@ -120,7 +120,7 @@ class QmtXtTraderClient:
             if hasattr(self._xt, "stop"):
                 self._xt.stop()
         except Exception as e:
-            logger.warning("XtQuantTrader.stop: %s", e)
+            logger.exception("XtQuantTrader.stop: %s", e)
         finally:
             self._xt = None
             self._account = None

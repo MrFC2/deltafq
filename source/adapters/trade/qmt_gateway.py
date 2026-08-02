@@ -70,7 +70,7 @@ class QmtTradeGateway(TradeGateway):
             aligned = (qty // self._lot_size) * self._lot_size
             if aligned <= 0:
                 raise ValueError(f"数量 {qty} 小于最小手数（{self._lot_size}）")
-            logger.warning("adjusting quantity %s -> %s (lot_size=%s)", qty, aligned, self._lot_size)
+            logger.error("adjusting quantity %s -> %s (lot_size=%s)", qty, aligned, self._lot_size)
             qty = aligned
         is_buy = signal_data.signal == Signal.BUY
         oid = self._client.order_stock_limit(ticker, qty, float(price), is_buy, strategy_name=self._strategy_name,
@@ -86,7 +86,7 @@ class QmtTradeGateway(TradeGateway):
             asset = self._client.query_stock_asset()
             return float(getattr(asset, "cash", 0.0) or 0.0) if asset is not None else 0.0
         except Exception as e:
-            logger.warning("query_stock_asset 失败: %s", e)
+            logger.exception("query_stock_asset 失败: %s", e)
             return 0.0
 
     def get_position(self, ticker: str) -> int:
@@ -97,7 +97,7 @@ class QmtTradeGateway(TradeGateway):
                 if (getattr(p, "stock_code", "") or "") == ticker:
                     return int(getattr(p, "can_use_volume", None) or getattr(p, "volume", 0) or 0)
         except Exception as e:
-            logger.warning("query_stock_positions 失败: %s", e)
+            logger.exception("query_stock_positions 失败: %s", e)
         return 0
 
     def get_commission(self) -> float:
@@ -124,7 +124,7 @@ class QmtTradeGateway(TradeGateway):
                     return st in _MINIQMT_ORDER_STATUS_TERMINAL
             return True
         except Exception as e:
-            logger.warning("查询挂单 %s 失败: %s", order_id, e)
+            logger.exception("查询挂单 %s 失败: %s", order_id, e)
             return False
 
     def cancel_order(self, order_id: str) -> bool:
@@ -138,7 +138,7 @@ class QmtTradeGateway(TradeGateway):
         try:
             rc = self._client.cancel_order_stock(oid)
         except Exception as e:
-            logger.warning("cancel_order_stock %s: %s", oid, e)
+            logger.exception("cancel_order_stock %s: %s", oid, e)
             rc = -1
         if rc == 0:
             return True
@@ -160,5 +160,5 @@ class QmtTradeGateway(TradeGateway):
                     rc2 = self._client.cancel_order_stock_sysid(code, str(sysid))
                     return rc2 == 0
         except Exception as e:
-            logger.warning("cancel fallback query: %s", e)
+            logger.exception("cancel fallback query: %s", e)
         return False

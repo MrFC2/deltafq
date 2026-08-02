@@ -68,7 +68,6 @@ class DataStorage(BaseComponent):
 
         filepath = symbol_dir / filename
         data.to_csv(filepath, encoding='utf-8-sig', index=True)
-        self.logger.info(f"已保存价格数据至：{filepath}")
         return filepath
 
     def load_price_data(self,
@@ -84,14 +83,13 @@ class DataStorage(BaseComponent):
             # 查找最新文件
             files = list(symbol_dir.glob(f"{ticker}_*.csv"))
             if not files:
-                self.logger.warning(f"未找到 {ticker} 的价格数据")
+                self.logger.error(f"未找到 {ticker} 的价格数据")
                 return None
             filename = sorted(files)[-1].name
 
         filepath = symbol_dir / filename
         if filepath.exists():
             data = pd.read_csv(filepath, index_col=0, parse_dates=True)
-            self.logger.info(f"已从以下路径加载价格数据：{filepath}")
             return data
         return None
 
@@ -117,8 +115,6 @@ class DataStorage(BaseComponent):
         trades_df.to_csv(trades_path, encoding='utf-8-sig', index=False)
         values_df.to_csv(values_path, encoding='utf-8-sig', index=False)
 
-        self.logger.info(f"已保存回测结果至：{symbol_dir}")
-
     def load_backtest_results(self,
                               ticker: str,
                               strategy_name: Optional[str] = None,
@@ -127,7 +123,7 @@ class DataStorage(BaseComponent):
         symbol_dir = self.backtest_dir / ticker.replace('.', '_')
 
         if not symbol_dir.exists():
-            self.logger.warning(f"未找到 {ticker} 的回测结果")
+            self.logger.error(f"未找到 {ticker} 的回测结果")
             return None
 
         # 查找成交和净值文件
@@ -139,7 +135,7 @@ class DataStorage(BaseComponent):
             values_files = list(symbol_dir.glob(f"{ticker}_values*.csv"))
 
         if not trades_files or not values_files:
-            self.logger.warning(f"未找到 {ticker} 的回测结果")
+            self.logger.error(f"未找到 {ticker} 的回测结果")
             return None
 
         if latest:
@@ -181,7 +177,6 @@ class DataStorage(BaseComponent):
 
         filepath = target_dir / filename
         data.to_csv(filepath, encoding='utf-8-sig', index=False)
-        self.logger.info(f"已保存数据至：{filepath}")
         return filepath
 
     # def load_data(self, filename: str, category: str = "indicators",

@@ -65,7 +65,7 @@ class BaostockDataGateway(DataGateway):
             self.data_fetcher.bs.login()
             return True
         except Exception as e:
-            self.logger.error(f"连接失败: {e}")
+            self.logger.exception(f"连接失败: {e}")
             return False
 
     def subscribe(self, tickers: List[str]) -> bool:
@@ -79,7 +79,6 @@ class BaostockDataGateway(DataGateway):
         """启动轮询线程。"""
         if self._running:
             return
-        self.logger.info("启动 baostock 轮询")
         self._running = True
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
@@ -92,7 +91,6 @@ class BaostockDataGateway(DataGateway):
         if self.data_fetcher.bs is not None:
             self.data_fetcher.bs.logout()
             self.data_fetcher.bs = None
-        self.logger.info("已停止 baostock 轮询")
 
     def get_today_ohlc(self, ticker: str) -> Optional[Dict[str, float]]:
         """从最近日线取开、高、低；缺数据返回 None。"""
@@ -103,7 +101,7 @@ class BaostockDataGateway(DataGateway):
             row = data[-1]
             return {"open": row.open, "high": row.high, "low": row.low}
         except Exception as e:
-            self.logger.error(f"获取 {ticker} 当日 OHLC 失败: {e}")
+            self.logger.exception(f"获取 {ticker} 当日 OHLC 失败: {e}")
             return None
 
     def get_depths(self, ticker: str, levels: int = 5) -> Dict[str, List[Dict[str, float]]]:
@@ -122,7 +120,7 @@ class BaostockDataGateway(DataGateway):
                 return {"bids": [], "asks": []}
             base = row.volume if row.volume and row.volume > 0 else 1000
         except Exception as e:
-            self.logger.debug(f"get_depths {ticker}: {e}")
+            self.logger.exception(f"get_depths {ticker}: {e}")
             return {"bids": [], "asks": []}
 
         lo = max(1, base // 20)
@@ -156,7 +154,7 @@ class BaostockDataGateway(DataGateway):
                     if self._push:
                         self._push(latest_data)
                 except Exception as e:
-                    self.logger.error(f"拉取 {ticker} 数据出错: {str(e)}")
+                    self.logger.exception(f"拉取 {ticker} 数据出错: {str(e)}")
                     continue
             time.sleep(self.interval)
 

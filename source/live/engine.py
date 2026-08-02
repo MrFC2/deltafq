@@ -213,7 +213,7 @@ class LiveEngine(BaseComponent):
         try:
             data = self._data_fetcher.fetch_data(self.ticker, self._strategy.period, start, end)
         except Exception as e:
-            self.logger.warning(f"DataFetcher 拉取失败: {e}")
+            self.logger.exception(f"DataFetcher 拉取失败: {e}")
             return None
         if not data:
             return None
@@ -255,7 +255,7 @@ class LiveEngine(BaseComponent):
             if not signals:
                 return
         except Exception as e:
-            self.logger.warning(f"策略信号执行失败: {e}")
+            self.logger.exception(f"策略信号执行失败: {e}")
             return
 
         # 缓存供 get_chart_data 使用

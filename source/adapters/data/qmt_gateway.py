@@ -101,7 +101,7 @@ class QmtDataGateway(DataGateway):
         """从快照取当日开、高、低三个 float；缺或错返回 None。"""
         tick = self._get_full_tick(ticker)
         if not tick:
-            self.logger.warning(f"get_today_ohlc: {ticker} 无快照")
+            self.logger.error(f"get_today_ohlc: {ticker} 无快照")
             return None
         try:
             o = tick.get("open")
@@ -111,7 +111,7 @@ class QmtDataGateway(DataGateway):
                 return None
             return {"open": float(o), "high": float(h), "low": float(l_)}
         except Exception as e:
-            self.logger.error(f"get_today_ohlc 解析错误: {e}")
+            self.logger.exception(f"get_today_ohlc 解析错误: {e}")
             return None
 
     def get_depths(self, ticker: str, levels: int = 5) -> Dict[str, List[Dict[str, float]]]:
@@ -144,14 +144,14 @@ class QmtDataGateway(DataGateway):
             datas = fetch_data(ticker, start.strftime("%Y-%m-%d"), None, period=Period.MINUTE_1,
                                dividend_type=self.dividend_type)
             if not datas:
-                self.logger.warning(f"{ticker} 暖机数据为空")
+                self.logger.error(f"{ticker} 暖机数据为空")
                 return
             for ticker_data in datas:
                 ticker_data.is_warm_up = True
                 if self._push:
                     self._push(ticker_data)
         except Exception as e:
-            self.logger.warning(f"{ticker} 暖机失败: {e}")
+            self.logger.exception(f"{ticker} 暖机失败: {e}")
 
     def _unsubscribe_push(self) -> None:
         """push 停时逐个退订 quote，再调 xtdata.stop（有则调）。"""
@@ -162,13 +162,13 @@ class QmtDataGateway(DataGateway):
                 try:
                     xtdata.unsubscribe_quote(seq)
                 except Exception as e:
-                    self.logger.warning(f"unsubscribe_quote {seq} 失败: {e}")
+                    self.logger.exception(f"unsubscribe_quote {seq} 失败: {e}")
             self._ticker_sub_seqs.clear()
             stop_fn = getattr(xtdata, "stop", None)
             if callable(stop_fn):
                 stop_fn()
         except Exception as e:
-            self.logger.warning(f"push 清理失败: {e}")
+            self.logger.exception(f"push 清理失败: {e}")
 
     def _run_poll(self, period: Period) -> None:
         """按 period 轮询行情，TICK 模式拉实时快照，K 线模式拉历史最新一根 K 线。"""

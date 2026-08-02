@@ -13,7 +13,6 @@ class TalibIndicators(BaseComponent):
     def __init__(self, **kwargs):
         """初始化技术指标计算器。"""
         super().__init__(**kwargs)
-        self.logger.info("初始化 TA-Lib 技术指标计算器")
     
     def sma(self, data: pd.Series, period: int) -> pd.Series:
         """计算简单移动均线（SMA）。"""
@@ -30,7 +29,7 @@ class TalibIndicators(BaseComponent):
         self.logger.info(f"计算 RSI(period={period})")
         return pd.Series(talib.RSI(data.values.astype(float), timeperiod=period), index=data.index)
     
-    def kdj(self, high: pd.Series, low: pd.Series, close: pd.Series, 
+    def kdj(self, high: pd.Series, low: pd.Series, close: pd.Series,
             n: int = 9, m1: int = 3, m2: int = 3) -> pd.DataFrame:
         """计算 KDJ 指标。"""
         self.logger.info(f"计算 KDJ(n={n}, m1={m1}, m2={m2})")
@@ -45,7 +44,7 @@ class TalibIndicators(BaseComponent):
     def boll(self, data: pd.Series, period: int = 20, std_dev: float = 2) -> pd.DataFrame:
         """计算布林带（BOLL）。"""
         self.logger.info(f"计算 BOLL(period={period}, std_dev={std_dev})")
-        upper, middle, lower = talib.BBANDS(data.values.astype(float), timeperiod=period, 
+        upper, middle, lower = talib.BBANDS(data.values.astype(float), timeperiod=period,
                                             nbdevup=std_dev, nbdevdn=std_dev, matype=0)
         return pd.DataFrame({
             'upper': pd.Series(upper, index=data.index),
@@ -58,7 +57,7 @@ class TalibIndicators(BaseComponent):
     def atr(self, high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> pd.Series:
         """计算平均真实波幅（ATR）。"""
         self.logger.info(f"计算 ATR(period={period})")
-        return pd.Series(talib.ATR(high.values.astype(float), low.values.astype(float), 
+        return pd.Series(talib.ATR(high.values.astype(float), low.values.astype(float),
                                    close.values.astype(float), timeperiod=period), index=close.index)
     
     def obv(self, close: pd.Series, volume: pd.Series) -> pd.Series:

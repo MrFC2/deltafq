@@ -109,7 +109,7 @@ class TraderEngine(BaseComponent):
                     'cost': total_cost
                 })
             else:
-                self.logger.warning(f"买入资金不足: 需要 {total_cost:.2f}，当前 {self.cash:.2f}")
+                self.logger.error(f"买入资金不足: 需要 {total_cost:.2f}，当前 {self.cash:.2f}")
                 self.order_manager.cancel_order(order_id)
         else:  # 卖出（signal == Signal.SELL）
             if self.position_manager.can_sell(ticker, quantity):
@@ -140,7 +140,7 @@ class TraderEngine(BaseComponent):
                     'profit_loss': profit_loss
                 })
             else:
-                self.logger.warning(f"卖出持仓不足: {ticker}，需要 {quantity}")
+                self.logger.error(f"卖出持仓不足: {ticker}，需要 {quantity}")
                 self.order_manager.cancel_order(order_id)
 
     def _get_latest_buy_cost(self, ticker: str) -> float:

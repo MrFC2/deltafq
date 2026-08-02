@@ -14,7 +14,6 @@ class SignalChart(BaseComponent):
     def __init__(self, **kwargs):
         """初始化信号图表。"""
         super().__init__(**kwargs)
-        self.logger.info("初始化信号图表")
 
     def plot_boll_signals(
         self,
@@ -41,7 +40,7 @@ class SignalChart(BaseComponent):
                 import plotly.graph_objects as go
                 from plotly.subplots import make_subplots
             except ImportError as exc:  # pragma: no cover
-                self.logger.info(f"Plotly not available ({exc}); falling back to Matplotlib")
+                self.logger.error(f"Plotly not available ({exc}); falling back to Matplotlib")
             else:
                 fig = make_subplots(
                     rows=2,

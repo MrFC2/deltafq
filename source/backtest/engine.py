@@ -127,7 +127,7 @@ class BacktestEngine(BaseComponent, ABC):
             return trades_df, values_df
 
         except Exception as e:
-            self.logger.error(f"_run_backtest 执行失败: {e}")
+            self.logger.exception(f"_run_backtest 执行失败: {e}")
             raise RuntimeError(f"回测执行失败: {e}") from e
 
     def _report(self,

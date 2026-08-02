@@ -47,12 +47,12 @@ class PositionManager(BaseComponent):
     def reduce_position(self, ticker: str, quantity: int) -> bool:
         """减少持仓。"""
         if ticker not in self.positions:
-            self.logger.warning(f"未找到标的持仓: {ticker}")
+            self.logger.error(f"未找到标的持仓: {ticker}")
             return False
 
         current_quantity = self.positions[ticker]['quantity']
         if current_quantity < quantity:
-            self.logger.warning(f"持仓数量不足: {ticker}")
+            self.logger.error(f"持仓数量不足: {ticker}")
             return False
 
         new_quantity = current_quantity - quantity

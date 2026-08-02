@@ -96,5 +96,4 @@ class OrderManager(BaseComponent):
         for order_id in old_orders:
             del self.orders[order_id]
 
-        self.logger.info(f"已清理 {len(old_orders)} 条旧订单")
         return len(old_orders)

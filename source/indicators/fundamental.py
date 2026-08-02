@@ -12,7 +12,6 @@ class FundamentalIndicators(BaseComponent):
     def __init__(self, **kwargs):
         """初始化基本面指标计算器。"""
         super().__init__(**kwargs)
-        self.logger.info("初始化基本面指标计算器")
                          
     def pe(self, price: pd.Series, eps_ttm: pd.Series) -> pd.Series:
         """PE = 价格 / EPS"""

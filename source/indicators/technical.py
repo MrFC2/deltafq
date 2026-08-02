@@ -13,11 +13,9 @@ class TechnicalIndicators(BaseComponent):
     def __init__(self, **kwargs):
         """初始化技术指标计算器。"""
         super().__init__(**kwargs)
-        self.logger.info("初始化技术指标计算器")
     
     def sma(self, data: pd.Series, period: int) -> pd.Series:
         """计算简单移动均线（SMA）。"""
-        self.logger.info(f"计算 SMA(period={period})")
         return data.rolling(window=period).mean()
     
     def ema(self, data: pd.Series, period: int, method: str = 'pandas') -> pd.Series:
@@ -29,7 +27,6 @@ class TechnicalIndicators(BaseComponent):
             method: 'pandas' uses pandas ewm (default), 'talib' uses inline calculation matching TA-Lib.
                    Talib method is more precise but slightly slower.
         """
-        self.logger.info(f"计算 EMA(period={period}, method={method})")
         
         if method == 'talib':
             # TA-Lib compatible: seed with SMA of the first full window
@@ -98,7 +95,6 @@ class TechnicalIndicators(BaseComponent):
             method: 'sma' uses SMA for smoothing (default), 'rma' uses RMA (Wilder's Smoothing) matching TA-Lib.
                    RMA gives more weight to historical data, making it less responsive to recent changes.
         """
-        self.logger.info(f"计算 RSI(period={period}, method={method})")
         delta = data.diff()
         gains = delta.where(delta > 0, 0)
         losses = -delta.where(delta < 0, 0)
@@ -146,7 +142,6 @@ class TechnicalIndicators(BaseComponent):
             method: 'ema' uses EMA for smoothing (default, more responsive),
                    'sma' uses SMA for smoothing matching TA-Lib STOCH.
         """
-        self.logger.info(f"计算 KDJ(n={n}, m1={m1}, m2={m2}, method={method})")
         
         # 计算 RSV（原始随机值）
         lowest_low = low.rolling(window=n).min()
@@ -181,7 +176,6 @@ class TechnicalIndicators(BaseComponent):
             method: 'sample' uses sample std (ddof=1, default), 'population' uses population std (ddof=0) matching TA-Lib.
                    Population std is slightly smaller, making bands tighter. TA-Lib BBANDS uses population std.
         """
-        self.logger.info(f"计算 BOLL(period={period}, std_dev={std_dev}, method={method})")
         sma = self.sma(data, period)
         ddof = 0 if method == 'population' else 1
         std = data.rolling(window=period).std(ddof=ddof)
@@ -203,7 +197,6 @@ class TechnicalIndicators(BaseComponent):
             method: 'sma' uses SMA for smoothing (default), 'rma' uses RMA (Wilder's Smoothing) matching TA-Lib.
                    RMA gives more weight to historical data, making it less responsive to recent changes.
         """
-        self.logger.info(f"计算 ATR(period={period}, method={method})")
 
         # 计算真实波幅
         tr1 = high - low
@@ -233,7 +226,6 @@ class TechnicalIndicators(BaseComponent):
             close: Close price series
             volume: Volume series
         """
-        self.logger.info("计算 OBV")
         
         # 计算价格变动方向
         price_change = close.diff()
