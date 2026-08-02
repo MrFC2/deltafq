@@ -12,12 +12,11 @@ class DataGateway(BaseComponent, ABC):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         # ticker → 回调映射，网关通过 _callback.keys() 知道订阅了哪些标的
-        self._callback: Dict[str, Callable[[TickerData], None]] = {}
-        self._period: Period = Period.MINUTE_5
+        self._ticker_callback: Dict[str, Callable[[TickerData], None]] = {}
 
-    def register_callback(self, ticker: str, callback: Callable[[TickerData], None]) -> None:
+    def register_ticker_callback(self, ticker: str, _ticker_callback: Callable[[TickerData], None]) -> None:
         """注册某个标的的 Tick 推送回调，同时完成订阅。"""
-        self._callback[ticker] = callback
+        self._ticker_callback[ticker] = _ticker_callback
 
     def connect(self) -> bool:
         """建立网关连接；子类在 __init__ 完成连接时可不覆写。"""

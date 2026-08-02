@@ -117,7 +117,7 @@ class LiveEngine(BaseComponent):
 
     def run(self) -> None:
         """注册 Tick 回调并启动行情推送。"""
-        self.data_gateway.register_callback(self.ticker, self._run_strategy)
+        self.data_gateway.register_ticker_callback(self.ticker, self._run_strategy)
         self.data_gateway.start(self._strategy.period)
 
     def stop(self) -> None:

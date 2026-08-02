@@ -121,7 +121,7 @@ class BaostockDataGateway(DataGateway):
     def _run(self) -> None:
         """轮询各标的最新 5m；仅 bar 时间变化时组 TickerData 回调。"""
         while self._running:
-            for ticker, callback in list(self._callback.items()):
+            for ticker, callback in list(self._ticker_callback.items()):
                 try:
                     data = self._fetch_recent_7_day_data(ticker, Period.MINUTE_5)
                     if not data:

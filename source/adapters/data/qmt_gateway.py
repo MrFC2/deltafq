@@ -129,7 +129,7 @@ class QmtDataGateway(DataGateway):
                 return
             for ticker_data in datas:
                 ticker_data.is_warm_up = True
-                callback = self._callback.get(ticker)
+                callback = self._ticker_callback.get(ticker)
                 if callback:
                     callback(ticker_data)
         except Exception as e:
@@ -155,7 +155,7 @@ class QmtDataGateway(DataGateway):
     def _start_poll(self, period: Period) -> None:
         """按 period 轮询行情，TICK 模式拉实时快照，K 线模式等到新 K 线才推送。"""
         while self._running:
-            for ticker, callback in list(self._callback.items()):
+            for ticker, callback in list(self._ticker_callback.items()):
                 if period == Period.TICK:
                     # 拉取实时信息
                     ticker_data = self._poll_tick(ticker)
@@ -204,7 +204,7 @@ class QmtDataGateway(DataGateway):
             return
 
         # 逐个标的订阅分笔行情
-        for ticker in list(self._callback.keys()):
+        for ticker in list(self._ticker_callback.keys()):
             seq = xtdata.subscribe_quote(ticker, period=period.value, start_time="", end_time="", count=0,
                                          callback=self._on_push_datas)
             if seq < 0:
@@ -243,7 +243,7 @@ class QmtDataGateway(DataGateway):
                 bid, ask = self._bid_ask_from_dict(row)
                 ticker_data = TickerData(ticker=code, price=float(price), timestamp=ts, volume=int(vol),
                                          bid=bid, ask=ask)
-                callback = self._callback.get(code)
+                callback = self._ticker_callback.get(code)
                 if callback:
                     callback(ticker_data)
 
