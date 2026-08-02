@@ -55,15 +55,7 @@ class BaostockDataGateway(DataGateway):
         # 行情拉取器
         import baostock as bs
         self.data_fetcher: BaostockDataFetcher = BaostockDataFetcher(bs)
-
-    def connect(self) -> bool:
-        """登录 baostock，将 session 注入 fetcher。"""
-        try:
-            self.data_fetcher.bs.login()
-            return True
-        except Exception as e:
-            self.logger.exception(f"连接失败: {e}")
-            return False
+        self.data_fetcher.bs.login()
 
     def start(self, period: Period) -> None:
         """启动轮询线程。"""

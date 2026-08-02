@@ -47,10 +47,6 @@ class QmtTradeGateway(TradeGateway):
         """底层交易客户端；可直接查资金、持仓、委托、成交。"""
         return self._client
 
-    def connect(self) -> bool:
-        """连接交易端并订阅资金账号。"""
-        return self._client.connect()
-
     def stop(self) -> None:
         """断开交易端连接。"""
         self._client.disconnect()

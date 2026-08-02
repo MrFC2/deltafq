@@ -116,10 +116,7 @@ class LiveEngine(BaseComponent):
     # ---------- 运行 ----------
 
     def run(self) -> None:
-        """连接网关、注册 Tick、订阅标的并启动推送。"""
-        if not self.data_gateway.connect() or not self.trade_gateway.connect():
-            raise RuntimeError("网关连接失败")
-        # 注册 ticker 对应的回调，同时完成订阅
+        """注册 Tick 回调并启动行情推送。"""
         self.data_gateway.register_callback(self.ticker, self._run_strategy)
         self.data_gateway.start(self._strategy.period)
 

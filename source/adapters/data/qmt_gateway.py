@@ -58,10 +58,6 @@ class QmtDataGateway(DataGateway):
         # K 线模式下各标的上次推送的 K 线时间戳，用于去重
         self._last_kline_ts: Dict[str, Optional[datetime]] = {}
 
-    def connect(self) -> bool:
-        """加载 xtdata，本机需已启动 miniQMT。"""
-        return True
-
     def start(self, period: Period) -> None:
         """起后台线程：poll 轮询快照，push 订分笔并跑 xtdata.run。"""
         if self._running:

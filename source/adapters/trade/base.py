@@ -7,10 +7,9 @@ from ...core.models import SignalData
 class TradeGateway(ABC):
     """实盘交易网关抽象：连接、下单、撤单、关闭、账户查询。"""
 
-    @abstractmethod
     def connect(self) -> bool:
-        """建立交易连接。"""
-        raise NotImplementedError
+        """建立交易连接；子类在 __init__ 完成连接时可不覆写。"""
+        return True
 
     @abstractmethod
     def send_order(self,

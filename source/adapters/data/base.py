@@ -19,10 +19,9 @@ class DataGateway(BaseComponent, ABC):
         """注册某个标的的 Tick 推送回调，同时完成订阅。"""
         self._callback[ticker] = callback
 
-    @abstractmethod
     def connect(self) -> bool:
-        """建立网关连接。"""
-        raise NotImplementedError
+        """建立网关连接；子类在 __init__ 完成连接时可不覆写。"""
+        return True
 
     @abstractmethod
     def start(self, period: Period) -> None:

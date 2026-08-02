@@ -10,9 +10,6 @@ class PaperTradeGateway(TradeGateway):
                  commission: float = 0.001) -> None:
         self._engine = TraderEngine(cash=initial_capital, commission=commission, match_on_tick=True)
 
-    def connect(self) -> bool:
-        return True
-
     def send_order(self,
                    ticker: str,
                    signal_data: SignalData,
