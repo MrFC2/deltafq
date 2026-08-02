@@ -36,7 +36,7 @@ class QmtDataGateway(DataGateway):
     """poll 定时拉全快照，push 订分笔推送；xt 标的代码，Tick 含最新价及可选买卖盘。"""
 
     def __init__(self,
-                 interval: float = 3.0,
+                 poll_interval: float = 3.0,
                  dividend_type: str = "none",
                  mode: GatewayMode = GatewayMode.POLL,
                  **kwargs: Any) -> None:
@@ -45,7 +45,7 @@ class QmtDataGateway(DataGateway):
 
         # --- 配置参数 ---
         # 轮询间隔（秒），仅 poll 模式使用
-        self.interval = interval
+        self.interval = poll_interval
         # K 线除权类型（none / 前复权等）
         self.dividend_type = dividend_type
         # 行情模式：poll 定时拉全快照，push 订分笔

@@ -56,7 +56,7 @@ def run_queries(gw: QmtTradeGateway) -> None:
 def run_orders(gw: QmtTradeGateway) -> None:
     code = "000001.SZ"
     # 通过 tick 回调获取最新价
-    data_gw = QmtDataGateway(interval=1.0, mode="poll")
+    data_gw = QmtDataGateway(poll_interval=1.0, mode="poll")
     if not data_gw.connect():
         raise ValueError("行情网关连接失败")
     done = threading.Event()

@@ -42,7 +42,7 @@ class DemoStrategy(BaseStrategy):
 def main() -> None:
     engine = LiveEngine(
         ticker="159118.SZ",
-        data_gateway=QmtDataGateway(interval=5.0, mode="poll"),
+        data_gateway=QmtDataGateway(poll_interval=5.0, mode="poll"),
         trade_gateway=QmtTradeGateway(
             userdata_mini_path=MIN_PATH,
             account_id=ACCOUNT_ID,
