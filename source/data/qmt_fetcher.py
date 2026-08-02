@@ -7,8 +7,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional
 
+import logging
 import pandas as pd
 from xtquant import xtdata  # type: ignore
+
+logger = logging.getLogger(__name__)
 
 from source.data.fetcher import DataFetcher
 from source.enums import Period
@@ -79,11 +82,11 @@ def fetch_data(ticker: str,
     end_time = _end_exclusive_to_xt(end_date) if end_date else ""
 
     fields = ["time", *_OHLCV_FIELDS]
-    bars = xtdata.get_market_data(field_list=fields, stock_list=[ticker], period=xt_period, start_time=start_time,
+    data = xtdata.get_market_data(field_list=fields, stock_list=[ticker], period=xt_period, start_time=start_time,
                                   end_time=end_time, count=-1, dividend_type=dividend_type, fill_data=True)
-
-    loc = bars["time"].loc[ticker].values
+    logger.info(f"fetch_data data: {data}")
+    loc = data["time"].loc[ticker].values
     idx = pd.DatetimeIndex(pd.to_datetime(loc, unit="ms"))
-    data = {col: bars[f].loc[ticker].values for f, col in zip(_OHLCV_FIELDS, _OHLCV_COLUMNS)}
+    data = {col: data[f].loc[ticker].values for f, col in zip(_OHLCV_FIELDS, _OHLCV_COLUMNS)}
     df = pd.DataFrame(data, index=idx).sort_index()
     return DataFetcher.df_to_ticker_data(ticker, df)

@@ -31,7 +31,6 @@ from .base import DataGateway
 from ...core.models import TickerData
 from ...enums import GatewayMode, Period
 
-
 class QmtDataGateway(DataGateway):
     """poll 定时拉全快照，push 订分笔推送；xt 标的代码，Tick 含最新价及可选买卖盘。"""
 
@@ -194,7 +193,7 @@ class QmtDataGateway(DataGateway):
     def _poll_tick(self, ticker: str) -> Optional[TickerData]:
         """拉实时快照，返回 TickerData；失败返回 None。"""
         tick = self._get_full_tick(ticker)
-        # TODO 这里需要看下查询的data是什么格式，看下应该怎么封装tickerData
+        self.logger.info(f"_poll_tick data: {tick}")
         if not tick:
             return None
         price = tick.get("lastPrice") or tick.get("last") or tick.get("price")
@@ -241,7 +240,7 @@ class QmtDataGateway(DataGateway):
 
     def _on_push_datas(self, data: dict) -> None:
         """分笔推送回调：行转 TickerData 再交 tick 回调"""
-        # TODO 这里需要看下返回的data是什么格式，看下应该怎么封装tickerData
+        self.logger.info(f"_on_push_datas data: {data}")
         if not self._running:
             return
         # datas 结构：{标的代码: [分笔行, ...]}
