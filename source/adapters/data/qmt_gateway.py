@@ -86,8 +86,8 @@ class QmtDataGateway(DataGateway):
             self._thread = threading.Thread(target=self._run_poll, args=(period,), daemon=True)
         else:
             self._thread = threading.Thread(target=self._run_push, args=(period,), daemon=True)
-        self._thread.start()
         self._running = True
+        self._thread.start()
 
     def stop(self) -> None:
         """停线程；push 会退订并调 stop（若有）；join 等线程结束。"""
