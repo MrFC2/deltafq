@@ -3,6 +3,7 @@ from typing import Callable, Dict, List, Optional
 
 from ...core.models import TickerData
 from ...core.base import BaseComponent
+from ...enums import Period
 
 
 class DataGateway(BaseComponent, ABC):
@@ -11,6 +12,7 @@ class DataGateway(BaseComponent, ABC):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self._push: Optional[Callable[[TickerData], None]] = None
+        self._period: Period = Period.MINUTE_5
 
     def set_push(self, callback: Callable[[TickerData], None]) -> None:
         """注册 Tick 推送回调。"""
@@ -27,7 +29,7 @@ class DataGateway(BaseComponent, ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def start(self) -> None:
+    def start(self, period: Period) -> None:
         """启动行情循环（轮询或推送）。"""
         raise NotImplementedError
 

@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 from source.data.baostock_fetcher import BaostockDataFetcher
-from ...enums import Interval
+from ...enums import Period
 from .base import DataGateway
 from ...core.models import TickerData
 
@@ -75,7 +75,7 @@ class BaostockDataGateway(DataGateway):
             self._tickers.append(ticker)
         return True
 
-    def start(self) -> None:
+    def start(self, period: Period) -> None:
         """启动轮询线程。"""
         if self._running:
             return
@@ -97,7 +97,7 @@ class BaostockDataGateway(DataGateway):
     def get_today_ohlc(self, ticker: str) -> Optional[Dict[str, float]]:
         """从最近日线取开、高、低；缺数据返回 None。"""
         try:
-            data = self._fetch_recent_7_day_data(ticker, Interval.DAY_1)
+            data = self._fetch_recent_7_day_data(ticker, Period.DAY_1)
             if not data:
                 return None
             row = data[-1]
@@ -113,7 +113,7 @@ class BaostockDataGateway(DataGateway):
         """
         levels = max(1, min(int(levels), 10))
         try:
-            data = self._fetch_recent_7_day_data(ticker, Interval.MINUTE_5)
+            data = self._fetch_recent_7_day_data(ticker, Period.MINUTE_5)
             if not data:
                 return {"bids": [], "asks": []}
             row = data[-1]
@@ -143,7 +143,7 @@ class BaostockDataGateway(DataGateway):
         while self._running:
             for ticker in self._tickers:
                 try:
-                    data = self._fetch_recent_7_day_data(ticker, Interval.MINUTE_5)
+                    data = self._fetch_recent_7_day_data(ticker, Period.MINUTE_5)
                     if not data:
                         continue
                     # 取最新数据进行推送
@@ -160,8 +160,8 @@ class BaostockDataGateway(DataGateway):
                     continue
             time.sleep(self.interval)
 
-    def _fetch_recent_7_day_data(self, ticker: str, interval: Interval) -> List[TickerData]:
+    def _fetch_recent_7_day_data(self, ticker: str, period: Period) -> List[TickerData]:
         """用已登录会话拉近 7 日 K 线。"""
         start = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
         end = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-        return self.data_fetcher.fetch_data(ticker, interval, start, end)
+        return self.data_fetcher.fetch_data(ticker, period, start, end)

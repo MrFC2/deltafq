@@ -29,23 +29,20 @@ from xtquant import xtdata  # type: ignore
 from source.data.qmt_fetcher import fetch_data
 from .base import DataGateway
 from ...core.models import TickerData
-from ...enums import GatewayMode, Interval
+from ...enums import GatewayMode, Period
 
 
 class QmtDataGateway(DataGateway):
     """poll 定时拉全快照，push 订分笔推送；xt 标的代码，Tick 含最新价及可选买卖盘。"""
 
     def __init__(self,
-                 poll_interval: float = 3.0,
                  dividend_type: str = "none",
                  mode: GatewayMode = GatewayMode.POLL,
                  **kwargs: Any) -> None:
-        """轮询间隔秒、K 线除权类型、模式 poll 或 push。"""
+        """K 线除权类型、模式 poll 或 push。"""
         super().__init__(**kwargs)
 
         # --- 配置参数 ---
-        # 轮询间隔（秒），仅 poll 模式使用
-        self.interval = poll_interval
         # K 线除权类型（none / 前复权等）
         self.dividend_type = dividend_type
         # 行情模式：poll 定时拉全快照，push 订分笔
@@ -80,14 +77,14 @@ class QmtDataGateway(DataGateway):
             self._warm_up(ticker)
         return True
 
-    def start(self) -> None:
+    def start(self, period: Period) -> None:
         """起后台线程：poll 轮询快照，push 订分笔并跑 xtdata.run。"""
         if self._running:
             return
         if self.mode == GatewayMode.POLL:
-            self._thread = threading.Thread(target=self._run_poll, daemon=True)
+            self._thread = threading.Thread(target=self._run_poll, args=(period,), daemon=True)
         else:
-            self._thread = threading.Thread(target=self._run_push, daemon=True)
+            self._thread = threading.Thread(target=self._run_push, args=(period,), daemon=True)
         self._thread.start()
         self._running = True
 
@@ -144,20 +141,13 @@ class QmtDataGateway(DataGateway):
         try:
             end = datetime.now()
             start = end - timedelta(days=1)
-            datas = fetch_data(ticker, start.strftime("%Y-%m-%d"), None, interval=Interval.MINUTE_1,
+            datas = fetch_data(ticker, start.strftime("%Y-%m-%d"), None, period=Period.MINUTE_1,
                                dividend_type=self.dividend_type)
-            if datas.empty:
+            if not datas:
                 self.logger.warning(f"{ticker} 暖机数据为空")
                 return
-            for timestamp, data in datas.iterrows():
-                ts = timestamp.to_pydatetime() if hasattr(timestamp, "to_pydatetime") else timestamp
-                if getattr(ts, "tzinfo", None) is not None:
-                    ts = ts.replace(tzinfo=None)
-                price = float(data["Close"])
-                volume = int(data["Volume"])
-                ticker_data = TickerData(ticker=ticker, timestamp=ts, price=price, open=float(data["Open"]),
-                                         high=float(data["High"]), low=float(data["Low"]), volume=volume,
-                                         is_warm_up=True)
+            for ticker_data in datas:
+                ticker_data.is_warm_up = True
                 if self._push:
                     self._push(ticker_data)
         except Exception as e:
@@ -180,32 +170,43 @@ class QmtDataGateway(DataGateway):
         except Exception as e:
             self.logger.warning(f"push 清理失败: {e}")
 
-    def _run_poll(self) -> None:
-        """对每个标的拉全快照，组 TickerData，调 tick 回调。"""
+    def _run_poll(self, period: Period) -> None:
+        """按 period 轮询行情，TICK 模式拉实时快照，K 线模式拉历史最新一根 K 线。"""
         while self._running:
             for ticker in self._tickers:
-                tick = self._get_full_tick(ticker)
-                if not tick:
-                    continue
                 try:
-                    last = tick.get("lastPrice") or tick.get("last") or tick.get("price")
-                    vol = tick.get("volume") or tick.get("lastVolume") or 0
-                    if last is None:
-                        continue
-                    ts = self._ts_from_millis_or_now(tick.get("time"))
-                    bid, ask = self._bid_ask_from_dict(tick)
-                    ticker_data = TickerData(ticker=ticker, timestamp=ts, price=float(last),
-                                             open=float(tick["open"]) if tick.get("open") is not None else None,
-                                             high=float(tick.get("high") or tick.get("highPrice") or 0) or None,
-                                             low=float(tick.get("low") or tick.get("lowPrice") or 0) or None,
-                                             volume=int(vol) if vol is not None else None, bid=bid, ask=ask)
-                    if self._push:
+                    if period == Period.TICK:
+                        ticker_data = self._poll_tick(ticker)
+                    else:
+                        ticker_data = self._poll_kline(ticker, period)
+                    if ticker_data and self._push:
                         self._push(ticker_data)
                 except Exception as e:
                     self.logger.error(f"轮询 {ticker} 出错: {e}")
-            time.sleep(self.interval)
+            time.sleep(period.fetch_seconds)
 
-    def _run_push(self) -> None:
+    def _poll_tick(self, ticker: str) -> Optional[TickerData]:
+        """拉实时快照，返回 TickerData；失败返回 None。"""
+        tick = self._get_full_tick(ticker)
+        # TODO 这里需要看下查询的data是什么格式，看下应该怎么封装tickerData
+        if not tick:
+            return None
+        price = tick.get("lastPrice") or tick.get("last") or tick.get("price")
+        if price is None:
+            return None
+        ts = self._ts_from_millis_or_now(tick.get("time"))
+        bid, ask = self._bid_ask_from_dict(tick)
+        vol = tick.get("volume") or tick.get("lastVolume") or 0
+        return TickerData(ticker=ticker, timestamp=ts, price=float(price),
+                          volume=int(vol), bid=bid, ask=ask)
+
+    def _poll_kline(self, ticker: str, period: Period) -> Optional[TickerData]:
+        """拉最新一根 K 线，返回 TickerData；失败返回 None。"""
+        today = datetime.now().strftime("%Y-%m-%d")
+        datas = fetch_data(ticker, today, None, period=period, dividend_type=self.dividend_type)
+        return datas[-1] if datas else None
+
+    def _run_push(self, period: Period) -> None:
         """逐只 subscribe_quote，最后阻塞 xd.run。"""
         # 防御性检查：线程启动时已被 stop
         if not self._running:
@@ -214,7 +215,7 @@ class QmtDataGateway(DataGateway):
         # 逐个标的订阅分笔行情
         self._ticker_sub_seqs = []
         for ticker in list(self._tickers):
-            seq = xtdata.subscribe_quote(ticker, period="tick", start_time="", end_time="", count=0,
+            seq = xtdata.subscribe_quote(ticker, period=period.value, start_time="", end_time="", count=0,
                                          callback=self._on_push_datas)
             if seq < 0:
                 self.logger.error(f"subscribe_quote 失败 {ticker}: {seq}")
@@ -232,12 +233,13 @@ class QmtDataGateway(DataGateway):
             if self._running:
                 self.logger.error(f"xtdata.run 异常: {e}")
 
-    def _on_push_datas(self, datas: dict) -> None:
-        """分笔推送回调：行转 TickerData 再交 tick 回调。"""
+    def _on_push_datas(self, data: dict) -> None:
+        """分笔推送回调：行转 TickerData 再交 tick 回调"""
+        # TODO 这里需要看下返回的data是什么格式，看下应该怎么封装tickerData
         if not self._running:
             return
         # datas 结构：{标的代码: [分笔行, ...]}
-        for code, rows in (datas or {}).items():
+        for code, rows in (data or {}).items():
             for row in rows or []:
                 # 跳过格式异常的推送数据
                 if not isinstance(row, dict):

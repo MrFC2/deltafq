@@ -8,7 +8,7 @@ from ..core.base import BaseComponent
 from ..data import DataFetcher, DataStorage, BaostockDataFetcher
 from ..strategy.base import BaseStrategy
 from ..trader.engine import TraderEngine
-from ..enums import OrderType, Signal, Interval
+from ..enums import OrderType, Signal, Period
 from .performance import PerformanceReporter
 from ..charts.performance import PerformanceChart
 from ..core.models import SignalData, TickerData
@@ -69,7 +69,7 @@ class BacktestEngine(BaseComponent, ABC):
         """加载行情数据。"""
         if not self.ticker or not self.start_date:
             raise ValueError("ticker 和 start_date 不能为空。")
-        return self.data_fetcher.fetch_data(self.ticker, Interval.DAY_1, self.start_date, self.end_date)
+        return self.data_fetcher.fetch_data(self.ticker, Period.DAY_1, self.start_date, self.end_date)
 
     def _run_strategy(self, data: List[TickerData]) -> List[SignalData]:
         """运行策略，返回信号列表。"""
@@ -142,7 +142,7 @@ class BacktestEngine(BaseComponent, ABC):
         # 展示图表（含指标表格）
         benchmark_close = None
         if self.benchmark is not None:
-            benchmark_bars = self.data_fetcher.fetch_data(self.benchmark, Interval.DAY_1, self.start_date, self.end_date)
+            benchmark_bars = self.data_fetcher.fetch_data(self.benchmark, Period.DAY_1, self.start_date, self.end_date)
             benchmark_close = pd.Series(
                 [t.price for t in benchmark_bars],
                 index=[t.timestamp for t in benchmark_bars],

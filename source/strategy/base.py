@@ -5,16 +5,16 @@ from typing import Any, List, Optional
 
 from ..core.base import BaseComponent
 from ..core.models import SignalData, TickerData
-from ..enums import Interval
+from ..enums import Period
 
 
 class BaseStrategy(BaseComponent, ABC):
     """策略基类，子类实现 generate_signals 即可。"""
 
-    def __init__(self, name: str, interval: Interval, **kwargs: Any) -> None:
+    def __init__(self, name: str, period: Period, **kwargs: Any) -> None:
         super().__init__(name=name, **kwargs)
         # 策略期望收到的 K 线周期，引擎据此决定拉取数据的粒度
-        self.interval: Interval = interval
+        self.period: Period = period
 
     @abstractmethod
     def generate_signals(self,

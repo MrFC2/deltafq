@@ -14,7 +14,7 @@ from typing import List, Optional, Dict, Any
 
 from ..core.base import BaseComponent
 from .cleaner import DataCleaner
-from ..enums import Interval
+from ..enums import Period
 from ..core.models import TickerData
 
 import warnings
@@ -31,7 +31,7 @@ class DataFetcher(BaseComponent, ABC):
     @abstractmethod
     def fetch_data(self,
                    ticker: str,
-                   interval: Interval,
+                   period: Period,
                    start_date: str,
                    end_date: Optional[str] = None) -> List[TickerData]:
         """拉取单个标的行情数据并清洗，返回按时间升序的 TickerData 列表。"""

@@ -10,13 +10,13 @@ from typing import List, Optional
 import pandas as pd
 
 from source.data.fetcher import DataFetcher
-from source.enums import Interval
+from source.enums import Period
 from source.core.models import TickerData
 
-# Interval 枚举 → baostock frequency
+# Period 枚举 → baostock frequency
 _FREQ = {
-    Interval.DAY_1: "d", Interval.WEEK_1: "w", Interval.MONTH_1: "m",
-    Interval.MINUTE_5: "5", Interval.MINUTE_15: "15", Interval.MINUTE_30: "30", Interval.HOUR_1: "60",
+    Period.DAY_1: "d", Period.WEEK_1: "w", Period.MONTH_1: "m",
+    Period.MINUTE_5: "5", Period.MINUTE_15: "15", Period.MINUTE_30: "30", Period.HOUR_1: "60",
 }
 
 
@@ -41,7 +41,7 @@ class BaostockDataFetcher(DataFetcher):
 
     def fetch_data(self,
                    ticker: str,
-                   interval: Interval,
+                   period: Period,
                    start_date: str,
                    end_date: Optional[str] = None) -> List[TickerData]:
         """拉取历史 K 线，返回 TickerData 列表。end_date 排他（与 yahoo 一致）。"""
@@ -53,7 +53,7 @@ class BaostockDataFetcher(DataFetcher):
             bs.login()
             owns_session = True
 
-        freq = _FREQ.get(interval, interval.value)
+        freq = _FREQ.get(period, period.value)
         # baostock end 为包含，故排他结束日减一天
         end = ""
         if end_date:

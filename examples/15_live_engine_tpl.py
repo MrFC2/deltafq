@@ -14,7 +14,7 @@ import pandas as pd
 from source.live import LiveEngine
 from source.adapters.trade.paper_gateway import PaperTradeGateway
 from source.strategy.base import BaseStrategy
-from source.enums import Interval
+from source.enums import Period
 from source.core.models import SignalData, TickerData
 from source.enums import Signal
 from typing import List
@@ -24,7 +24,7 @@ class Every2BarFlipStrategy(BaseStrategy):
     """Every 2 strategy runs flip signal 1/-1 for quick verification."""
 
     def __init__(self, **kwargs):
-        super().__init__(interval=Interval.MINUTE_1, **kwargs)
+        super().__init__(period=Period.MINUTE_1, **kwargs)
         self._run_count = 0
 
     def generate_signals(self, data: List[TickerData], cash=None, position=None, commission=None) -> List[SignalData]:

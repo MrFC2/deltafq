@@ -13,14 +13,14 @@ if project_root not in sys.path:
 from source.data import BaostockDataFetcher
 from source.strategy.base import BaseStrategy
 from source.core.models import SignalData, TickerData
-from source.enums import Signal, Interval
+from source.enums import Signal, Period
 
 
 class DemoStrategy(BaseStrategy):
     """Simple moving-average crossover strategy."""
 
     def __init__(self, fast_period: int = 5, slow_period: int = 20, **kwargs: Any) -> None:
-        super().__init__(interval=Interval.DAY_1, **kwargs)
+        super().__init__(period=Period.DAY_1, **kwargs)
         self.fast_period = fast_period
         self.slow_period = slow_period
 

@@ -14,7 +14,7 @@ from source.live import LiveEngine
 from source.adapters.data.qmt_gateway import QmtDataGateway
 from source.adapters.trade.qmt_gateway import QmtTradeGateway
 from source.strategy.base import BaseStrategy
-from source.enums import Interval
+from source.enums import Period
 from source.core.models import SignalData, TickerData
 from source.enums import Signal
 from typing import List
@@ -29,7 +29,7 @@ class DemoStrategy(BaseStrategy):
     _SEQ = (0, 1, -1)
 
     def __init__(self, **kwargs):
-        super().__init__(interval=Interval.MINUTE_1, **kwargs)
+        super().__init__(period=Period.MINUTE_1, **kwargs)
         self.order_quantity = 100
         self._i = 0
 
@@ -42,7 +42,7 @@ class DemoStrategy(BaseStrategy):
 def main() -> None:
     engine = LiveEngine(
         ticker="159118.SZ",
-        data_gateway=QmtDataGateway(poll_interval=5.0, mode="poll"),
+        data_gateway=QmtDataGateway(mode="poll"),
         trade_gateway=QmtTradeGateway(
             userdata_mini_path=MIN_PATH,
             account_id=ACCOUNT_ID,

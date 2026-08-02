@@ -57,7 +57,7 @@ from ..adapters.data.base import DataGateway
 from ..adapters.trade.base import TradeGateway
 from ..adapters.trade.paper_gateway import PaperTradeGateway
 from ..core.models import SignalData, TickerData
-from ..enums import Interval, Signal
+from ..enums import Period, Signal
 from ..adapters.data.qmt_gateway import QmtDataGateway
 
 _SIG_ICON = {1: "↑", -1: "↓", 0: "-"}
@@ -106,7 +106,7 @@ class LiveEngine(BaseComponent):
         self._cached_strategy_input: Optional[List[TickerData]] = None
         # 最近一次策略产生的信号序列
         self._cached_signals: Optional[List[SignalData]] = None
-        # K 线/REALTIME 模式下的 tick 滑动窗口
+        # K 线/TICK 模式下的 tick 滑动窗口
         self._ticker_datas: deque = deque(maxlen=strategy_input_size)
 
         # --- 统计记录 ---
@@ -123,7 +123,7 @@ class LiveEngine(BaseComponent):
         self.data_gateway.set_push(self._run_strategy)
         # 订阅标的并启动行情流
         self.data_gateway.subscribe([self.ticker])
-        self.data_gateway.start()
+        self.data_gateway.start(self._strategy.period)
 
     def stop(self) -> None:
         """停止数据流与交易网关。"""
@@ -144,7 +144,7 @@ class LiveEngine(BaseComponent):
         if not self._cached_strategy_input or not self._cached_signals:
             return {"candles": [], "signals": []}
 
-        date_fmt = "%Y-%m-%d" if self._strategy.interval == Interval.DAY_1 else "%Y-%m-%d %H:%M:%S"
+        date_fmt = "%Y-%m-%d" if self._strategy.period == Period.DAY_1 else "%Y-%m-%d %H:%M:%S"
 
         candles: List[Dict[str, Any]] = []
         for t in self._cached_strategy_input:
@@ -189,7 +189,7 @@ class LiveEngine(BaseComponent):
 
     def _create_data_fetcher(self) -> Optional[DataFetcher]:
         """非 tick 模式时按网关类型创建对应 DataFetcher，tick 模式返回 None。"""
-        if self._strategy.interval == Interval.REALTIME:
+        if self._strategy.period == Period.TICK:
             return None
         if isinstance(self.data_gateway, QmtDataGateway):
             return QmtDataFetcher()
@@ -197,13 +197,13 @@ class LiveEngine(BaseComponent):
 
     def _fetch_data(self) -> Optional[List[TickerData]]:
         """用 DataFetcher 拉当前 strategy_interval 下最近 strategy_input_size 根 K 线。"""
-        # REALTIME 模式不拉 K 线，数据由 tick 实时积累
+        # TICK 模式不拉 K 线，数据由 tick 实时积累
         if self._data_fetcher is None:
             return None
         now = datetime.now(timezone.utc)
-        if self._strategy.interval.days_per_bar > 0:
+        if self._strategy.period.days_per_bar > 0:
             # 日/周/月线：按每根 bar 对应日历天数估算拉取范围，多留 60 天缓冲
-            cal_days = int(self.strategy_input_size * self._strategy.interval.days_per_bar) + 60
+            cal_days = int(self.strategy_input_size * self._strategy.period.days_per_bar) + 60
             start = (now - timedelta(days=max(cal_days, 60))).strftime("%Y-%m-%d")
         else:
             # 分钟/小时线：按 strategy_input_size 估算天数，最少 7 天、最多 60 天
@@ -211,7 +211,7 @@ class LiveEngine(BaseComponent):
         end = (now + timedelta(days=1)).strftime("%Y-%m-%d")
 
         try:
-            data = self._data_fetcher.fetch_data(self.ticker, self._strategy.interval, start, end)
+            data = self._data_fetcher.fetch_data(self.ticker, self._strategy.period, start, end)
         except Exception as e:
             self.logger.warning(f"DataFetcher 拉取失败: {e}")
             return None
@@ -272,25 +272,29 @@ class LiveEngine(BaseComponent):
         self._append_values_record(ticker_data, latest_signal.signal, cash, position)
 
     def _append_ticker_datas(self, ticker_data: TickerData) -> bool:
-        """由当前 tick 更新 _tick_datas；未到重拉间隔时返回 False。"""
-        if self._strategy.interval == Interval.REALTIME:
-            self._ticker_datas.append(ticker_data)
-            return True
-
-        # K 线模式：_tick_datas 最后一根的时间戳未超过重拉间隔时跳过
-        if self._ticker_datas:
-            interval = (datetime.now() - self._ticker_datas[-1].timestamp).total_seconds()
-            if interval < self._strategy.interval.refetch_seconds:
-                return False
-
-        datas = self._fetch_data()
-        if datas is None:
-            return False
-
-        self._ticker_datas.clear()
-        for data in datas:
-            self._ticker_datas.append(data)
+        """由网关推来的 ticker_data 直接 append；网关层负责按 period 控制推送频率。"""
+        self._ticker_datas.append(ticker_data)
         return True
+
+        # 原版逻辑（网关层无 period 感知时在引擎层做时间窗口判断）：
+        # if self._strategy.period == Period.TICK:
+        #     self._ticker_datas.append(ticker_data)
+        #     return True
+        #
+        # # K 线模式：_tick_datas 最后一根的时间戳未超过重拉间隔时跳过
+        # if self._ticker_datas:
+        #     period = (datetime.now() - self._ticker_datas[-1].timestamp).total_seconds()
+        #     if period < self._strategy.period.refetch_seconds:
+        #         return False
+        #
+        # datas = self._fetch_data()
+        # if datas is None:
+        #     return False
+        #
+        # self._ticker_datas.clear()
+        # for data in datas:
+        #     self._ticker_datas.append(data)
+        # return True
 
     def _append_values_record(self,
                               ticker_data: TickerData,
