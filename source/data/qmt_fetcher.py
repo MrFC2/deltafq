@@ -72,18 +72,19 @@ def _end_exclusive_to_xt(end_date: Optional[str]) -> str:
 
 
 def fetch_data(ticker: str,
-               start_date: str,
+               start_date: Optional[str] = None,
                end_date: Optional[str] = None,
                period: Period = Period.DAY_1,
-               dividend_type: str = "none") -> List[TickerData]:
-    """拉取历史 K 线并返回 TickerData 列表。"""
+               dividend_type: str = "none",
+               count: int = -1) -> List[TickerData]:
+    """拉取历史 K 线并返回 TickerData 列表。count=-1 拉全量，count=1 只拉最新一根。"""
     xt_period = period_to_xt_period(period)
-    start_time = _compact_date(start_date)
+    start_time = _compact_date(start_date) if start_date else ""
     end_time = _end_exclusive_to_xt(end_date) if end_date else ""
 
     fields = ["time", *_OHLCV_FIELDS]
     data = xtdata.get_market_data(field_list=fields, stock_list=[ticker], period=xt_period, start_time=start_time,
-                                  end_time=end_time, count=-1, dividend_type=dividend_type, fill_data=True)
+                                  end_time=end_time, count=count, dividend_type=dividend_type, fill_data=True)
     logger.info(f"fetch_data data: {data}")
     loc = data["time"].loc[ticker].values
     idx = pd.DatetimeIndex(pd.to_datetime(loc, unit="ms"))

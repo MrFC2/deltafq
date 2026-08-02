@@ -43,9 +43,6 @@ class BaostockDataGateway(DataGateway):
         # 轮询间隔（秒）
         self.interval: float = interval
 
-        # --- 订阅状态 ---
-        # 已订阅标的列表
-        self._tickers: List[str] = []
         # 各标的最后一根 K 线时间戳，用于去重推送
         self._last_kline_ts: Dict[str, datetime] = {}
 
@@ -67,13 +64,6 @@ class BaostockDataGateway(DataGateway):
         except Exception as e:
             self.logger.exception(f"连接失败: {e}")
             return False
-
-    def subscribe(self, tickers: List[str]) -> bool:
-        """追加订阅标的。"""
-        new_ticker = [s for s in tickers if s not in self._tickers]
-        for ticker in new_ticker:
-            self._tickers.append(ticker)
-        return True
 
     def start(self, period: Period) -> None:
         """启动轮询线程。"""
@@ -139,7 +129,7 @@ class BaostockDataGateway(DataGateway):
     def _run(self) -> None:
         """轮询各标的最新 5m；仅 bar 时间变化时组 TickerData 回调。"""
         while self._running:
-            for ticker in self._tickers:
+            for ticker, callback in list(self._callback.items()):
                 try:
                     data = self._fetch_recent_7_day_data(ticker, Period.MINUTE_5)
                     if not data:
@@ -151,8 +141,8 @@ class BaostockDataGateway(DataGateway):
                     if self._last_kline_ts.get(ticker) == data_timestamp:
                         continue
                     self._last_kline_ts[ticker] = data_timestamp
-                    if self._push:
-                        self._push(latest_data)
+                    if callback:
+                        callback(latest_data)
                 except Exception as e:
                     self.logger.exception(f"拉取 {ticker} 数据出错: {str(e)}")
                     continue

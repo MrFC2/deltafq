@@ -31,6 +31,7 @@ from .base import DataGateway
 from ...core.models import TickerData
 from ...enums import GatewayMode, Period
 
+
 class QmtDataGateway(DataGateway):
     """poll 定时拉全快照，push 订分笔推送；xt 标的代码，Tick 含最新价及可选买卖盘。"""
 
@@ -47,10 +48,6 @@ class QmtDataGateway(DataGateway):
         # 行情模式：poll 定时拉全快照，push 订分笔
         self.mode: GatewayMode = mode
 
-        # --- 订阅状态 ---
-        # 已订阅标的列表
-        self._tickers: List[str] = []
-
         # --- 运行时状态 ---
         # 轮询/推送线程运行标志
         self._running = False
@@ -63,19 +60,6 @@ class QmtDataGateway(DataGateway):
 
     def connect(self) -> bool:
         """加载 xtdata，本机需已启动 miniQMT。"""
-        try:
-            # xtdata 已在顶层导入，此处仅保留 try-catch 用于统一错误处理
-            return True
-        except Exception as e:
-            self.logger.error(f"miniQMT 连接失败: {e}")
-            return False
-
-    def subscribe(self, tickers: List[str]) -> bool:
-        """追加订阅；新标的用近一日 1m K 线逐根暖机回调。"""
-        new_tickers = [s for s in tickers if s not in self._tickers]
-        for ticker in new_tickers:
-            self._tickers.append(ticker)
-            self._warm_up(ticker)
         return True
 
     def start(self, period: Period) -> None:
@@ -83,9 +67,9 @@ class QmtDataGateway(DataGateway):
         if self._running:
             return
         if self.mode == GatewayMode.POLL:
-            self._thread = threading.Thread(target=self._run_poll, args=(period,), daemon=True)
+            self._thread = threading.Thread(target=self._start_poll, args=(period,), daemon=True)
         else:
-            self._thread = threading.Thread(target=self._run_push, args=(period,), daemon=True)
+            self._thread = threading.Thread(target=self._start_push, args=(period,), daemon=True)
         self._running = True
         self._thread.start()
 
@@ -149,8 +133,9 @@ class QmtDataGateway(DataGateway):
                 return
             for ticker_data in datas:
                 ticker_data.is_warm_up = True
-                if self._push:
-                    self._push(ticker_data)
+                callback = self._callback.get(ticker)
+                if callback:
+                    callback(ticker_data)
         except Exception as e:
             self.logger.exception(f"{ticker} 暖机失败: {e}")
 
@@ -171,22 +156,21 @@ class QmtDataGateway(DataGateway):
         except Exception as e:
             self.logger.exception(f"push 清理失败: {e}")
 
-    def _run_poll(self, period: Period) -> None:
+    def _start_poll(self, period: Period) -> None:
         """按 period 轮询行情，TICK 模式拉实时快照，K 线模式等到新 K 线才推送。"""
         while self._running:
-            for ticker in self._tickers:
-                try:
-                    if period == Period.TICK:
-                        # 拉取实时信息
-                        ticker_data = self._poll_tick(ticker)
-                    else:
-                        # K 线模式：等到时间戳比上次大才推送
-                        ticker_data = self._poll_kline(ticker, period)
-                    if ticker_data and self._push:
-                        self._push(ticker_data)
-                except Exception as e:
-                    self.logger.error(f"轮询 {ticker} 出错: {e}")
+            for ticker, callback in list(self._callback.items()):
+                if period == Period.TICK:
+                    # 拉取实时信息
+                    ticker_data = self._poll_tick(ticker)
+                else:
+                    # K 线模式：拿到新数据才推送，旧数据等下一轮
+                    ticker_data = self._poll_kline(ticker, period)
 
+                if ticker_data and callback:
+                    callback(ticker_data)
+
+            # 加多3秒，给第三方缓冲时间统计数据
             time.sleep(period.fetch_seconds + 3)
 
     def _poll_tick(self, ticker: str) -> Optional[TickerData]:
@@ -201,33 +185,30 @@ class QmtDataGateway(DataGateway):
         ts = self._ts_from_millis_or_now(tick.get("time"))
         bid, ask = self._bid_ask_from_dict(tick)
         vol = tick.get("volume") or tick.get("lastVolume") or 0
-        return TickerData(ticker=ticker, timestamp=ts, price=float(price),
-                          volume=int(vol), bid=bid, ask=ask)
+        return TickerData(ticker=ticker, timestamp=ts, price=float(price), volume=int(vol), bid=bid, ask=ask)
 
     def _poll_kline(self, ticker: str, period: Period) -> Optional[TickerData]:
-        """拉最新一根 K 线，等到时间戳比上次新才返回；旧数据则睡 1 秒重试。"""
-        while self._running:
-            today = datetime.now().strftime("%Y-%m-%d")
-            datas = fetch_data(ticker, today, None, period=period, dividend_type=self.dividend_type)
-            if datas:
-                data = datas[-1]
-                last_ts = self._last_kline_ts.get(ticker)
-                if last_ts is None or data.timestamp > last_ts:
-                    # 是新 K 线，记录时间戳并返回
-                    self._last_kline_ts[ticker] = data.timestamp
-                    return data
-            # 还是旧数据，等 1 秒再试
-            time.sleep(1)
-        return None
+        """拉最新一根 K 线，是新数据才返回，旧数据返回 None 由外层下一轮重试。"""
+        datas = fetch_data(ticker, None, None, period=period, dividend_type=self.dividend_type, count=1)
+        if not datas:
+            return None
+        data = datas[-1]
+        last_ts = self._last_kline_ts.get(ticker)
+        if last_ts is not None and data.timestamp <= last_ts:
+            # 还是旧数据，返回 None，外层下一轮再试
+            return None
+        # 是新 K 线，记录时间戳并返回
+        self._last_kline_ts[ticker] = data.timestamp
+        return data
 
-    def _run_push(self, period: Period) -> None:
+    def _start_push(self, period: Period) -> None:
         """逐只 subscribe_quote，最后阻塞 xd.run。"""
         # 防御性检查：线程启动时已被 stop
         if not self._running:
             return
 
         # 逐个标的订阅分笔行情
-        for ticker in list(self._tickers):
+        for ticker in list(self._callback.keys()):
             seq = xtdata.subscribe_quote(ticker, period=period.value, start_time="", end_time="", count=0,
                                          callback=self._on_push_datas)
             if seq < 0:
@@ -261,13 +242,14 @@ class QmtDataGateway(DataGateway):
                 price = row.get("lastPrice") or row.get("last_price") or row.get("price")
                 if price is None:
                     continue
-                vol = row.get("volume") or row.get("lastVolume")
+                vol = row.get("volume") or row.get("lastVolume") or 0
                 ts = self._ts_from_millis_or_now(row.get("time"))
                 bid, ask = self._bid_ask_from_dict(row)
                 ticker_data = TickerData(ticker=code, price=float(price), timestamp=ts, volume=int(vol),
                                          bid=bid, ask=ask)
-                if self._push:
-                    self._push(ticker_data)
+                callback = self._callback.get(code)
+                if callback:
+                    callback(ticker_data)
 
     def _get_full_tick(self, ticker: str) -> Optional[Dict[str, Any]]:
         """调 get_full_tick；成功返回快照，失败返回 None。"""
