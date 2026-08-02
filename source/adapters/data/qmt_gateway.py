@@ -102,9 +102,9 @@ class QmtDataGateway(DataGateway):
 
     def get_today_ohlc(self, ticker: str) -> Optional[Dict[str, float]]:
         """从快照取当日开、高、低三个 float；缺或错返回 None。"""
-        tick, err = self._get_full_tick(ticker)
-        if err or not tick:
-            self.logger.warning(f"get_today_ohlc: {err}")
+        tick = self._get_full_tick(ticker)
+        if not tick:
+            self.logger.warning(f"get_today_ohlc: {ticker} 无快照")
             return None
         try:
             o = tick.get("open")
@@ -119,9 +119,8 @@ class QmtDataGateway(DataGateway):
 
     def get_depths(self, ticker: str, levels: int = 5) -> Dict[str, List[Dict[str, float]]]:
         """返回买卖盘口深度（价格+委托量）。"""
-        tick, err = self._get_full_tick(ticker)
-        if err or not tick:
-            self.logger.debug(f"get_depths {ticker}: {err}")
+        tick = self._get_full_tick(ticker)
+        if not tick:
             return {"bids": [], "asks": []}
         lv = max(1, min(int(levels), 10))
         bids: List[Dict[str, float]] = []
@@ -185,9 +184,8 @@ class QmtDataGateway(DataGateway):
         """对每个标的拉全快照，组 TickerData，调 tick 回调。"""
         while self._running:
             for ticker in self._tickers:
-                tick, err = self._get_full_tick(ticker)
-                if err or not tick:
-                    self.logger.debug(f"跳过 tick {ticker}: {err}")
+                tick = self._get_full_tick(ticker)
+                if not tick:
                     continue
                 try:
                     last = tick.get("lastPrice") or tick.get("last") or tick.get("price")
@@ -256,15 +254,12 @@ class QmtDataGateway(DataGateway):
                 if self._push:
                     self._push(ticker_data)
 
-    def _get_full_tick(self, ticker: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
-        """调 get_full_tick；成功返回快照和 None，失败返回 None 和错误说明。"""
-        try:
-            data = xtdata.get_full_tick([ticker])
-            if not data or ticker not in data:
-                return None, f"{ticker} 无快照"
-            return data[ticker], None
-        except Exception as e:
-            return None, str(e)
+    def _get_full_tick(self, ticker: str) -> Optional[Dict[str, Any]]:
+        """调 get_full_tick；成功返回快照，失败返回 None。"""
+        data = xtdata.get_full_tick([ticker])
+        if not data or ticker not in data:
+            return None
+        return data[ticker]
 
     @staticmethod
     def _bid_ask_from_dict(d: Dict[str, Any]) -> Tuple[Optional[float], Optional[float]]:
