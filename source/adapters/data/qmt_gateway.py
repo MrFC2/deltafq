@@ -176,13 +176,19 @@ class QmtDataGateway(DataGateway):
             for ticker in self._tickers:
                 try:
                     if period == Period.TICK:
+                        # 拉取实时信息
                         ticker_data = self._poll_tick(ticker)
                     else:
+                        # 拉取历史k线
                         ticker_data = self._poll_kline(ticker, period)
+
+                    # 数据推送
                     if ticker_data and self._push:
                         self._push(ticker_data)
                 except Exception as e:
                     self.logger.error(f"轮询 {ticker} 出错: {e}")
+
+            # 循环拉取
             time.sleep(period.fetch_seconds)
 
     def _poll_tick(self, ticker: str) -> Optional[TickerData]:
