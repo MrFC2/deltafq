@@ -97,6 +97,23 @@ class QmtDataGateway(DataGateway):
 
     # ---------- 私有 ----------
 
+    def _unsubscribe_push(self) -> None:
+        """push 停时逐个退订 quote，再调 xtdata.stop（有则调）。"""
+        if not self._ticker_sub_seqs:
+            return
+        try:
+            for seq in self._ticker_sub_seqs:
+                try:
+                    xtdata.unsubscribe_quote(seq)
+                except Exception as e:
+                    self.logger.exception(f"unsubscribe_quote {seq} 失败: {e}")
+            self._ticker_sub_seqs.clear()
+            stop_fn = getattr(xtdata, "stop", None)
+            if callable(stop_fn):
+                stop_fn()
+        except Exception as e:
+            self.logger.exception(f"push 清理失败: {e}")
+
     def start_push(self) -> None:
         """逐只 subscribe_quote（每只用注册时的 period），最后阻塞 xtdata.run。
         start() 的 PUSH 路径只建一个线程调此方法，保证 xtdata.run() 全局只调一次。
@@ -142,23 +159,6 @@ class QmtDataGateway(DataGateway):
                 if entry:
                     callback, _ = entry
                     callback(ticker_data)
-
-    def _unsubscribe_push(self) -> None:
-        """push 停时逐个退订 quote，再调 xtdata.stop（有则调）。"""
-        if not self._ticker_sub_seqs:
-            return
-        try:
-            for seq in self._ticker_sub_seqs:
-                try:
-                    xtdata.unsubscribe_quote(seq)
-                except Exception as e:
-                    self.logger.exception(f"unsubscribe_quote {seq} 失败: {e}")
-            self._ticker_sub_seqs.clear()
-            stop_fn = getattr(xtdata, "stop", None)
-            if callable(stop_fn):
-                stop_fn()
-        except Exception as e:
-            self.logger.exception(f"push 清理失败: {e}")
 
     def start_poll(self, period: Period, tickers: List[str]) -> None:
         """按 period 轮询行情，TICK 模式拉实时快照，K 线模式等到新 K 线才推送。"""
@@ -222,6 +222,19 @@ class QmtDataGateway(DataGateway):
             return a, b
         return b, a
 
+    @staticmethod
+    def _ts_from_millis_or_now(raw: Any) -> datetime:
+        """时间戳毫秒太长则按毫秒除；坏了或没有就用本机当前时间。"""
+        if raw is None:
+            return datetime.now().replace(tzinfo=None)
+        try:
+            n = int(raw)
+            if n > 10 ** 12:
+                n = n // 1000
+            return datetime.fromtimestamp(n)
+        except (TypeError, ValueError, OSError):
+            return datetime.now().replace(tzinfo=None)
+
     @classmethod
     def _level_value(cls, d: Dict[str, Any], side: str, kind: str, idx: int) -> Optional[float]:
         """取指定档位字段，兼容数组字段和逐档字段。"""
@@ -260,16 +273,3 @@ class QmtDataGateway(DataGateway):
             return float(v)
         except (TypeError, ValueError):
             return None
-
-    @staticmethod
-    def _ts_from_millis_or_now(raw: Any) -> datetime:
-        """时间戳毫秒太长则按毫秒除；坏了或没有就用本机当前时间。"""
-        if raw is None:
-            return datetime.now().replace(tzinfo=None)
-        try:
-            n = int(raw)
-            if n > 10 ** 12:
-                n = n // 1000
-            return datetime.fromtimestamp(n)
-        except (TypeError, ValueError, OSError):
-            return datetime.now().replace(tzinfo=None)
