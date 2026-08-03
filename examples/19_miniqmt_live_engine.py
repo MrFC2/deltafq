@@ -11,8 +11,8 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from source.live import LiveEngine
-from source.adapters.data.qmt_gateway import QmtDataGateway
-from source.adapters.trade.qmt_gateway import QmtTradeGateway
+from source.gateway.data.qmt_gateway import QmtDataGateway
+from source.gateway.trade.qmt_gateway import QmtTradeGateway
 from source.strategy.base import BaseStrategy
 from source.enums import Period
 from source.core.models import SignalData, TickerData

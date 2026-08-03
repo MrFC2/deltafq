@@ -9,8 +9,8 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from source.adapters.data import QmtDataGateway
-from source.adapters.trade import QmtTradeGateway
+from source.gateway.data import QmtDataGateway
+from source.gateway.trade import QmtTradeGateway
 from source.core.models import OrderRequest, TickerData
 
 # 配置 miniQMT 环境变量

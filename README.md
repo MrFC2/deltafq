@@ -138,7 +138,7 @@ deltafq/
 │   ├── gateway_registry.py        # 网关工厂与注册
 │   ├── engine.py                  # LiveEngine 实盘编排
 │   └── models.py                  # TickData、OrderRequest 等
-├── adapters/                      # 可插拔行情 / 交易适配
+├── gateway/                      # 可插拔行情 / 交易适配
 │   ├── data/                      # 数据源适配（历史 bars + 实时 gateway）
 │   │   ├── baostock_bars.py       # baostock 历史 K 线
 │   │   ├── baostock_gateway.py    # baostock 轮询 5m 行情

@@ -37,8 +37,8 @@ DeltaFQ is a three-layer quantitative trading framework: **Research → Backtest
 ```
 DataFetcher (data/fetcher.py)
   ├── source="yahoo"     → yfinance
-  ├── source="baostock"  → adapters/data/baostock_bars.py
-  └── source="miniqmt"   → adapters/data/miniqmt_bars.py
+  ├── source="baostock"  → gateway/data/baostock_bars.py
+  └── source="miniqmt"   → gateway/data/miniqmt_bars.py
        ↓
 DataCleaner (data/cleaner.py)   # dropna, normalize columns
        ↓

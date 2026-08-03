@@ -9,7 +9,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from source.live import create_data_gateway
-from source.adapters.data.base import DataGateway
+from source.gateway.data.base import DataGateway
 from source.core.models import TickerData
 
 NAME = "baostock"  # "miniqmt" | "baostock"

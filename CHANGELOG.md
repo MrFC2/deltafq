@@ -7,8 +7,8 @@
 - LiveEngine warmup 支持 `baostock_warmup`；示例 `21_baostock_test.py` 覆盖历史 + 行情烟测
 
 ## [1.1.0] - 2026-07-18
-- `DataFetcher(source="baostock")`：A 股历史 OHLCV（`adapters/data/baostock_bars.py`）
-- 历史 K 线适配迁入 `adapters/data/`（`miniqmt_bars` / `baostock_bars`），与 `*_gateway` 并列
+- `DataFetcher(source="baostock")`：A 股历史 OHLCV（`gateway/data/baostock_bars.py`）
+- 历史 K 线适配迁入 `gateway/data/`（`miniqmt_bars` / `baostock_bars`），与 `*_gateway` 并列
 - 示例 `21_baostock_test.py`
 
 ## [1.0.2] - 2026-04-27
@@ -35,7 +35,7 @@
 
 ### 数据与交易适配器
 - `MiniQmtDataGateway`：新增 `get_full_tick_dict(symbol)`，并在 poll/push 两种模式下统一补充 bid/ask；同时完善生命周期与 warm-up/退订相关处理
-- `MiniQmtTradeGateway`：交易网关实现迁移到 `deltafq/adapters/trade/miniqmt_gateway.py` 并调整导出路径；下单保持限价单与 `lot_size` 对齐，撤单失败时支持按合同号兜底
+- `MiniQmtTradeGateway`：交易网关实现迁移到 `deltafq/gateway/trade/miniqmt_gateway.py` 并调整导出路径；下单保持限价单与 `lot_size` 对齐，撤单失败时支持按合同号兜底
 - `MiniQmtXtTraderClient` 与 `miniqmt_xtdata`：补充接口说明与注释，保持交易查询与历史数据工具语义一致
 
 ### 文档与示例
@@ -51,7 +51,7 @@
 ### miniQMT 交易接入
 - 交易客户端：新增 `MiniQmtXtTraderClient`，支持连接、下单、撤单、账户/持仓/委托/成交查询
 - 交易网关：新增 `MiniQmtTradeGateway`，支持限价单、`lot_size` 对齐与撤单回退
-- 注册导出：`TRADE_GATEWAYS` 注册 `miniqmt`，并在 `deltafq.live` 与 `deltafq.adapters.trade` 导出
+- 注册导出：`TRADE_GATEWAYS` 注册 `miniqmt`，并在 `deltafq.live` 与 `deltafq.gateway.trade` 导出
 - 示例 `18_miniqmt_trade_demo.py`：新增 miniQMT 实盘连接、查询、限价下单与批量撤单演示
 
 ## [0.8.3] - 2026-04-17

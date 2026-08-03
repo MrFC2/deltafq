@@ -52,9 +52,9 @@ import pandas as pd
 from ..backtest.performance import PerformanceReporter
 from ..core.base import BaseComponent
 from ..strategy.base import BaseStrategy
-from ..adapters.data.base import DataGateway
-from ..adapters.trade.base import TradeGateway
-from ..adapters.trade.paper_gateway import PaperTradeGateway
+from ..gateway.data.base import DataGateway
+from ..gateway.trade.base import TradeGateway
+from ..gateway.trade.paper_gateway import PaperTradeGateway
 from ..core.models import SignalData, TickerData
 from ..enums import Period, Signal
 

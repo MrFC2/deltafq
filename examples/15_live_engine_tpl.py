@@ -4,7 +4,7 @@ import sys
 import os
 import time
 
-from source.adapters.data import BaostockDataGateway
+from source.gateway.data import BaostockDataGateway
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
@@ -12,7 +12,7 @@ if project_root not in sys.path:
 
 import pandas as pd
 from source.live import LiveEngine
-from source.adapters.trade.paper_gateway import PaperTradeGateway
+from source.gateway.trade.paper_gateway import PaperTradeGateway
 from source.strategy.base import BaseStrategy
 from source.enums import Period
 from source.core.models import SignalData, TickerData
