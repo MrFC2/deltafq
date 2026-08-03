@@ -13,6 +13,8 @@ class DataGateway(BaseComponent, ABC):
         super().__init__(**kwargs)
         # ticker → (callback, period) 映射，网关通过 keys() 知道订阅了哪些标的
         self._ticker_callbacks: Dict[str, Tuple[Callable[[TickerData], None], Period]] = {}
+        # 行情循环运行标志
+        self._running: bool = False
 
     def register_ticker_callback(self,
                                  ticker: str,

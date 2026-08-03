@@ -50,8 +50,6 @@ class QmtDataGateway(DataGateway):
         self.mode: GatewayMode = mode
 
         # --- 运行时状态 ---
-        # 轮询/推送线程运行标志
-        self._running = False
         # 后台 daemon 线程列表（每个 period 分组对应一个线程）
         self._threads: List[threading.Thread] = []
         # push 模式下各标的订阅序号，退订时使用

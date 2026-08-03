@@ -56,9 +56,6 @@ from ..gateway.trade.paper_gateway import PaperTradeGateway
 from ..core.models import SignalData, TickerData
 from ..enums import Period, Signal
 
-_SIG_ICON = {1: "↑", -1: "↓", 0: "-"}
-_ACTION_ICON = {"buy": "↑", "sell": "↓", "skip": "x", "no_change": "-"}
-
 
 @dataclass
 class TickerContext:

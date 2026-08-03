@@ -9,7 +9,7 @@ baostock 行情，类 BaostockDataGateway。
     get_depths           合成盘口（价由最新 close 铺档）
 
 私有
-    _run                 主循环：bar 时间戳变化才推送
+    _run                 主循环：推送最新一根 K 线
     _fetch_data          拉指定天数内的 K 线
 """
 import math
@@ -18,6 +18,8 @@ import threading
 import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
+
+import baostock as bs  # type: ignore
 
 from quant.data.baostock_fetcher import BaostockDataFetcher
 from ...enums import Period
@@ -41,15 +43,11 @@ class BaostockDataGateway(DataGateway):
         # 轮询间隔（秒）
         self.interval: float = interval
 
-
-        # --- 運行時状態 ---
-        # 轮询线程运行标志
-        self._running: bool = False
+        # --- 运行时状态 ---
         # 轮询 daemon 线程
         self._thread: Optional[threading.Thread] = None
 
         # 行情拉取器
-        import baostock as bs
         self.data_fetcher: BaostockDataFetcher = BaostockDataFetcher(bs)
         self.data_fetcher.bs.login()
 
