@@ -41,10 +41,8 @@ class BaostockDataGateway(DataGateway):
         # 轮询间隔（秒）
         self.interval: float = interval
 
-        # 各标的最后一根 K 线时间戳，用于去重推送
-        self._last_kline_ts: Dict[str, datetime] = {}
 
-        # --- 运行时状态 ---
+        # --- 運行時状態 ---
         # 轮询线程运行标志
         self._running: bool = False
         # 轮询 daemon 线程
@@ -129,22 +127,15 @@ class BaostockDataGateway(DataGateway):
     # ---------- 私有 ----------
 
     def _run(self) -> None:
-        """轮询各标的最新 5m；仅 bar 时间变化时组 TickerData 回调。"""
+        """轮询各标的最新 5m，推送最新一根 K 线，幂等校验由上层 engine 负责。"""
         while self._running:
             for ticker, (callback, _) in list(self._ticker_callbacks.items()):
                 try:
                     data = self._fetch_data(ticker, Period.MINUTE_5, 7)
                     if not data:
                         continue
-                    # 取最新数据进行推送
-                    latest_data = data[-1]
-                    data_timestamp = latest_data.timestamp
-                    # 同一根 K 线不重复推送
-                    if self._last_kline_ts.get(ticker) == data_timestamp:
-                        continue
-                    self._last_kline_ts[ticker] = data_timestamp
                     if callback:
-                        callback(latest_data)
+                        callback(data[-1])
                 except Exception as e:
                     self.logger.exception(f"拉取 {ticker} 数据出错: {str(e)}")
                     continue

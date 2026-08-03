@@ -187,14 +187,18 @@ class LiveEngine(BaseComponent):
 
     def _run_strategy(self, ticker_data: TickerData) -> None:
         """编排：撮合挂单 → 建 df → 信号 → 账户快照 → 权益 → 信号翻转时撤单/下单。"""
-        # 模拟交易撮合成交（实盘交易依赖第三方平台不需要）
-        if isinstance(self.trade_gateway, PaperTradeGateway):
-            self.trade_gateway.on_tick(ticker_data)
-
         # 按 ticker 路由到对应 ctx，无对应标的时跳过
         ctx = self._ticker_contexts.get(ticker_data.ticker)
         if ctx is None:
             return
+
+        # 幂等校验：时间戳未变说明是重复数据，跳过
+        if ctx.ticker_datas and ctx.ticker_datas[-1].timestamp == ticker_data.timestamp:
+            return
+
+        # 模拟交易撮合成交（实盘交易依赖第三方平台不需要）
+        if isinstance(self.trade_gateway, PaperTradeGateway):
+            self.trade_gateway.on_tick(ticker_data)
 
         ctx.ticker_datas.append(ticker_data)
 

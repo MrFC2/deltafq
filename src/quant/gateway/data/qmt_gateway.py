@@ -56,8 +56,6 @@ class QmtDataGateway(DataGateway):
         self._threads: List[threading.Thread] = []
         # push 模式下各标的订阅序号，退订时使用
         self._ticker_sub_seqs: List[int] = []
-        # K 线模式下各标的上次推送的 K 线时间戳，用于去重
-        self._last_kline_ts: Dict[str, Optional[datetime]] = {}
 
     def start(self) -> None:
         """起后台线程：poll 轮询快照，push 订分笔并跑 xtdata.run。"""
@@ -184,18 +182,9 @@ class QmtDataGateway(DataGateway):
         return TickerData(ticker=ticker, timestamp=ts, price=float(price), volume=int(vol), bid=bid, ask=ask)
 
     def _poll_kline(self, ticker: str, period: Period) -> Optional[TickerData]:
-        """拉最新一根 K 线，是新数据才返回，旧数据返回 None 由外层下一轮重试。"""
+        """拉最新一根 K 线并返回，幂等校验由上层 engine 负责。"""
         datas = fetch_data(ticker, None, None, period=period, dividend_type=self.dividend_type, count=1)
-        if not datas:
-            return None
-        data = datas[-1]
-        last_ts = self._last_kline_ts.get(ticker)
-        if last_ts is not None and data.timestamp <= last_ts:
-            # 还是旧数据，返回 None，外层下一轮再试
-            return None
-        # 是新 K 线，记录时间戳并返回
-        self._last_kline_ts[ticker] = data.timestamp
-        return data
+        return datas[-1] if datas else None
 
     def _start_push(self) -> None:
         """逐只 subscribe_quote（每只用注册时的 period），最后阻塞 xtdata.run。
