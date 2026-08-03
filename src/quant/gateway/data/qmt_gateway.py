@@ -19,9 +19,7 @@ miniQMT 行情（xtdata），类 QmtDataGateway。
     _bid_ask_from_dict   快照 dict 取买一卖一
     _ts_from_millis_or_now  行情时间转 datetime
 """
-import threading
 import time
-from collections import defaultdict
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -38,51 +36,22 @@ class QmtDataGateway(DataGateway):
 
     def __init__(self,
                  dividend_type: str = "none",
-                 mode: GatewayMode = GatewayMode.POLL,
+                 mode: GatewayMode = GatewayMode.PUSH,
                  **kwargs: Any) -> None:
         """K 线除权类型、模式 poll 或 push。"""
-        super().__init__(**kwargs)
+        super().__init__(mode=mode, **kwargs)
 
-        # --- 配置参数 ---
         # K 线除权类型（none / 前复权等）
         self.dividend_type = dividend_type
-        # 行情模式：poll 定时拉全快照，push 订分笔
-        self.mode: GatewayMode = mode
 
-        # --- 运行时状态 ---
         # push 模式下各标的订阅序号，退订时使用
         self._ticker_sub_seqs: List[int] = []
 
-    def start(self) -> None:
-        """起后台线程：poll 轮询快照，push 订分笔并跑 xtdata.run。"""
-        if self._running:
-            return
-        self._running = True
-
-        if self.mode == GatewayMode.PUSH:
-            # PUSH：xtdata.run() 是全局事件循环只能调一次，所有 ticker 在同一个线程里订阅
-            t = threading.Thread(target=self._start_push, daemon=True)
-            self._threads.append(t)
-            t.start()
-            return
-
-        # POLL：按 period 分组，每组起一个 daemon 线程
-        period_tickers: Dict[Period, List[str]] = defaultdict(list)
-        for ticker, (_, period) in self._ticker_callbacks.items():
-            period_tickers[period].append(ticker)
-        for period, tickers in period_tickers.items():
-            t = threading.Thread(target=self._start_poll, args=(period, tickers), daemon=True)
-            self._threads.append(t)
-            t.start()
-
     def stop(self) -> None:
-        """停线程；push 会退订并调 stop（若有）；join 等线程结束。"""
-        self._running = False
+        """push 先退订，再走基类 join 逻辑。"""
         if self.mode == GatewayMode.PUSH:
             self._unsubscribe_push()
-        for t in self._threads:
-            t.join(timeout=5.0)
-        self._threads.clear()
+        super().stop()
 
     def get_kline_warm_up(self, ticker: str, period: Period, size: int) -> List[TickerData]:
         """拉取最近 size 根 K 线作为数据预热。"""
@@ -128,7 +97,7 @@ class QmtDataGateway(DataGateway):
 
     # ---------- 私有 ----------
 
-    def _start_push(self) -> None:
+    def start_push(self) -> None:
         """逐只 subscribe_quote（每只用注册时的 period），最后阻塞 xtdata.run。
         start() 的 PUSH 路径只建一个线程调此方法，保证 xtdata.run() 全局只调一次。
         """
@@ -191,7 +160,7 @@ class QmtDataGateway(DataGateway):
         except Exception as e:
             self.logger.exception(f"push 清理失败: {e}")
 
-    def _start_poll(self, period: Period, tickers: List[str]) -> None:
+    def start_poll(self, period: Period, tickers: List[str]) -> None:
         """按 period 轮询行情，TICK 模式拉实时快照，K 线模式等到新 K 线才推送。"""
         while self._running:
             for ticker in tickers:

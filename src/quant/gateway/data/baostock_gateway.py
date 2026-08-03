@@ -14,16 +14,14 @@ baostock 行情，类 BaostockDataGateway。
 """
 import math
 import random
-import threading
 import time
-from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import baostock as bs  # type: ignore
 
 from quant.data.baostock_fetcher import BaostockDataFetcher
-from ...enums import Period
+from ...enums import GatewayMode, Period
 from .base import DataGateway
 from ...core.models import TickerData
 
@@ -32,36 +30,15 @@ class BaostockDataGateway(DataGateway):
     """轮询 baostock 最新 K 线；无真实 tick / Level2。"""
 
     def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-
-        # --- 运行时状态 ---
-        # 后台 daemon 线程列表（每个 period 分组一个线程）
-        self._threads: List[threading.Thread] = []
+        super().__init__(mode=GatewayMode.POLL, **kwargs)
 
         # 行情拉取器
         self.data_fetcher: BaostockDataFetcher = BaostockDataFetcher(bs)
         self.data_fetcher.bs.login()
 
-    def start(self) -> None:
-        """按 period 分组起 daemon 线程轮询。"""
-        if self._running:
-            return
-        self._running = True
-
-        period_tickers: Dict[Period, List[str]] = defaultdict(list)
-        for ticker, (_, period) in self._ticker_callbacks.items():
-            period_tickers[period].append(ticker)
-        for period, tickers in period_tickers.items():
-            t = threading.Thread(target=self._start_poll, args=(period, tickers), daemon=True)
-            self._threads.append(t)
-            t.start()
-
     def stop(self) -> None:
         """停止所有轮询线程并 logout。"""
-        self._running = False
-        for t in self._threads:
-            t.join(timeout=5.0)
-        self._threads.clear()
+        super().stop()
         if self.data_fetcher.bs is not None:
             self.data_fetcher.bs.logout()
             self.data_fetcher.bs = None
@@ -116,7 +93,7 @@ class BaostockDataGateway(DataGateway):
 
     # ---------- 私有 ----------
 
-    def _start_poll(self, period: Period, tickers: List[str]) -> None:
+    def start_poll(self, period: Period, tickers: List[str]) -> None:
         """某 period 分组的轮询主循环：推送最新一根 K 线，幂等校验由上层 engine 负责。"""
         days = self._days_for_period(period, 2)
         while self._running:

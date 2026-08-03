@@ -1,22 +1,21 @@
 import threading
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from typing import Callable, Dict, List, Optional, Tuple
 
 from ...core.models import TickerData
 from ...core.base import BaseComponent
-from ...enums import Period
+from ...enums import GatewayMode, Period
 
 
 class DataGateway(BaseComponent, ABC):
     """实盘行情网关抽象：连接、订阅、推送与日内行情查询。"""
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, mode: GatewayMode = GatewayMode.POLL, **kwargs) -> None:
         super().__init__(**kwargs)
-        # ticker → (callback, period) 映射，网关通过 keys() 知道订阅了哪些标的
+        self.mode: GatewayMode = mode
         self._ticker_callbacks: Dict[str, Tuple[Callable[[TickerData], None], Period]] = {}
-        # 行情循环运行标志
         self._running: bool = False
-        # 后台 daemon 线程列表
         self._threads: List[threading.Thread] = []
 
     def register_ticker_callback(self,
@@ -26,14 +25,37 @@ class DataGateway(BaseComponent, ABC):
         """注册某个标的的 Tick 推送回调，注册时携带 period，供 gateway 内部分组建线程。"""
         self._ticker_callbacks[ticker] = (callback, period)
 
-    @abstractmethod
     def start(self) -> None:
-        """启动行情循环（轮询或推送）。"""
+        """启动行情：push 模式单线程跑 _start_push，poll 模式按 period 分组跑 _start_poll。"""
+        if self._running:
+            return
+        self._running = True
+        if self.mode == GatewayMode.PUSH:
+            t = threading.Thread(target=self.start_push, daemon=True)
+            self._threads.append(t)
+            t.start()
+        else:
+            period_tickers: Dict[Period, List[str]] = defaultdict(list)
+            for ticker, (_, period) in self._ticker_callbacks.items():
+                period_tickers[period].append(ticker)
+            for period, tickers in period_tickers.items():
+                t = threading.Thread(target=self.start_poll, args=(period, tickers), daemon=True)
+                self._threads.append(t)
+                t.start()
+
+    def stop(self) -> None:
+        """停止行情，join 所有线程。子类可 override 追加清理逻辑后调 super().stop()。"""
+        self._running = False
+        for t in self._threads:
+            t.join(timeout=5.0)
+        self._threads.clear()
+
+    def start_poll(self, period: Period, tickers: List[str]) -> None:
+        """poll 模式实现，子类按需 override。"""
         raise NotImplementedError
 
-    @abstractmethod
-    def stop(self) -> None:
-        """停止网关并释放资源。"""
+    def start_push(self) -> None:
+        """push 模式实现，子类按需 override。"""
         raise NotImplementedError
 
     @abstractmethod
