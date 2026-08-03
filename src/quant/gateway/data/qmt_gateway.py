@@ -116,9 +116,11 @@ class QmtDataGateway(DataGateway):
         """逐只 subscribe_quote（每只用注册时的 period），最后阻塞 xtdata.run。
         start() 的 PUSH 路径只建一个线程调此方法，保证 xtdata.run() 全局只调一次。
         """
+        # 防御性检查：线程启动时已被 stop
         if not self._running:
             return
 
+        # 逐个标的订阅分笔行情，各自使用注册时传入的 period
         for ticker, (_, period) in self._ticker_callbacks.items():
             seq = xtdata.subscribe_quote(ticker, period=period.code, start_time="", end_time="", count=0,
                                          callback=self._push_callback)
@@ -127,9 +129,11 @@ class QmtDataGateway(DataGateway):
                 continue
             self._ticker_sub_seqs.append(seq)
 
+        # 无成功订阅则退出
         if not self._ticker_sub_seqs:
             return
 
+        # 阻塞运行 xtdata 事件循环，直到 stop() 调用 unsubscribe
         try:
             xtdata.run()
         except Exception as e:
@@ -164,13 +168,16 @@ class QmtDataGateway(DataGateway):
             for ticker in tickers:
                 callback, _ = self._ticker_callbacks.get(ticker, (None, None))
                 if period == Period.TICK:
+                    # 拉取实时信息
                     ticker_data = self._poll_tick(ticker)
                 else:
+                    # K 线模式：拿到新数据才推送，旧数据等下一轮
                     ticker_data = self._poll_kline(ticker, period)
 
                 if ticker_data and callback:
                     callback(ticker_data)
 
+            # 加多3秒，给第三方缓冲时间统计数据
             time.sleep(period.fetch_seconds + 3)
 
     def _poll_tick(self, ticker: str) -> Optional[TickerData]:

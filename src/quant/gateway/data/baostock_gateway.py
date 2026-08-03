@@ -93,6 +93,7 @@ class BaostockDataGateway(DataGateway):
 
     def start_poll(self, period: Period, tickers: List[str]) -> None:
         """某 period 分组的轮询主循环：推送最新一根 K 线，幂等校验由上层 engine 负责。"""
+        # 估算拉取最新 bar 所需天数，多拉 2 根确保边界不缺
         days = self._days_for_period(period, 2)
         while self._running:
             for ticker in tickers:
@@ -103,6 +104,7 @@ class BaostockDataGateway(DataGateway):
                         callback(data[-1])
                 except Exception as e:
                     self.logger.exception(f"拉取 {ticker} 数据出错: {str(e)}")
+            # 加多3秒，给 baostock 缓冲时间
             time.sleep(period.fetch_seconds + 3)
 
     def _fetch_data(self, ticker: str, period: Period, days: int) -> List[TickerData]:
