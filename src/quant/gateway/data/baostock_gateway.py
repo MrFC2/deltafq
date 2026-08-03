@@ -2,20 +2,21 @@
 baostock 行情，类 BaostockDataGateway。
 
 对外
-    start                开 daemon 线程轮询最新 5m
+    start                按 period 分组起 daemon 线程轮询
     stop                 停线程并 logout
     get_kline_warm_up    数据预热：拉取最近 N 根 K 线
     get_today_ohlc       当日开高低（日线）
     get_depths           合成盘口（价由最新 close 铺档）
 
 私有
-    _run                 主循环：推送最新一根 K 线
+    _start_poll          某 period 分组的主循环
     _fetch_data          拉指定天数内的 K 线
 """
 import math
 import random
 import threading
 import time
+from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -28,55 +29,46 @@ from ...core.models import TickerData
 
 
 class BaostockDataGateway(DataGateway):
-    """轮询 baostock 5m 最新价；无真实 tick / Level2。"""
+    """轮询 baostock 最新 K 线；无真实 tick / Level2。"""
 
-    def __init__(self, interval: float = 60.0, **kwargs: Any) -> None:
-        """
-        初始化 BaostockDataGateway。
-
-        Args:
-            interval: 轮询间隔（秒），默认 60s。
-        """
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
 
-        # --- 配置参数 ---
-        # 轮询间隔（秒）
-        self.interval: float = interval
-
         # --- 运行时状态 ---
-        # 轮询 daemon 线程
-        self._thread: Optional[threading.Thread] = None
+        # 后台 daemon 线程列表（每个 period 分组一个线程）
+        self._threads: List[threading.Thread] = []
 
         # 行情拉取器
         self.data_fetcher: BaostockDataFetcher = BaostockDataFetcher(bs)
         self.data_fetcher.bs.login()
 
     def start(self) -> None:
-        """启动轮询线程。"""
+        """按 period 分组起 daemon 线程轮询。"""
         if self._running:
             return
         self._running = True
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
+
+        period_tickers: Dict[Period, List[str]] = defaultdict(list)
+        for ticker, (_, period) in self._ticker_callbacks.items():
+            period_tickers[period].append(ticker)
+        for period, tickers in period_tickers.items():
+            t = threading.Thread(target=self._start_poll, args=(period, tickers), daemon=True)
+            self._threads.append(t)
+            t.start()
 
     def stop(self) -> None:
-        """停止轮询线程并 logout。"""
+        """停止所有轮询线程并 logout。"""
         self._running = False
-        if self._thread:
-            self._thread.join(timeout=2)
+        for t in self._threads:
+            t.join(timeout=5.0)
+        self._threads.clear()
         if self.data_fetcher.bs is not None:
             self.data_fetcher.bs.logout()
             self.data_fetcher.bs = None
 
     def get_kline_warm_up(self, ticker: str, period: Period, size: int) -> List[TickerData]:
         """拉取最近 size 根 K 线作为数据预热，按 period 动态估算所需天数。"""
-        if period.days_per_bar > 0:
-            # 日/周/月线：直接按每根 bar 对应日历天数估算，加 2 倍缓冲
-            days_needed = math.ceil(size * period.days_per_bar) * 2
-        else:
-            # 分钟/小时线：按 fetch_seconds 换算，交易日约 4 小时，再乘 7/5 换算日历天
-            trading_seconds_per_day = 4 * 3600
-            days_needed = math.ceil(size * period.fetch_seconds / trading_seconds_per_day * (7 / 5)) * 2
+        days_needed = self._days_for_period(period, size)
         datas = self._fetch_data(ticker, period, days_needed)
         return datas[-size:] if datas else []
 
@@ -124,23 +116,30 @@ class BaostockDataGateway(DataGateway):
 
     # ---------- 私有 ----------
 
-    def _run(self) -> None:
-        """轮询各标的最新 5m，推送最新一根 K 线，幂等校验由上层 engine 负责。"""
+    def _start_poll(self, period: Period, tickers: List[str]) -> None:
+        """某 period 分组的轮询主循环：推送最新一根 K 线，幂等校验由上层 engine 负责。"""
+        days = self._days_for_period(period, 2)
         while self._running:
-            for ticker, (callback, _) in list(self._ticker_callbacks.items()):
+            for ticker in tickers:
+                callback, _ = self._ticker_callbacks.get(ticker, (None, None))
                 try:
-                    data = self._fetch_data(ticker, Period.MINUTE_5, 7)
-                    if not data:
-                        continue
-                    if callback:
+                    data = self._fetch_data(ticker, period, days)
+                    if data and callback:
                         callback(data[-1])
                 except Exception as e:
                     self.logger.exception(f"拉取 {ticker} 数据出错: {str(e)}")
-                    continue
-            time.sleep(self.interval)
+            time.sleep(period.fetch_seconds + 3)
 
     def _fetch_data(self, ticker: str, period: Period, days: int) -> List[TickerData]:
         """用已登录会话拉近 days 日 K 线。"""
         start = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
         end = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
         return self.data_fetcher.fetch_data(ticker, period, start, end)
+
+    @staticmethod
+    def _days_for_period(period: Period, bars: int) -> int:
+        """估算拉取 bars 根 K 线所需的日历天数。"""
+        if period.days_per_bar > 0:
+            return math.ceil(bars * period.days_per_bar) * 2
+        trading_seconds_per_day = 4 * 3600
+        return math.ceil(bars * period.fetch_seconds / trading_seconds_per_day * (7 / 5)) * 2

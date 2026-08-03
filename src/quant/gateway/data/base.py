@@ -1,3 +1,4 @@
+import threading
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, List, Optional, Tuple
 
@@ -15,6 +16,8 @@ class DataGateway(BaseComponent, ABC):
         self._ticker_callbacks: Dict[str, Tuple[Callable[[TickerData], None], Period]] = {}
         # 行情循环运行标志
         self._running: bool = False
+        # 后台 daemon 线程列表
+        self._threads: List[threading.Thread] = []
 
     def register_ticker_callback(self,
                                  ticker: str,

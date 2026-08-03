@@ -50,8 +50,6 @@ class QmtDataGateway(DataGateway):
         self.mode: GatewayMode = mode
 
         # --- 运行时状态 ---
-        # 后台 daemon 线程列表（每个 period 分组对应一个线程）
-        self._threads: List[threading.Thread] = []
         # push 模式下各标的订阅序号，退订时使用
         self._ticker_sub_seqs: List[int] = []
 
@@ -85,6 +83,11 @@ class QmtDataGateway(DataGateway):
         for t in self._threads:
             t.join(timeout=5.0)
         self._threads.clear()
+
+    def get_kline_warm_up(self, ticker: str, period: Period, size: int) -> List[TickerData]:
+        """拉取最近 size 根 K 线作为数据预热。"""
+        datas = fetch_data(ticker, None, None, period=period, dividend_type=self.dividend_type, count=size)
+        return datas or []
 
     def get_today_ohlc(self, ticker: str) -> Optional[Dict[str, float]]:
         """从快照取当日开、高、低三个 float；缺或错返回 None。"""
@@ -123,12 +126,53 @@ class QmtDataGateway(DataGateway):
                 asks.append({"level": float(i), "price": ap, "volume": float(av or 0.0)})
         return {"bids": bids, "asks": asks}
 
-    def get_kline_warm_up(self, ticker: str, period: Period, size: int) -> List[TickerData]:
-        """拉取最近 size 根 K 线作为数据预热。"""
-        datas = fetch_data(ticker, None, None, period=period, dividend_type=self.dividend_type, count=size)
-        return datas or []
-
     # ---------- 私有 ----------
+
+    def _start_push(self) -> None:
+        """逐只 subscribe_quote（每只用注册时的 period），最后阻塞 xtdata.run。
+        start() 的 PUSH 路径只建一个线程调此方法，保证 xtdata.run() 全局只调一次。
+        """
+        if not self._running:
+            return
+
+        for ticker, (_, period) in self._ticker_callbacks.items():
+            seq = xtdata.subscribe_quote(ticker, period=period.code, start_time="", end_time="", count=0,
+                                         callback=self._push_callback)
+            if seq < 0:
+                self.logger.error(f"subscribe_quote 失败 {ticker}: {seq}")
+                continue
+            self._ticker_sub_seqs.append(seq)
+
+        if not self._ticker_sub_seqs:
+            return
+
+        try:
+            xtdata.run()
+        except Exception as e:
+            if self._running:
+                self.logger.error(f"xtdata.run 异常: {e}")
+
+    def _push_callback(self, data: dict) -> None:
+        """分笔推送回调：行转 TickerData 再交 tick 回调"""
+        self.logger.info(f"_on_push_datas data: {data}")
+        if not self._running:
+            return
+        for code, rows in (data or {}).items():
+            for row in rows or []:
+                if not isinstance(row, dict):
+                    continue
+                price = row.get("lastPrice") or row.get("last_price") or row.get("price")
+                if price is None:
+                    continue
+                vol = row.get("volume") or row.get("lastVolume") or 0
+                ts = self._ts_from_millis_or_now(row.get("time"))
+                bid, ask = self._bid_ask_from_dict(row)
+                ticker_data = TickerData(ticker=code, price=float(price), timestamp=ts, volume=int(vol),
+                                         bid=bid, ask=ask)
+                entry = self._ticker_callbacks.get(code)
+                if entry:
+                    callback, _ = entry
+                    callback(ticker_data)
 
     def _unsubscribe_push(self) -> None:
         """push 停时逐个退订 quote，再调 xtdata.stop（有则调）。"""
@@ -153,16 +197,13 @@ class QmtDataGateway(DataGateway):
             for ticker in tickers:
                 callback, _ = self._ticker_callbacks.get(ticker, (None, None))
                 if period == Period.TICK:
-                    # 拉取实时信息
                     ticker_data = self._poll_tick(ticker)
                 else:
-                    # K 线模式：拿到新数据才推送，旧数据等下一轮
                     ticker_data = self._poll_kline(ticker, period)
 
                 if ticker_data and callback:
                     callback(ticker_data)
 
-            # 加多3秒，给第三方缓冲时间统计数据
             time.sleep(period.fetch_seconds + 3)
 
     def _poll_tick(self, ticker: str) -> Optional[TickerData]:
@@ -183,59 +224,6 @@ class QmtDataGateway(DataGateway):
         """拉最新一根 K 线并返回，幂等校验由上层 engine 负责。"""
         datas = fetch_data(ticker, None, None, period=period, dividend_type=self.dividend_type, count=1)
         return datas[-1] if datas else None
-
-    def _start_push(self) -> None:
-        """逐只 subscribe_quote（每只用注册时的 period），最后阻塞 xtdata.run。
-        start() 的 PUSH 路径只建一个线程调此方法，保证 xtdata.run() 全局只调一次。
-        """
-        # 防御性检查：线程启动时已被 stop
-        if not self._running:
-            return
-
-        # 逐个标的订阅分笔行情，各自使用注册时传入的 period
-        for ticker, (_, period) in self._ticker_callbacks.items():
-            seq = xtdata.subscribe_quote(ticker, period=period.code, start_time="", end_time="", count=0,
-                                         callback=self._push_callback)
-            if seq < 0:
-                self.logger.error(f"subscribe_quote 失败 {ticker}: {seq}")
-                continue
-            self._ticker_sub_seqs.append(seq)
-
-        # 无成功订阅则退出
-        if not self._ticker_sub_seqs:
-            return
-
-        # 阻塞运行 xtdata 事件循环，直到 stop() 调用 unsubscribe
-        try:
-            xtdata.run()
-        except Exception as e:
-            if self._running:
-                self.logger.error(f"xtdata.run 异常: {e}")
-
-    def _push_callback(self, data: dict) -> None:
-        """分笔推送回调：行转 TickerData 再交 tick 回调"""
-        self.logger.info(f"_on_push_datas data: {data}")
-        if not self._running:
-            return
-        # datas 结构：{标的代码: [分笔行, ...]}
-        for code, rows in (data or {}).items():
-            for row in rows or []:
-                # 跳过格式异常的推送数据
-                if not isinstance(row, dict):
-                    continue
-                # 兼容多种字段名
-                price = row.get("lastPrice") or row.get("last_price") or row.get("price")
-                if price is None:
-                    continue
-                vol = row.get("volume") or row.get("lastVolume") or 0
-                ts = self._ts_from_millis_or_now(row.get("time"))
-                bid, ask = self._bid_ask_from_dict(row)
-                ticker_data = TickerData(ticker=code, price=float(price), timestamp=ts, volume=int(vol),
-                                         bid=bid, ask=ask)
-                entry = self._ticker_callbacks.get(code)
-                if entry:
-                    callback, _ = entry
-                    callback(ticker_data)
 
     def _get_full_tick(self, ticker: str) -> Optional[Dict[str, Any]]:
         """调 get_full_tick；成功返回快照，失败返回 None。"""
