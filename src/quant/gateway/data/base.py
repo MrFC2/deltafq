@@ -30,20 +30,22 @@ class DataGateway(BaseComponent, ABC):
         if self._running:
             return
         self._running = True
+
         if self.mode == GatewayMode.PUSH:
             # PUSH：xtdata.run() 是全局事件循环只能调一次，所有 ticker 在同一个线程里订阅
             t = threading.Thread(target=self.start_push, daemon=True)
             self._threads.append(t)
             t.start()
-        else:
-            # POLL：按 period 分组，每组起一个 daemon 线程
-            period_tickers: Dict[Period, List[str]] = defaultdict(list)
-            for ticker, (_, period) in self._ticker_callbacks.items():
-                period_tickers[period].append(ticker)
-            for period, tickers in period_tickers.items():
-                t = threading.Thread(target=self.start_poll, args=(period, tickers), daemon=True)
-                self._threads.append(t)
-                t.start()
+            return
+
+        # POLL：按 period 分组，每组起一个 daemon 线程
+        period_tickers: Dict[Period, List[str]] = defaultdict(list)
+        for ticker, (_, period) in self._ticker_callbacks.items():
+            period_tickers[period].append(ticker)
+        for period, tickers in period_tickers.items():
+            t = threading.Thread(target=self.start_poll, args=(period, tickers), daemon=True)
+            self._threads.append(t)
+            t.start()
 
     def stop(self) -> None:
         """停止行情，join 所有线程。子类可 override 追加清理逻辑后调 super().stop()。"""
