@@ -1,20 +1,20 @@
 """
-miniQMT 行情（xtdata），类 MiniQmtDataGateway。
+miniQMT 行情（xtdata），类 QmtDataGateway。
 
 对外
-    connect              加载 xtdata，需 miniQMT 已开
-    subscribe            追加标的并 1m 暖机回放
     start                开 daemon：poll 轮询或 push 订分笔
     stop                 停线程，push 会退订
+    get_kline_warm_up    数据预热：拉取最近 N 根 K 线
     get_today_ohlc       当日开高低（从快照解析）
     get_depths           买卖盘口（从快照解析）
 
 私有
-    _warm_up             近一日 1m 合成暖机 tick
     _unsubscribe_push    push 停时退订
-    _run_poll            按间隔拉全快照轮询
-    _run_push            订分笔并阻塞 run
-    _on_push_tick        分笔回调里组 TickerData
+    _start_poll          按间隔拉全快照轮询
+    _start_push          订分笔并阻塞 run
+    _on_push_datas       分笔回调里组 TickerData
+    _poll_tick           拉实时快照
+    _poll_kline          拉最新一根 K 线
     _get_full_tick       封装 get_full_tick
     _bid_ask_from_dict   快照 dict 取买一卖一
     _ts_from_millis_or_now  行情时间转 datetime
@@ -22,7 +22,7 @@ miniQMT 行情（xtdata），类 MiniQmtDataGateway。
 import threading
 import time
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from xtquant import xtdata  # type: ignore
@@ -127,26 +127,12 @@ class QmtDataGateway(DataGateway):
                 asks.append({"level": float(i), "price": ap, "volume": float(av or 0.0)})
         return {"bids": bids, "asks": asks}
 
-    # ---------- 私有 ----------
+    def get_kline_warm_up(self, ticker: str, period: Period, size: int) -> List[TickerData]:
+        """拉取最近 size 根 K 线作为数据预热。"""
+        datas = fetch_data(ticker, None, None, period=period, dividend_type=self.dividend_type, count=size)
+        return datas or []
 
-    def _warm_up(self, ticker: str) -> None:
-        """近一日 1m 收盘合成暖机 tick。 TODO 这个warmup现在没意义，看下后面怎么改"""
-        try:
-            end = datetime.now()
-            start = end - timedelta(days=1)
-            datas = fetch_data(ticker, start.strftime("%Y-%m-%d"), None, period=Period.MINUTE_1,
-                               dividend_type=self.dividend_type)
-            if not datas:
-                self.logger.error(f"{ticker} 暖机数据为空")
-                return
-            for ticker_data in datas:
-                ticker_data.is_warm_up = True
-                entry = self._ticker_callbacks.get(ticker)
-                if entry:
-                    callback, _ = entry
-                    callback(ticker_data)
-        except Exception as e:
-            self.logger.exception(f"{ticker} 暖机失败: {e}")
+    # ---------- 私有 ----------
 
     def _unsubscribe_push(self) -> None:
         """push 停时逐个退订 quote，再调 xtdata.stop（有则调）。"""

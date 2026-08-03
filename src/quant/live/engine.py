@@ -30,8 +30,7 @@ LiveEngine — 对外查询与绩效
     calculate_metrics     基于成交与净值计算绩效指标（与回测接口一致）
 
 LiveEngine — 内部：数据与网关
-    # _create_data_fetcher  已废弃
-    # _fetch_data           已废弃
+    （已移至 DataGateway）
 
 LiveEngine — 内部：账户与挂单
     （已内联至调用处）
@@ -39,13 +38,12 @@ LiveEngine — 内部：账户与挂单
 LiveEngine — 内部：Tick
     _run_strategy               编排：撮合挂单 → 路由 ctx → 信号 → 快照 → 净值 → 翻转处理
     _append_values_record       追加一条净值记录（与回测 values 形状一致）
-    # _calc_order_quantity      按信号与策略 order_* 计算买卖数量（已移至策略层）
     _make_signal_to_order       信号相对上次变化时：撤挂单、下限价、更新 ctx.last_signal
 """
 
 from collections import deque
 from dataclasses import dataclass
-from typing import Optional, Any, Dict, List, Tuple
+from typing import Deque, Optional, Any, Dict, List, Tuple
 
 import pandas as pd
 
@@ -68,7 +66,7 @@ class TickerContext:
     # 绑定的策略实例（每个 ticker 独占，不共用）
     strategy: BaseStrategy
     # K线/Tick 滑动窗口，maxlen=strategy.data_size
-    ticker_datas: deque
+    ticker_datas: Deque[TickerData]
     # 上次信号，用于检测翻转
     last_signal: Signal = Signal.HOLD
     # 当前未成交挂单委托号
@@ -114,9 +112,14 @@ class LiveEngine(BaseComponent):
 
     def run(self) -> None:
         """注册 Tick 回调并启动行情推送。"""
-        # 每个 ticker 注册回调时携带 period，gateway 内部按 period 分组建线程
         for ticker, ctx in self._ticker_contexts.items():
+            # 注册回调时携带 period，gateway 内部按 period 分组建线程
             self.data_gateway.register_ticker_callback(ticker, self._run_strategy, ctx.strategy.period)
+            # 数据预热：仅 K 线模式需要，TICK 模式不需要历史窗口
+            if ctx.strategy.period != Period.TICK:
+                datas = self.data_gateway.get_kline_warm_up(ticker, ctx.strategy.period, ctx.strategy.data_size)
+                ctx.ticker_datas.extend(datas)
+
         self.data_gateway.start()
 
     def stop(self) -> None:
@@ -180,40 +183,6 @@ class LiveEngine(BaseComponent):
         reporter = PerformanceReporter()
         return reporter.compute(ticker, trades_df, values_df)
 
-    # ---------- 内部：数据与网关 ----------
-
-    # def _create_data_fetcher(self, strategy: BaseStrategy) -> Optional[DataFetcher]:
-    #     """非 tick 模式时按网关类型创建对应 DataFetcher，tick 模式返回 None。"""
-    #     if strategy.period == Period.TICK:
-    #         return None
-    #     if isinstance(self.data_gateway, QmtDataGateway):
-    #         return QmtDataFetcher()
-    #     return BaostockDataFetcher()
-
-    # def _fetch_data(self, ticker: str, strategy: BaseStrategy) -> Optional[List[TickerData]]:
-    #     """用 DataFetcher 拉当前 period 下最近 strategy_input_size 根 K 线。"""
-    #     data_fetcher = self._contexts[ticker].data_fetcher
-    #     if data_fetcher is None:
-    #         return None
-    #     now = datetime.now(timezone.utc)
-    #     if strategy.period.days_per_bar > 0:
-    #         cal_days = int(self.strategy_input_size * strategy.period.days_per_bar) + 60
-    #         start = (now - timedelta(days=max(cal_days, 60))).strftime("%Y-%m-%d")
-    #     else:
-    #         start = (now - timedelta(days=max(7, min(60, self.strategy_input_size // 10)))).strftime("%Y-%m-%d")
-    #     end = (now + timedelta(days=1)).strftime("%Y-%m-%d")
-    #     try:
-    #         data = data_fetcher.fetch_data(ticker, strategy.period, start, end)
-    #     except Exception as e:
-    #         self.logger.exception(f"DataFetcher 拉取失败: {e}")
-    #         return None
-    #     if not data:
-    #         return None
-    #     n = min(len(data), self.strategy_input_size)
-    #     return data[-n:]
-
-    # ---------- 内部：账户与挂单 ----------
-
     # ---------- 内部：Tick ----------
 
     def _run_strategy(self, ticker_data: TickerData) -> None:
@@ -221,10 +190,6 @@ class LiveEngine(BaseComponent):
         # 模拟交易撮合成交（实盘交易依赖第三方平台不需要）
         if isinstance(self.trade_gateway, PaperTradeGateway):
             self.trade_gateway.on_tick(ticker_data)
-
-        # 暖机 tick 只用于喂价格撮合，不触发策略
-        if ticker_data.is_warm_up:
-            return
 
         # 按 ticker 路由到对应 ctx，无对应标的时跳过
         ctx = self._ticker_contexts.get(ticker_data.ticker)
@@ -281,30 +246,6 @@ class LiveEngine(BaseComponent):
             "total_value": total_value,
             "daily_pnl": daily_pnl,
         })
-
-    # def _calc_order_quantity(self, signal_data: SignalData, price: float, cash: float, position: int,
-    #                          commission: float) -> Tuple[int, int]:
-    #     """按当前信号与上次信号计算本次应买卖的数量，返回 (buy_quantity, sell_quantity)。"""
-    #     signal = signal_data.signal
-    #     order_quantity = signal_data.quantity
-    #     # 信号由非买转买
-    #     if self._last_signal != Signal.BUY and signal == Signal.BUY:
-    #         # 现金可承受的最大股数
-    #         max_buy_quantity = max(0, int(cash / (price * (1 + commission))))
-    #         if order_quantity and order_quantity > 0:
-    #             # 股数上限优先
-    #             return min(order_quantity, max_buy_quantity), 0
-    #         # 无限制则全仓买入
-    #         return max_buy_quantity, 0
-    #
-    #     # 信号由非卖转卖
-    #     if self._last_signal != Signal.SELL and signal == Signal.SELL and position > 0:
-    #         # 有股数上限则不超过持仓，否则清仓
-    #         if order_quantity and order_quantity > 0:
-    #             return 0, min(position, order_quantity)
-    #         return 0, position
-    #
-    #     return 0, 0
 
     def _make_signal_to_order(self,
                               ctx: TickerContext,

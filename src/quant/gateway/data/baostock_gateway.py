@@ -2,24 +2,22 @@
 baostock 行情，类 BaostockDataGateway。
 
 对外
-    connect              bs.login
-    subscribe            追加订阅标的
     start                开 daemon 线程轮询最新 5m
     stop                 停线程并 logout
+    get_kline_warm_up    数据预热：拉取最近 N 根 K 线
     get_today_ohlc       当日开高低（日线）
     get_depths           合成盘口（价由最新 close 铺档）
 
 私有
     _run                 主循环：bar 时间戳变化才推送
-    _fetch_recent_7_day_data  已登录会话拉近 7 日 K 线
+    _fetch_data          拉指定天数内的 K 线
 """
+import math
 import random
 import threading
 import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
-
-import pandas as pd
 
 from quant.data.baostock_fetcher import BaostockDataFetcher
 from ...enums import Period
@@ -74,10 +72,22 @@ class BaostockDataGateway(DataGateway):
             self.data_fetcher.bs.logout()
             self.data_fetcher.bs = None
 
+    def get_kline_warm_up(self, ticker: str, period: Period, size: int) -> List[TickerData]:
+        """拉取最近 size 根 K 线作为数据预热，按 period 动态估算所需天数。"""
+        if period.days_per_bar > 0:
+            # 日/周/月线：直接按每根 bar 对应日历天数估算，加 2 倍缓冲
+            days_needed = math.ceil(size * period.days_per_bar) * 2
+        else:
+            # 分钟/小时线：按 fetch_seconds 换算，交易日约 4 小时，再乘 7/5 换算日历天
+            trading_seconds_per_day = 4 * 3600
+            days_needed = math.ceil(size * period.fetch_seconds / trading_seconds_per_day * (7 / 5)) * 2
+        datas = self._fetch_data(ticker, period, days_needed)
+        return datas[-size:] if datas else []
+
     def get_today_ohlc(self, ticker: str) -> Optional[Dict[str, float]]:
         """从最近日线取开、高、低；缺数据返回 None。"""
         try:
-            data = self._fetch_recent_7_day_data(ticker, Period.DAY_1)
+            data = self._fetch_data(ticker, Period.DAY_1, 7)
             if not data:
                 return None
             row = data[-1]
@@ -93,7 +103,7 @@ class BaostockDataGateway(DataGateway):
         """
         levels = max(1, min(int(levels), 10))
         try:
-            data = self._fetch_recent_7_day_data(ticker, Period.MINUTE_5)
+            data = self._fetch_data(ticker, Period.MINUTE_5, 7)
             if not data:
                 return {"bids": [], "asks": []}
             row = data[-1]
@@ -123,7 +133,7 @@ class BaostockDataGateway(DataGateway):
         while self._running:
             for ticker, (callback, _) in list(self._ticker_callbacks.items()):
                 try:
-                    data = self._fetch_recent_7_day_data(ticker, Period.MINUTE_5)
+                    data = self._fetch_data(ticker, Period.MINUTE_5, 7)
                     if not data:
                         continue
                     # 取最新数据进行推送
@@ -140,8 +150,8 @@ class BaostockDataGateway(DataGateway):
                     continue
             time.sleep(self.interval)
 
-    def _fetch_recent_7_day_data(self, ticker: str, period: Period) -> List[TickerData]:
-        """用已登录会话拉近 7 日 K 线。"""
-        start = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+    def _fetch_data(self, ticker: str, period: Period, days: int) -> List[TickerData]:
+        """用已登录会话拉近 days 日 K 线。"""
+        start = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
         end = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
         return self.data_fetcher.fetch_data(ticker, period, start, end)

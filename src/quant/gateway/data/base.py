@@ -32,6 +32,11 @@ class DataGateway(BaseComponent, ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def get_kline_warm_up(self, ticker: str, period: Period, size: int) -> List[TickerData]:
+        """拉取最近 size 根 K 线作为数据预热，供 engine 填充历史窗口。"""
+        raise NotImplementedError
+
+    @abstractmethod
     def get_today_ohlc(self, ticker: str) -> Optional[Dict[str, float]]:
         """返回当日开高低；不可用时返回 None。"""
         raise NotImplementedError
