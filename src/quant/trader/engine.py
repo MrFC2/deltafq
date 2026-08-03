@@ -2,16 +2,14 @@
 交易执行引擎。
 """
 
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import Dict, List, Optional
 from datetime import datetime
 from ..core.base import BaseComponent
+from ..core.models import TickerData
 from .order_manager import OrderManager
 from .position_manager import PositionManager
 
 from ..enums import OrderType, Signal
-
-if TYPE_CHECKING:
-    from ..core.models import TickerData
 
 
 class TraderEngine(BaseComponent):

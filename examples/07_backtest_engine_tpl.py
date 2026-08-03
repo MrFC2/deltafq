@@ -1,14 +1,8 @@
 """Minimal BacktestEngine usage example."""
 
-import os
-import sys
-from typing import Any, List
+from typing import Any, List, Optional
 
 import pandas as pd
-
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
 
 from quant.backtest import BacktestEngine
 from quant.strategy.base import BaseStrategy
@@ -25,7 +19,11 @@ class SimpleMAStrategy(BaseStrategy):
         self.fast_period = fast_period
         self.slow_period = slow_period
 
-    def generate_signals(self, data: List[TickerData]) -> List[SignalData]:
+    def generate_signals(self,
+                         data: List[TickerData],
+                         cash: Optional[float] = None,
+                         position: Optional[int] = None,
+                         commission: Optional[float] = None) -> List[SignalData]:
         closes = pd.Series([t.price for t in data], index=[t.timestamp for t in data])
         fast_ma = closes.rolling(window=self.fast_period, min_periods=1).mean()
         slow_ma = closes.rolling(window=self.slow_period, min_periods=1).mean()
