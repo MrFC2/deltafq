@@ -55,7 +55,8 @@ class Signal(int, Enum):
 class Period(Enum):
     """K 线周期。refetch_seconds: 实盘重拉间隔；days_per_bar: 估算日历天数用于拉足 lookback。"""
 
-    def __init__(self, _: str, fetch_seconds: int = 0, days_per_bar: float = 0.0):
+    def __init__(self, code: str, fetch_seconds: int = 0, days_per_bar: float = 0.0):
+        self.code = code
         self.fetch_seconds = fetch_seconds
         self.days_per_bar = days_per_bar
 
@@ -66,5 +67,5 @@ class Period(Enum):
     MINUTE_30 = ("30m", 1800, 0.0)
     HOUR_1 = ("1h", 3600, 0.0)
     DAY_1 = ("1d", 86400, 365 / 252)
-    WEEK_1 = ("1wk", 604800,  365 / 52)
+    WEEK_1 = ("1wk", 604800, 365 / 52)
     MONTH_1 = ("1mo", 2592000, 365 / 12)

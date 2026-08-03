@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 from ...core.models import TickerData
 from ...core.base import BaseComponent
@@ -11,15 +11,18 @@ class DataGateway(BaseComponent, ABC):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        # ticker → 回调映射，网关通过 _callback.keys() 知道订阅了哪些标的
-        self._ticker_callback: Dict[str, Callable[[TickerData], None]] = {}
+        # ticker → (callback, period) 映射，网关通过 keys() 知道订阅了哪些标的
+        self._ticker_callbacks: Dict[str, Tuple[Callable[[TickerData], None], Period]] = {}
 
-    def register_ticker_callback(self, ticker: str, _ticker_callback: Callable[[TickerData], None]) -> None:
-        """注册某个标的的 Tick 推送回调，同时完成订阅。"""
-        self._ticker_callback[ticker] = _ticker_callback
+    def register_ticker_callback(self,
+                                 ticker: str,
+                                 callback: Callable[[TickerData], None],
+                                 period: Period) -> None:
+        """注册某个标的的 Tick 推送回调，注册时携带 period，供 gateway 内部分组建线程。"""
+        self._ticker_callbacks[ticker] = (callback, period)
 
     @abstractmethod
-    def start(self, period: Period) -> None:
+    def start(self) -> None:
         """启动行情循环（轮询或推送）。"""
         raise NotImplementedError
 

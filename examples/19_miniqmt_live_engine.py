@@ -33,7 +33,7 @@ class DemoStrategy(BaseStrategy):
         self.order_quantity = 100
         self._i = 0
 
-    def generate_signals(self, data: List[TickerData]) -> List[SignalData]:
+    def generate_signals(self, data: List[TickerData], cash=None, position=None, commission=None) -> List[SignalData]:
         sig = Signal(self._SEQ[self._i % len(self._SEQ)])
         self._i += 1
         return [SignalData(timestamp=t.timestamp, signal=sig) for t in data]
@@ -41,7 +41,7 @@ class DemoStrategy(BaseStrategy):
 
 def main() -> None:
     engine = LiveEngine(
-        ticker="159118.SZ",
+        ticker_strategies={"159118.SZ": DemoStrategy(name="SeqNeg010")},
         data_gateway=QmtDataGateway(mode="poll"),
         trade_gateway=QmtTradeGateway(
             userdata_mini_path=MIN_PATH,
@@ -49,8 +49,6 @@ def main() -> None:
             strategy_name="deltafq_order_amount_demo",
             lot_size=100,
         ),
-        strategy=DemoStrategy(name="SeqNeg010"),
-        strategy_input_size=10,
     )
     engine.run()
     try:

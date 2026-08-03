@@ -33,13 +33,14 @@ class Every2BarFlipStrategy(BaseStrategy):
         return [SignalData(timestamp=t.timestamp, signal=sig) for t in data]
 
 
+TICKER = "BTC-USD"
+
+
 def main():
     engine = LiveEngine(
-        ticker="BTC-USD",
+        ticker_strategies={TICKER: Every2BarFlipStrategy(name="Every2Flip")},
         data_gateway=BaostockDataGateway(interval=10.0),
         trade_gateway=PaperTradeGateway(initial_capital=1_000_000),
-        strategy=Every2BarFlipStrategy(name="Every2Flip"),
-        strategy_input_size=50,
     )
     engine.run()
 
@@ -70,7 +71,7 @@ def main():
     _print_section("Orders", df_o.to_string(float_format="%.2f"))
 
     # 3. Values (equity curve)
-    values_metrics, metrics = engine.calculate_metrics()
+    values_metrics, metrics = engine.calculate_metrics(TICKER)
     df_v = values_metrics.copy()
     if not df_v.empty and "date" not in df_v.columns:
         df_v = df_v.reset_index()
@@ -82,7 +83,7 @@ def main():
     _print_section("Metrics", "\n".join(lines))
 
     # plot K-line & signal (Plotly)
-    # chart = engine.get_chart_data()
+    # chart = engine.get_chart_data(TICKER)
     # if chart["candles"]:
     #     import plotly.graph_objects as go
     #     from plotly.subplots import make_subplots

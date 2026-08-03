@@ -21,6 +21,7 @@ miniQMT 行情（xtdata），类 MiniQmtDataGateway。
 """
 import threading
 import time
+from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -51,32 +52,43 @@ class QmtDataGateway(DataGateway):
         # --- 运行时状态 ---
         # 轮询/推送线程运行标志
         self._running = False
-        # 后台 daemon 线程
-        self._thread: Optional[threading.Thread] = None
+        # 后台 daemon 线程列表（每个 period 分组对应一个线程）
+        self._threads: List[threading.Thread] = []
         # push 模式下各标的订阅序号，退订时使用
         self._ticker_sub_seqs: List[int] = []
         # K 线模式下各标的上次推送的 K 线时间戳，用于去重
         self._last_kline_ts: Dict[str, Optional[datetime]] = {}
 
-    def start(self, period: Period) -> None:
+    def start(self) -> None:
         """起后台线程：poll 轮询快照，push 订分笔并跑 xtdata.run。"""
         if self._running:
             return
-        if self.mode == GatewayMode.POLL:
-            self._thread = threading.Thread(target=self._start_poll, args=(period,), daemon=True)
-        else:
-            self._thread = threading.Thread(target=self._start_push, args=(period,), daemon=True)
         self._running = True
-        self._thread.start()
+
+        if self.mode == GatewayMode.PUSH:
+            # PUSH：xtdata.run() 是全局事件循环只能调一次，所有 ticker 在同一个线程里订阅
+            t = threading.Thread(target=self._start_push, daemon=True)
+            self._threads.append(t)
+            t.start()
+            return
+
+        # POLL：按 period 分组，每组起一个 daemon 线程
+        period_tickers: Dict[Period, List[str]] = defaultdict(list)
+        for ticker, (_, period) in self._ticker_callbacks.items():
+            period_tickers[period].append(ticker)
+        for period, tickers in period_tickers.items():
+            t = threading.Thread(target=self._start_poll, args=(period, tickers), daemon=True)
+            self._threads.append(t)
+            t.start()
 
     def stop(self) -> None:
         """停线程；push 会退订并调 stop（若有）；join 等线程结束。"""
         self._running = False
         if self.mode == GatewayMode.PUSH:
             self._unsubscribe_push()
-        if self._thread:
-            self._thread.join(timeout=5.0)
-        self._thread = None
+        for t in self._threads:
+            t.join(timeout=5.0)
+        self._threads.clear()
 
     def get_today_ohlc(self, ticker: str) -> Optional[Dict[str, float]]:
         """从快照取当日开、高、低三个 float；缺或错返回 None。"""
@@ -129,8 +141,9 @@ class QmtDataGateway(DataGateway):
                 return
             for ticker_data in datas:
                 ticker_data.is_warm_up = True
-                callback = self._ticker_callback.get(ticker)
-                if callback:
+                entry = self._ticker_callbacks.get(ticker)
+                if entry:
+                    callback, _ = entry
                     callback(ticker_data)
         except Exception as e:
             self.logger.exception(f"{ticker} 暖机失败: {e}")
@@ -152,10 +165,11 @@ class QmtDataGateway(DataGateway):
         except Exception as e:
             self.logger.exception(f"push 清理失败: {e}")
 
-    def _start_poll(self, period: Period) -> None:
+    def _start_poll(self, period: Period, tickers: List[str]) -> None:
         """按 period 轮询行情，TICK 模式拉实时快照，K 线模式等到新 K 线才推送。"""
         while self._running:
-            for ticker, callback in list(self._ticker_callback.items()):
+            for ticker in tickers:
+                callback, _ = self._ticker_callbacks.get(ticker, (None, None))
                 if period == Period.TICK:
                     # 拉取实时信息
                     ticker_data = self._poll_tick(ticker)
@@ -197,16 +211,18 @@ class QmtDataGateway(DataGateway):
         self._last_kline_ts[ticker] = data.timestamp
         return data
 
-    def _start_push(self, period: Period) -> None:
-        """逐只 subscribe_quote，最后阻塞 xd.run。"""
+    def _start_push(self) -> None:
+        """逐只 subscribe_quote（每只用注册时的 period），最后阻塞 xtdata.run。
+        start() 的 PUSH 路径只建一个线程调此方法，保证 xtdata.run() 全局只调一次。
+        """
         # 防御性检查：线程启动时已被 stop
         if not self._running:
             return
 
-        # 逐个标的订阅分笔行情
-        for ticker in list(self._ticker_callback.keys()):
-            seq = xtdata.subscribe_quote(ticker, period=period.value, start_time="", end_time="", count=0,
-                                         callback=self._on_push_datas)
+        # 逐个标的订阅分笔行情，各自使用注册时传入的 period
+        for ticker, (_, period) in self._ticker_callbacks.items():
+            seq = xtdata.subscribe_quote(ticker, period=period.code, start_time="", end_time="", count=0,
+                                         callback=self._push_callback)
             if seq < 0:
                 self.logger.error(f"subscribe_quote 失败 {ticker}: {seq}")
                 continue
@@ -223,7 +239,7 @@ class QmtDataGateway(DataGateway):
             if self._running:
                 self.logger.error(f"xtdata.run 异常: {e}")
 
-    def _on_push_datas(self, data: dict) -> None:
+    def _push_callback(self, data: dict) -> None:
         """分笔推送回调：行转 TickerData 再交 tick 回调"""
         self.logger.info(f"_on_push_datas data: {data}")
         if not self._running:
@@ -243,8 +259,9 @@ class QmtDataGateway(DataGateway):
                 bid, ask = self._bid_ask_from_dict(row)
                 ticker_data = TickerData(ticker=code, price=float(price), timestamp=ts, volume=int(vol),
                                          bid=bid, ask=ask)
-                callback = self._ticker_callback.get(code)
-                if callback:
+                entry = self._ticker_callbacks.get(code)
+                if entry:
+                    callback, _ = entry
                     callback(ticker_data)
 
     def _get_full_tick(self, ticker: str) -> Optional[Dict[str, Any]]:
