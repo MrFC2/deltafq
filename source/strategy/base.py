@@ -11,10 +11,12 @@ from ..enums import Period
 class BaseStrategy(BaseComponent, ABC):
     """策略基类，子类实现 generate_signals 即可。"""
 
-    def __init__(self, name: str, period: Period, **kwargs: Any) -> None:
+    def __init__(self, name: str, period: Period, data_size: int = 100, **kwargs: Any) -> None:
         super().__init__(name=name, **kwargs)
         # 策略期望收到的 K 线周期，引擎据此决定拉取数据的粒度
         self.period: Period = period
+        # 策略需要的历史数据点数（K 线根数或 tick 数），引擎据此设置滑动窗口大小
+        self.data_size: int = data_size
 
     @abstractmethod
     def generate_signals(self,

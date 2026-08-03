@@ -74,15 +74,12 @@ class LiveEngine(BaseComponent):
                  data_gateway: DataGateway,
                  trade_gateway: TradeGateway,
                  strategy: BaseStrategy,
-                 strategy_input_size: int = 100,
                  **kwargs):
         super().__init__(**kwargs)
 
         # --- 配置参数 ---
         # 交易标的代码
         self.ticker: str = ticker
-        # 策略所需数据点数（K 线根数或 tick 数）
-        self.strategy_input_size: int = strategy_input_size
 
         # --- 核心组件 ---
         # 行情网关
@@ -101,8 +98,8 @@ class LiveEngine(BaseComponent):
         self._cached_strategy_input: Optional[List[TickerData]] = None
         # 最近一次策略产生的信号序列
         self._cached_signals: Optional[List[SignalData]] = None
-        # K 线/TICK 模式下的 tick 滑动窗口
-        self._ticker_datas: deque = deque(maxlen=strategy_input_size)
+        # K 线/TICK 模式下的 tick 滑动窗口，大小由策略的 data_size 决定
+        self._ticker_datas: deque = deque(maxlen=strategy.data_size)
 
         # --- 统计记录 ---
         # 净值记录列表
