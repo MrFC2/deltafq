@@ -91,8 +91,6 @@ class BaostockDataGateway(DataGateway):
             asks.append({"level": lv, "price": round(last_f + lv * step, 6), "volume": float(random.randint(lo, hi))})
         return {"bids": bids, "asks": asks}
 
-    # ---------- 私有 ----------
-
     def start_poll(self, period: Period, tickers: List[str]) -> None:
         """某 period 分组的轮询主循环：推送最新一根 K 线，幂等校验由上层 engine 负责。"""
         days = self._days_for_period(period, 2)

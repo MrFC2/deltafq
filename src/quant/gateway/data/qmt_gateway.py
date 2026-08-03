@@ -95,8 +95,6 @@ class QmtDataGateway(DataGateway):
                 asks.append({"level": float(i), "price": ap, "volume": float(av or 0.0)})
         return {"bids": bids, "asks": asks}
 
-    # ---------- 私有 ----------
-
     def _unsubscribe_push(self) -> None:
         """push 停时逐个退订 quote，再调 xtdata.stop（有则调）。"""
         if not self._ticker_sub_seqs:
