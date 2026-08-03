@@ -65,8 +65,6 @@ _ACTION_ICON = {"buy": "↑", "sell": "↓", "skip": "x", "no_change": "-"}
 @dataclass
 class TickerContext:
     """单标的运行时状态容器，随 LiveEngine 构造时按 ticker 初始化。"""
-    # 标的代码
-    ticker: str
     # 绑定的策略实例（每个 ticker 独占，不共用）
     strategy: BaseStrategy
     # K线/Tick 滑动窗口，maxlen=strategy.data_size
@@ -107,18 +105,18 @@ class LiveEngine(BaseComponent):
         self._values_records: List[Dict[str, Any]] = []
 
         # 唯一的 per-ticker 状态容器，deque 大小由各策略的 data_size 决定
-        self._ticker_contexts: List[TickerContext] = [
-            TickerContext(ticker=ticker, strategy=strategy, ticker_datas=deque(maxlen=strategy.data_size))
+        self._ticker_contexts: Dict[str, TickerContext] = {
+            ticker: TickerContext(strategy=strategy, ticker_datas=deque(maxlen=strategy.data_size))
             for ticker, strategy in ticker_strategies.items()
-        ]
+        }
 
     # ---------- 运行 ----------
 
     def run(self) -> None:
         """注册 Tick 回调并启动行情推送。"""
         # 每个 ticker 注册回调时携带 period，gateway 内部按 period 分组建线程
-        for ctx in self._ticker_contexts:
-            self.data_gateway.register_ticker_callback(ctx.ticker, self._run_strategy, ctx.strategy.period)
+        for ticker, ctx in self._ticker_contexts.items():
+            self.data_gateway.register_ticker_callback(ticker, self._run_strategy, ctx.strategy.period)
         self.data_gateway.start()
 
     def stop(self) -> None:
@@ -137,7 +135,7 @@ class LiveEngine(BaseComponent):
         返回:
             candles: [{date, open, high, low, close}, ...]；signals: [int, ...]
         """
-        ctx = next((c for c in self._ticker_contexts if c.ticker == ticker), None)
+        ctx = self._ticker_contexts.get(ticker)
         if not ctx or not ctx.cached_strategy_input or not ctx.cached_signals:
             return {"candles": [], "signals": []}
 
@@ -229,7 +227,7 @@ class LiveEngine(BaseComponent):
             return
 
         # 按 ticker 路由到对应 ctx，无对应标的时跳过
-        ctx = next((c for c in self._ticker_contexts if c.ticker == ticker_data.ticker), None)
+        ctx = self._ticker_contexts.get(ticker_data.ticker)
         if ctx is None:
             return
 
@@ -333,7 +331,7 @@ class LiveEngine(BaseComponent):
         if signal == Signal.BUY:
             if signal_data.quantity:
                 buy_price = float(ticker_data.ask) if ticker_data.ask is not None else ticker_data.price  # 优先用卖一价成交
-                ctx.last_pending_order_id = self.trade_gateway.send_order(ctx.ticker, signal_data, buy_price)
+                ctx.last_pending_order_id = self.trade_gateway.send_order(ticker_data.ticker, signal_data, buy_price)
 
         # 持仓 → 卖出：quantity 缺失则跳过下单但仍更新信号状态
         if signal == Signal.SELL and position > 0:
@@ -341,7 +339,7 @@ class LiveEngine(BaseComponent):
                 ctx.last_signal = signal
                 return
             sell_price = float(ticker_data.bid) if ticker_data.bid is not None else ticker_data.price  # 优先用买一价成交
-            ctx.last_pending_order_id = self.trade_gateway.send_order(ctx.ticker, signal_data, sell_price)
+            ctx.last_pending_order_id = self.trade_gateway.send_order(ticker_data.ticker, signal_data, sell_price)
 
         # signal == HOLD：撤旧单后不下新单，等待下次信号
         ctx.last_signal = signal
