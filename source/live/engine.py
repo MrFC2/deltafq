@@ -44,21 +44,18 @@ LiveEngine — 内部：Tick
 """
 
 from collections import deque
-from datetime import datetime, timedelta, timezone
 from typing import Optional, Any, Dict, List, Tuple
 
 import pandas as pd
 
 from ..backtest.performance import PerformanceReporter
 from ..core.base import BaseComponent
-from ..data import DataFetcher, BaostockDataFetcher, QmtDataFetcher
 from ..strategy.base import BaseStrategy
 from ..adapters.data.base import DataGateway
 from ..adapters.trade.base import TradeGateway
 from ..adapters.trade.paper_gateway import PaperTradeGateway
 from ..core.models import SignalData, TickerData
 from ..enums import Period, Signal
-from ..adapters.data.qmt_gateway import QmtDataGateway
 
 _SIG_ICON = {1: "↑", -1: "↓", 0: "-"}
 _ACTION_ICON = {"buy": "↑", "sell": "↓", "skip": "x", "no_change": "-"}
@@ -94,8 +91,6 @@ class LiveEngine(BaseComponent):
         self.trade_gateway: TradeGateway = trade_gateway
         # 信号策略
         self._strategy: BaseStrategy = strategy
-        # K 线拉取器（tick 模式下为 None）
-        self._data_fetcher: Optional[DataFetcher] = self._create_data_fetcher()
 
         # --- 运行时状态 ---
         # 上次信号值，用于检测翻转
@@ -182,40 +177,35 @@ class LiveEngine(BaseComponent):
 
     # ---------- 内部：数据与网关 ----------
 
-    def _create_data_fetcher(self) -> Optional[DataFetcher]:
-        """非 tick 模式时按网关类型创建对应 DataFetcher，tick 模式返回 None。"""
-        if self._strategy.period == Period.TICK:
-            return None
-        if isinstance(self.data_gateway, QmtDataGateway):
-            return QmtDataFetcher()
-        return BaostockDataFetcher()
+    # def _create_data_fetcher(self, strategy: BaseStrategy) -> Optional[DataFetcher]:
+    #     """非 tick 模式时按网关类型创建对应 DataFetcher，tick 模式返回 None。"""
+    #     if strategy.period == Period.TICK:
+    #         return None
+    #     if isinstance(self.data_gateway, QmtDataGateway):
+    #         return QmtDataFetcher()
+    #     return BaostockDataFetcher()
 
-    def _fetch_data(self) -> Optional[List[TickerData]]:
-        """用 DataFetcher 拉当前 strategy_interval 下最近 strategy_input_size 根 K 线。"""
-        # TICK 模式不拉 K 线，数据由 tick 实时积累
-        if self._data_fetcher is None:
-            return None
-        now = datetime.now(timezone.utc)
-        if self._strategy.period.days_per_bar > 0:
-            # 日/周/月线：按每根 bar 对应日历天数估算拉取范围，多留 60 天缓冲
-            cal_days = int(self.strategy_input_size * self._strategy.period.days_per_bar) + 60
-            start = (now - timedelta(days=max(cal_days, 60))).strftime("%Y-%m-%d")
-        else:
-            # 分钟/小时线：按 strategy_input_size 估算天数，最少 7 天、最多 60 天
-            start = (now - timedelta(days=max(7, min(60, self.strategy_input_size // 10)))).strftime("%Y-%m-%d")
-        end = (now + timedelta(days=1)).strftime("%Y-%m-%d")
-
-        try:
-            data = self._data_fetcher.fetch_data(self.ticker, self._strategy.period, start, end)
-        except Exception as e:
-            self.logger.exception(f"DataFetcher 拉取失败: {e}")
-            return None
-        if not data:
-            return None
-
-        # 只取策略需要的 n 条数据
-        n = min(len(data), self.strategy_input_size)
-        return data[-n:]
+    # def _fetch_data(self, ticker: str, strategy: BaseStrategy) -> Optional[List[TickerData]]:
+    #     """用 DataFetcher 拉当前 period 下最近 strategy_input_size 根 K 线。"""
+    #     data_fetcher = self._contexts[ticker].data_fetcher
+    #     if data_fetcher is None:
+    #         return None
+    #     now = datetime.now(timezone.utc)
+    #     if strategy.period.days_per_bar > 0:
+    #         cal_days = int(self.strategy_input_size * strategy.period.days_per_bar) + 60
+    #         start = (now - timedelta(days=max(cal_days, 60))).strftime("%Y-%m-%d")
+    #     else:
+    #         start = (now - timedelta(days=max(7, min(60, self.strategy_input_size // 10)))).strftime("%Y-%m-%d")
+    #     end = (now + timedelta(days=1)).strftime("%Y-%m-%d")
+    #     try:
+    #         data = data_fetcher.fetch_data(ticker, strategy.period, start, end)
+    #     except Exception as e:
+    #         self.logger.exception(f"DataFetcher 拉取失败: {e}")
+    #         return None
+    #     if not data:
+    #         return None
+    #     n = min(len(data), self.strategy_input_size)
+    #     return data[-n:]
 
     # ---------- 内部：账户与挂单 ----------
 
