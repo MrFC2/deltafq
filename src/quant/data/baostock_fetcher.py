@@ -9,9 +9,9 @@ from typing import List, Optional
 
 import pandas as pd
 
-from source.data.fetcher import DataFetcher
-from source.enums import Period
-from source.core.models import TickerData
+from quant.data.fetcher import DataFetcher
+from quant.enums import Period
+from quant.core.models import TickerData
 
 # Period 枚举 → baostock frequency
 _FREQ = {

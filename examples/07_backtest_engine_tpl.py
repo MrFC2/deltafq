@@ -10,11 +10,11 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from source.backtest import BacktestEngine
-from source.strategy.base import BaseStrategy
-from source.data import BaostockDataFetcher
-from source.core.models import SignalData, TickerData
-from source.enums import Signal, Period
+from quant.backtest import BacktestEngine
+from quant.strategy.base import BaseStrategy
+from quant.data import BaostockDataFetcher
+from quant.core.models import SignalData, TickerData
+from quant.enums import Signal, Period
 
 
 class SimpleMAStrategy(BaseStrategy):

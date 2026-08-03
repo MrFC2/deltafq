@@ -13,9 +13,9 @@ from xtquant import xtdata  # type: ignore
 
 logger = logging.getLogger(__name__)
 
-from source.data.fetcher import DataFetcher
-from source.enums import Period
-from source.core.models import TickerData
+from quant.data.fetcher import DataFetcher
+from quant.enums import Period
+from quant.core.models import TickerData
 
 # Period 枚举 → xt 周期；未命中的 Period 直接用其 value 透传。
 _PERIOD_MAP = {

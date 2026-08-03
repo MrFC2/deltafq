@@ -27,7 +27,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from xtquant import xtdata  # type: ignore
 
-from source.data.qmt_fetcher import fetch_data
+from quant.data.qmt_fetcher import fetch_data
 from .base import DataGateway
 from ...core.models import TickerData
 from ...enums import GatewayMode, Period

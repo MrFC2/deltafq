@@ -7,10 +7,10 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from source.data import BaostockDataFetcher
-from source.indicators import TechnicalIndicators
-from source.strategy import SignalGenerator
-from source.backtest import BacktestEngine
+from quant.data import BaostockDataFetcher
+from quant.indicators import TechnicalIndicators
+from quant.strategy import SignalGenerator
+from quant.backtest import BacktestEngine
 
 
 def main() -> None:

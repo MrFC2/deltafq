@@ -10,11 +10,11 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 import pandas as pd
-from source.data import BaostockDataFetcher, DataStorage
-from source.strategy.base import BaseStrategy
-from source.trader.engine import TraderEngine
-from source.core.models import SignalData, TickerData
-from source.enums import Signal, Period
+from quant.data import BaostockDataFetcher, DataStorage
+from quant.strategy.base import BaseStrategy
+from quant.trader.engine import TraderEngine
+from quant.core.models import SignalData, TickerData
+from quant.enums import Signal, Period
 from typing import List
 
 

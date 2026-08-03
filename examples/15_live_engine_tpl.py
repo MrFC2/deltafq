@@ -4,19 +4,19 @@ import sys
 import os
 import time
 
-from source.gateway.data import BaostockDataGateway
+from quant.gateway.data import BaostockDataGateway
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 import pandas as pd
-from source.live import LiveEngine
-from source.gateway.trade.paper_gateway import PaperTradeGateway
-from source.strategy.base import BaseStrategy
-from source.enums import Period
-from source.core.models import SignalData, TickerData
-from source.enums import Signal
+from quant.live import LiveEngine
+from quant.gateway.trade.paper_gateway import PaperTradeGateway
+from quant.strategy.base import BaseStrategy
+from quant.enums import Period
+from quant.core.models import SignalData, TickerData
+from quant.enums import Signal
 from typing import List
 
 

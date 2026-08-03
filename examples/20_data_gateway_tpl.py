@@ -8,9 +8,9 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from source.live import create_data_gateway
-from source.gateway.data.base import DataGateway
-from source.core.models import TickerData
+from quant.live import create_data_gateway
+from quant.gateway.data.base import DataGateway
+from quant.core.models import TickerData
 
 NAME = "baostock"  # "miniqmt" | "baostock"
 SYMBOL = "600000.SH" # "600000.SH" | "sh.600000"

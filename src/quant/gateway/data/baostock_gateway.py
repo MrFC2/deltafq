@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from source.data.baostock_fetcher import BaostockDataFetcher
+from quant.data.baostock_fetcher import BaostockDataFetcher
 from ...enums import Period
 from .base import DataGateway
 from ...core.models import TickerData

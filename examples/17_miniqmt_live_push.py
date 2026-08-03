@@ -8,8 +8,8 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from source.live.event_engine import EventEngine, EVENT_TICK
-from source.live.gateway_registry import create_data_gateway
+from quant.live.event_engine import EventEngine, EVENT_TICK
+from quant.live.gateway_registry import create_data_gateway
 
 # "poll" 轮询 | "push" 推送
 MODE = "poll"

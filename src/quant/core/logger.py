@@ -13,8 +13,8 @@ import os
 import sys
 from pathlib import Path
 
-# 项目根目录（source/core/logger.py 往上两级）
-_PROJECT_ROOT = Path(__file__).parent.parent.parent
+# 项目根目录（src/quant/core/logger.py 往上三级）
+_PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 _LOG_DIR = _PROJECT_ROOT / "logs"
 
 

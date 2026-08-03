@@ -60,8 +60,8 @@ Repository = "https://github.com/Delta-F/deltafq"
 Issues = "https://github.com/Delta-F/deltafq/issues"
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["deltafq*"]
+where = ["src"]
+include = ["quant*"]
 
 [tool.black]
 line-length = 88
