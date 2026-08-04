@@ -99,7 +99,6 @@ class BaostockDataGateway(DataGateway):
             # 拉取最近 2 天数据作为回放序列；数据量不足时 bars 为空 deque，后续跳过
             data = self._fetch_data(ticker, period, 2)
             replay_data[ticker] = deque(data or [])
-            self.logger.info(f"[baostock回放] {ticker} 预取 {len(replay_data[ticker])} 根 {period.code} K线")
 
         while self._running:
             for ticker in tickers:
