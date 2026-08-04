@@ -6,8 +6,6 @@ LiveEngine 示例：baostock 回放 + 纸面交易。
     python examples/22_baostock_live_engine.py
 """
 import time
-
-import pandas as pd
 from typing import List
 
 from quant.live import LiveEngine
@@ -30,14 +28,15 @@ class MaStrategy(BaseStrategy):
         if len(data) < self.long:
             return [SignalData(timestamp=t.timestamp, signal=Signal.HOLD) for t in data]
 
-        closes = [t.price for t in data]
+        closes = [t.price for t in data]  # 收盘价序列
         signals = []
         for i, t in enumerate(data):
             if i < self.long - 1:
+                # 数据不足一个长周期窗口，不产生信号
                 signals.append(SignalData(timestamp=t.timestamp, signal=Signal.HOLD))
                 continue
-            ma_short = sum(closes[i - self.short + 1: i + 1]) / self.short
-            ma_long = sum(closes[i - self.long + 1: i + 1]) / self.long
+            ma_short = sum(closes[i - self.short + 1: i + 1]) / self.short  # 短均线
+            ma_long = sum(closes[i - self.long + 1: i + 1]) / self.long     # 长均线
             if ma_short > ma_long:
                 sig = Signal.BUY
             elif ma_short < ma_long:
@@ -48,6 +47,7 @@ class MaStrategy(BaseStrategy):
             # 最新信号携带下单数量
             quantity = None
             if i == len(data) - 1 and cash and sig == Signal.BUY:
+                # 用可用资金的 90% 按手（100股整数倍）计算买入量
                 quantity = int(cash * 0.9 // (t.price * 100)) * 100
             signals.append(SignalData(timestamp=t.timestamp, signal=sig, quantity=quantity))
 
@@ -60,17 +60,6 @@ TICKERS = {
 }
 
 
-def _fmt_dt_cols(df: pd.DataFrame) -> pd.DataFrame:
-    for col in df.columns:
-        if pd.api.types.is_datetime64_any_dtype(df[col]):
-            df[col] = df[col].apply(lambda x: x.strftime("%Y-%m-%d %H:%M:%S") if pd.notna(x) else "")
-    return df
-
-
-def _print_section(title: str, body: str) -> None:
-    print(f"\n{'=' * 60}\n{title}\n{'=' * 60}\n{body}")
-
-
 def main():
     engine = LiveEngine(
         ticker_strategies=TICKERS,
@@ -78,7 +67,7 @@ def main():
         trade_gateway=PaperTradeGateway(initial_capital=1_000_000),
     )
     engine.run()
-    print("LiveEngine 启动，Ctrl+C 停止回放并打印报告...")
+    print("LiveEngine 启动，Ctrl+C 停止...")
 
     try:
         while True:
@@ -86,19 +75,6 @@ def main():
     except KeyboardInterrupt:
         engine.stop()
         print("\n已停止。")
-
-    # 成交记录
-    df_t = _fmt_dt_cols(engine.get_trades_df())
-    _print_section("Trades", df_t.to_string(float_format="%.2f") if not df_t.empty else "（暂无成交）")
-
-    # 各标的绩效
-    for ticker in TICKERS:
-        values_df, metrics = engine.calculate_metrics(ticker)
-        if values_df.empty:
-            _print_section(f"Metrics [{ticker}]", "（数据不足，无法计算）")
-            continue
-        lines = [f"  {k}: {v:.4f}" if isinstance(v, float) else f"  {k}: {v}" for k, v in metrics.items()]
-        _print_section(f"Metrics [{ticker}]", "\n".join(lines))
 
 
 if __name__ == "__main__":
