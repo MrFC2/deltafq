@@ -66,7 +66,7 @@ def main():
     ticker = "000001.SS"
     fetcher = BaostockDataFetcher()
     storage = DataStorage()
-    engine = TraderEngine(cash=100_000, commission=0.001, simulate_match=False)
+    engine = TraderEngine(cash=100_000, commission=0.001, enable_tick_match=False)
     qty = 100
     # (interval, strategy, start, end, daily_only)
     tasks = [

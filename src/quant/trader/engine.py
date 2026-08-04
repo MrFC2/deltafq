@@ -18,12 +18,12 @@ class TraderEngine(BaseComponent):
     def __init__(self,
                  cash: Optional[float] = None,
                  commission: Optional[float] = None,
-                 simulate_match: bool = False,
+                 enable_tick_match: bool = False,
                  **kwargs):
         """初始化执行引擎。"""
         super().__init__(**kwargs)
         # 是否在 tick 到达时撮合挂单（True=模拟撮合，False=立即成交）
-        self.simulate_match = simulate_match
+        self.enable_match = enable_tick_match
         # 当前可用资金
         self.cash = cash
         # 手续费率
@@ -53,7 +53,7 @@ class TraderEngine(BaseComponent):
             order_id = order['id']
 
             # 模拟：立即成交或挂单等待撮合
-            if not self.simulate_match:
+            if not self.enable_match:
                 self._settle_order(order_id, price, timestamp)
             return order_id
 
@@ -66,8 +66,9 @@ class TraderEngine(BaseComponent):
             if order["ticker"] != ticker_data.ticker:
                 continue
             sig, ot, p = order["signal"], order["order_type"], order["price"]
-            match = ot == OrderType.MARKET or (sig == Signal.BUY and ticker_data.price <= p) or (
-                        sig == Signal.SELL and ticker_data.price >= p)
+            match = (ot == OrderType.MARKET
+                     or (sig == Signal.BUY and ticker_data.price <= p)
+                     or (sig == Signal.SELL and ticker_data.price >= p))
             if match:
                 self._settle_order(order["id"], ticker_data.price, ticker_data.timestamp)
                 break  # 每个 tick 每标的只撮合一笔
