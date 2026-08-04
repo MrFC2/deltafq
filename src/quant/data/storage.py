@@ -16,7 +16,7 @@ class DataStorage(BaseComponent):
     Data storage manager with categorized storage.
     
     Directory structure:
-        data_cache/
+        data/
         ├── price/          # 行情数据
         │   └── {ticker}/
         ├── backtest/       # 回测结果

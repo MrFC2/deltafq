@@ -20,7 +20,7 @@ class Config:
         """加载默认配置。"""
         return {
             "data": {
-                "cache_dir": "data_cache",
+                "cache_dir": "data",
                 "default_source": "baostock"
             },
             "trading": {
@@ -63,7 +63,7 @@ class Config:
     def get_cache_dir(self) -> Path:
         """获取缓存目录路径。"""
         project_root = self._get_project_root()
-        cache_dir_name = self.get("data.cache_dir", "data_cache")
+        cache_dir_name = self.get("data.cache_dir", "data")
         return project_root / cache_dir_name
     
     def _get_project_root(self) -> Path:

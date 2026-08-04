@@ -127,7 +127,7 @@ class PerformanceChart(BaseComponent):
         import webbrowser
         from pathlib import Path
 
-        temp_dir = Path(__file__).parents[3] / "data_cache" / "backtest"
+        temp_dir = Path(__file__).parents[3] / "data" / "backtest"
         temp_dir.mkdir(parents=True, exist_ok=True)
 
         html_path = temp_dir / "deltafq_chart.html"
