@@ -122,7 +122,7 @@ class BacktestEngine(BaseComponent, ABC):
                 })
 
             # 汇总成交记录和净值表
-            trades_df = pd.DataFrame(self.trader.trades)
+            trades_df = pd.DataFrame(self.trader.trade_records)
             values_df = pd.DataFrame(values_records)
             return trades_df, values_df
 

@@ -195,7 +195,7 @@ class LiveEngine(BaseComponent):
 
         # 模拟交易撮合成交（实盘交易依赖第三方平台不需要）
         if isinstance(self.trade_gateway, PaperTradeGateway):
-            self.trade_gateway.on_tick(ticker_data)
+            self.trade_gateway.match_pending_orders(ticker_data)
 
         ctx.ticker_datas.append(ticker_data)
 

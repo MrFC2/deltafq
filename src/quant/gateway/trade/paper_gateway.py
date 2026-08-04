@@ -8,7 +8,7 @@ class PaperTradeGateway(TradeGateway):
     def __init__(self,
                  initial_capital: float = 1_000_000.0,
                  commission: float = 0.001) -> None:
-        self._engine = TraderEngine(cash=initial_capital, commission=commission, match_on_tick=True)
+        self._engine = TraderEngine(cash=initial_capital, commission=commission, simulate_match=True)
 
     def send_order(self,
                    ticker: str,
@@ -38,8 +38,8 @@ class PaperTradeGateway(TradeGateway):
             return True
         return (o.get("status") or "").lower() in ("executed", "cancelled")
 
-    def on_tick(self, ticker_data: TickerData) -> None:
-        self._engine.on_tick(ticker_data)
+    def match_pending_orders(self, ticker_data: TickerData) -> None:
+        self._engine.match_pending_orders(ticker_data)
 
     def get_trades(self) -> list:
-        return list(self._engine.trades)
+        return list(self._engine.trade_records)
