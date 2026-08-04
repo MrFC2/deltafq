@@ -24,7 +24,6 @@ LiveEngine — 运行
     stop                  停止数据网关与交易网关
 
 LiveEngine — 对外查询与绩效
-    get_chart_data        返回指定 ticker 缓存 K 线与信号列表（不落库、不重算）
     get_trades_df         从交易网关的执行引擎取成交明细 DataFrame
     get_values_df         净值记录（去重按日期取最后一条）
     calculate_metrics     基于成交与净值计算绩效指标（与回测接口一致）
@@ -68,10 +67,6 @@ class TickerContext:
     last_signal: Signal = Signal.HOLD
     # 当前未成交挂单委托号
     last_pending_order_id: Optional[str] = None
-    # 缓存最近一次策略输入，供 get_chart_data 使用
-    cached_strategy_input: Optional[List[TickerData]] = None
-    # 最近一次策略产生的信号序列
-    cached_signals: Optional[List[SignalData]] = None
 
 
 class LiveEngine(BaseComponent):
@@ -127,32 +122,6 @@ class LiveEngine(BaseComponent):
             self.trade_gateway.stop()
 
     # ---------- 对外查询与绩效 ----------
-
-    def get_chart_data(self, ticker: str) -> Dict[str, Any]:
-        """
-        返回缓存 K 线与信号（不重拉、不重算）。尚无缓存时 candles/signals 为空列表。
-
-        返回:
-            candles: [{date, open, high, low, close}, ...]；signals: [int, ...]
-        """
-        ctx = self._ticker_contexts.get(ticker)
-        if not ctx or not ctx.cached_strategy_input or not ctx.cached_signals:
-            return {"candles": [], "signals": []}
-
-        date_fmt = "%Y-%m-%d" if ctx.strategy.period == Period.DAY_1 else "%Y-%m-%d %H:%M:%S"
-
-        candles: List[Dict[str, Any]] = []
-        for t in ctx.cached_strategy_input:
-            c = t.price
-            o = t.open if t.open is not None else c
-            h = t.high if t.high is not None else c
-            l_ = t.low if t.low is not None else c
-            candles.append({"date": t.timestamp.strftime(date_fmt), "open": o, "high": h, "low": l_, "close": c})
-
-        sig_map = {s.timestamp: s.signal.value for s in ctx.cached_signals}
-        signals = [sig_map.get(t.timestamp, Signal.HOLD.value) for t in ctx.cached_strategy_input]
-
-        return {"candles": candles, "signals": signals}
 
     def get_trades_df(self) -> pd.DataFrame:
         """从纸面交易网关取成交列表（结构与回测一致）；实盘网关返回空 DataFrame。"""
@@ -212,10 +181,6 @@ class LiveEngine(BaseComponent):
         except Exception as e:
             self.logger.exception(f"[{ticker_data.ticker}] 策略执行失败: {e}")
             return
-
-        # 缓存供 get_chart_data 使用
-        ctx.cached_strategy_input = list(ctx.ticker_datas)
-        ctx.cached_signals = signals
 
         # 取最新一根 bar 的信号
         latest_signal = signals[-1]
