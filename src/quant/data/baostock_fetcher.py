@@ -62,11 +62,8 @@ class BaostockDataFetcher(DataFetcher):
         fields = "date,time,open,high,low,close,volume" if freq in ("5", "15", "30",
                                                                     "60") else "date,open,high,low,close,volume"
         try:
-            rs = bs.query_history_k_data_plus(
-                to_bs_code(ticker), fields,
-                start_date=start_date[:10], end_date=end,
-                frequency=freq, adjustflag="3",
-            )
+            rs = bs.query_history_k_data_plus(to_bs_code(ticker), fields, start_date=start_date[:10], end_date=end,
+                                              frequency=freq, adjustflag="3")
             rows = []
             while rs.error_code == "0" and rs.next():
                 rows.append(rs.get_row_data())

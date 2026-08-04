@@ -15,8 +15,9 @@ baostock 行情，类 BaostockDataGateway。
 import math
 import random
 import time
+from collections import deque
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Deque, Dict, List, Optional
 
 import baostock as bs  # type: ignore
 
@@ -92,20 +93,28 @@ class BaostockDataGateway(DataGateway):
         return {"bids": bids, "asks": asks}
 
     def start_poll(self, period: Period, tickers: List[str]) -> None:
-        """某 period 分组的轮询主循环：推送最新一根 K 线，幂等校验由上层 engine 负责。"""
-        # 估算拉取最新 bar 所需天数，多拉 2 根确保边界不缺
-        days = self._days_for_period(period, 2)
+        """回放昨天到现在的历史 K 线，模拟 QMT poll 模式逐根推送。"""
+        replay_data: Dict[str, Deque[TickerData]] = {}
+        for ticker in tickers:
+            # 拉取最近 2 天数据作为回放序列；数据量不足时 bars 为空 deque，后续跳过
+            data = self._fetch_data(ticker, period, 2)
+            replay_data[ticker] = deque(data or [])
+            self.logger.info(f"[baostock回放] {ticker} 预取 {len(replay_data[ticker])} 根 {period.code} K线")
+
         while self._running:
             for ticker in tickers:
                 callback, _ = self._ticker_callbacks.get(ticker, (None, None))
+                if not callback:
+                    continue
+                data = replay_data[ticker]
+                if not data:
+                    continue
                 try:
-                    data = self._fetch_data(ticker, period, days)
-                    if data and callback:
-                        callback(data[-1])
+                    callback(data.popleft())
                 except Exception as e:
-                    self.logger.exception(f"拉取 {ticker} 数据出错: {str(e)}")
-            # 加多3秒，给 baostock 缓冲时间
-            time.sleep(period.fetch_seconds + 3)
+                    self.logger.exception(f"回放 {ticker} 数据出错: {str(e)}")
+            # 按 period 节奏 sleep，模拟新 bar 产生的时间间隔
+            time.sleep(period.fetch_seconds)
 
     def _fetch_data(self, ticker: str, period: Period, days: int) -> List[TickerData]:
         """用已登录会话拉近 days 日 K 线。"""
