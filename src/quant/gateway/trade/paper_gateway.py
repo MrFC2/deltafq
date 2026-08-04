@@ -8,7 +8,7 @@ class PaperTradeGateway(TradeGateway):
     def __init__(self,
                  initial_capital: float = 1_000_000.0,
                  commission: float = 0.001) -> None:
-        self._engine = TraderEngine(cash=initial_capital, commission=commission, enable_tick_match=True)
+        self._engine = TraderEngine(cash=initial_capital, commission=commission, enable_match=True)
 
     def send_order(self,
                    ticker: str,

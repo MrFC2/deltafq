@@ -18,12 +18,12 @@ class TraderEngine(BaseComponent):
     def __init__(self,
                  cash: Optional[float] = None,
                  commission: Optional[float] = None,
-                 enable_tick_match: bool = False,
+                 enable_match: bool = False,
                  **kwargs):
         """初始化执行引擎。"""
         super().__init__(**kwargs)
         # 是否在 tick 到达时撮合挂单（True=模拟撮合，False=立即成交）
-        self.enable_match = enable_tick_match
+        self.enable_match = enable_match
         # 当前可用资金
         self.cash = cash
         # 手续费率
