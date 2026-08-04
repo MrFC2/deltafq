@@ -64,6 +64,9 @@ def _make_rotating_handler(subdir: str, level: int) -> logging.handlers.TimedRot
     return handler
 
 
+_uncaught_logger = logging.getLogger("uncaught")
+
+
 def _setup_root_logger() -> None:
     """配置全局 root logger，只执行一次。"""
     root = logging.getLogger()
@@ -107,8 +110,20 @@ def _setup_root_logger() -> None:
     root.addHandler(exc_handler)
 
 
+def _setup_excepthook() -> None:
+    """将未捕获异常写入日志文件，避免只打控制台。"""
+    def _handle(exc_type, exc_value, exc_tb):
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc_value, exc_tb)
+            return
+        _uncaught_logger.exception("未捕获异常", exc_info=(exc_type, exc_value, exc_tb))
+
+    sys.excepthook = _handle
+
+
 # 模块加载时立即配置
 _setup_root_logger()
+_setup_excepthook()
 
 
 class Logger:
