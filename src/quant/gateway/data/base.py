@@ -45,6 +45,8 @@ class DataGateway(BaseComponent, ABC):
         for period, tickers in period_tickers.items():
             t = threading.Thread(target=self.start_poll, args=(period, tickers), daemon=True)
             self._threads.append(t)
+        # 开始运行
+        for t in self._threads:
             t.start()
 
     def stop(self) -> None:
