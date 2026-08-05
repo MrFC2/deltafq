@@ -132,7 +132,7 @@ dmypy.json
 .idea/
 
 # DeltaFQ specific
-data/
+/data/
 *.csv
 *.json
 logs/
