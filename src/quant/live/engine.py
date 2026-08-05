@@ -25,8 +25,6 @@ LiveEngine — 运行
 
 LiveEngine — 对外查询与绩效
     get_trades_df         从交易网关的执行引擎取成交明细 DataFrame
-    get_values_df         净值记录（去重按日期取最后一条）
-    calculate_metrics     基于成交与净值计算绩效指标（与回测接口一致）
 
 LiveEngine — 内部：数据与网关
     （已移至 DataGateway）
@@ -35,18 +33,15 @@ LiveEngine — 内部：账户与挂单
     （已内联至调用处）
 
 LiveEngine — 内部：Tick
-    _run_strategy               编排：撮合挂单 → 路由 ctx → 信号 → 快照 → 净值 → 翻转处理
-    _append_values_record       追加一条净值记录（与回测 values 形状一致）
+    _run_strategy               编排：撮合挂单 → 路由 ctx → 信号 → 快照 → 翻转处理
     _make_signal_to_order       信号相对上次变化时：撤挂单、下限价、更新 ctx.last_signal
 """
 
 from collections import deque
 from dataclasses import dataclass
-from typing import Deque, Optional, Any, Dict, List, Tuple
+from typing import Deque, Optional, Dict
 
 import pandas as pd
-
-from ..backtest.performance import PerformanceReporter
 from ..core.base import BaseComponent
 from ..strategy.base import BaseStrategy
 from ..gateway.data.base import DataGateway
@@ -91,9 +86,6 @@ class LiveEngine(BaseComponent):
         self.trade_gateway: TradeGateway = trade_gateway
 
         # --- 统计记录 ---
-        # 净值记录列表
-        self._values_records: List[Dict[str, Any]] = []
-
         # 唯一的 per-ticker 状态容器，deque 大小由各策略的 data_size 决定
         self._ticker_contexts: Dict[str, TickerContext] = {
             ticker: TickerContext(strategy=strategy, ticker_datas=deque(maxlen=strategy.data_size))
@@ -128,26 +120,6 @@ class LiveEngine(BaseComponent):
         if not isinstance(self.trade_gateway, PaperTradeGateway):
             return pd.DataFrame()
         return pd.DataFrame(self.trade_gateway.get_trades())
-
-    def get_values_df(self) -> pd.DataFrame:
-        """权益曲线 DataFrame；按 date 去重保留最后一条。"""
-        if not self._values_records:
-            return pd.DataFrame()
-        df = pd.DataFrame(self._values_records)
-        if "date" not in df.columns:
-            return df
-        df = df.drop_duplicates(subset=["date"], keep="last")
-        df = df.sort_values("date").reset_index(drop=True)
-        return df
-
-    def calculate_metrics(self, ticker: str) -> Tuple[pd.DataFrame, Dict[str, Any]]:
-        """由成交与权益计算绩效；接口同 BacktestEngine.calculate_metrics；可在 run 中或结束后调用。"""
-        trades_df = self.get_trades_df()
-        values_df = self.get_values_df()
-        if values_df.empty:
-            return pd.DataFrame(), {}
-        reporter = PerformanceReporter()
-        return reporter.compute(ticker, trades_df, values_df)
 
     # ---------- 内部：Tick ----------
 
@@ -187,31 +159,6 @@ class LiveEngine(BaseComponent):
 
         # 根据信号生成买卖订单
         self._make_signal_to_order(ctx, latest_signal, position, ticker_data)
-
-        # 追加净值记录 TODO 放在这里不太合理，而且用的价格也不太对，后续看下怎么调整
-        self._append_values_record(ticker_data, latest_signal.signal, cash, position)
-
-    def _append_values_record(self,
-                              ticker_data: TickerData,
-                              signal: Signal,
-                              cash: float,
-                              position: int) -> None:
-        """追加一条净值记录，供 get_values_df / calculate_metrics 使用。"""
-        price = ticker_data.price
-        position_value = position * price
-        total_value = cash + position_value
-        prev_total = self._values_records[-1]["total_value"] if self._values_records else total_value
-        daily_pnl = total_value - prev_total
-        self._values_records.append({
-            "date": ticker_data.timestamp,
-            "signal": signal.value,
-            "price": price,
-            "cash": cash,
-            "position": position,
-            "position_value": position_value,
-            "total_value": total_value,
-            "daily_pnl": daily_pnl,
-        })
 
     def _make_signal_to_order(self,
                               ctx: TickerContext,
