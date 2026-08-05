@@ -9,7 +9,7 @@ import time
 from typing import List
 
 from quant.live import LiveEngine
-from quant.gateway.data import BaostockDataGateway
+from quant.gateway.data import DevDataGateway
 from quant.gateway.trade.paper_gateway import PaperTradeGateway
 from quant.strategy.base import BaseStrategy
 from quant.core.models import SignalData, TickerData
@@ -63,7 +63,7 @@ TICKERS = {
 def main():
     engine = LiveEngine(
         ticker_strategies=TICKERS,
-        data_gateway=BaostockDataGateway(),
+        data_gateway=DevDataGateway(),
         trade_gateway=PaperTradeGateway(initial_capital=1_000_000),
     )
     engine.run()

@@ -4,7 +4,7 @@ import sys
 import os
 import time
 
-from quant.gateway.data import BaostockDataGateway
+from quant.gateway.data import DevDataGateway
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
@@ -39,7 +39,7 @@ TICKER = "BTC-USD"
 def main():
     engine = LiveEngine(
         ticker_strategies={TICKER: Every2BarFlipStrategy(name="Every2Flip")},
-        data_gateway=BaostockDataGateway(interval=10.0),
+        data_gateway=DevDataGateway(interval=10.0),
         trade_gateway=PaperTradeGateway(initial_capital=1_000_000),
     )
     engine.run()
