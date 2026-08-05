@@ -9,14 +9,15 @@ from pathlib import Path
 
 class Config:
     """配置管理器。"""
-    
+
     def __init__(self, config_file: str = None):
         """初始化配置。"""
         self.config = self._load_default_config()
         if config_file and os.path.exists(config_file):
             self._load_config_file(config_file)
-    
-    def _load_default_config(self) -> Dict[str, Any]:
+
+    @staticmethod
+    def _load_default_config() -> Dict[str, Any]:
         """加载默认配置。"""
         return {
             "data": {
@@ -33,12 +34,12 @@ class Config:
                 "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
             }
         }
-    
+
     def _load_config_file(self, config_file: str):
         """从文件加载配置。"""
         # 预留：从文件加载配置
         pass
-    
+
     def get(self, key: str, default: Any = None) -> Any:
         """获取配置值。"""
         keys = key.split('.')
@@ -49,7 +50,7 @@ class Config:
             else:
                 return default
         return value
-    
+
     def set(self, key: str, value: Any):
         """设置配置值。"""
         keys = key.split('.')
@@ -59,14 +60,15 @@ class Config:
                 config[k] = {}
             config = config[k]
         config[keys[-1]] = value
-    
+
     def get_cache_dir(self) -> Path:
         """获取缓存目录路径。"""
         project_root = self._get_project_root()
         cache_dir_name = self.get("data.cache_dir", "data")
         return project_root / cache_dir_name
-    
-    def _get_project_root(self) -> Path:
+
+    @staticmethod
+    def _get_project_root() -> Path:
         """通过 setup.py 或 pyproject.toml 定位项目根目录。"""
         current = Path(__file__).resolve()
         # 从 deltafq/core/config.py 向上查找项目根目录
@@ -77,4 +79,3 @@ class Config:
         # 未找到时回退：config.py 向上两级为项目根
         # 正常情况下不会走到这里
         return current.parent.parent.parent
-
