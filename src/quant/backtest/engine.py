@@ -54,7 +54,7 @@ class BacktestEngine(BaseComponent, ABC):
     def run(self, save_results: bool = False) -> None:
         """完整回测流程入口。"""
         # 加载行情数据
-        data = self._load_data()
+        data = self._fetch_data()
         # 运行策略，生成信号
         signals = self._run_strategy(data)
         # 逐 bar 回放
@@ -65,7 +65,7 @@ class BacktestEngine(BaseComponent, ABC):
         if save_results:
             self.save_backtest_results(trades_df, values_df)
 
-    def _load_data(self) -> List[TickerData]:
+    def _fetch_data(self) -> List[TickerData]:
         """加载行情数据。"""
         if not self.ticker or not self.start_date:
             raise ValueError("ticker 和 start_date 不能为空。")
